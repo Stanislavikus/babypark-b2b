@@ -16,6 +16,11 @@ final class MasterOfferMutationException extends RuntimeException
         return new self('Ціна до знижки має бути більшою за поточну ціну продажу.');
     }
 
+    public static function invalidCostPrice(): self
+    {
+        return new self('Собівартість не може бути від’ємною.');
+    }
+
     public static function defaultPriceListUnavailable(): self
     {
         return new self('Основний прайс компанії недоступний або налаштований неоднозначно.');

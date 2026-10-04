@@ -6,12 +6,14 @@ use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
+use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceUser;
 use App\Services\Pricing\PriceResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -32,6 +34,8 @@ final class MasterOfferWorkspaceUiTest extends TestCase
 
     private User $actor;
 
+    private WorkspaceUser $membership;
+
     private PriceList $defaultPriceList;
 
     protected function setUp(): void
@@ -45,11 +49,11 @@ final class MasterOfferWorkspaceUiTest extends TestCase
             'is_active' => true,
         ]);
 
-        $membership = $this->makeWorkspaceMembership($this->workspace, $this->actor);
+        $this->membership = $this->makeWorkspaceMembership($this->workspace, $this->actor);
         $role = $this->createRoleWithPermissions($this->workspace->id, 'Offer UI manager', [
             WorkspacePermissions::MANAGE_PRODUCTS,
         ]);
-        $this->assignRoleToMembership($membership, $role);
+        $this->assignRoleToMembership($this->membership, $role);
 
         $this->defaultPriceList = PriceList::withoutWorkspaceScope()->firstOrCreate(
             [
@@ -201,6 +205,83 @@ final class MasterOfferWorkspaceUiTest extends TestCase
     }
 
     #[Test]
+    public function cost_is_hidden_and_redacted_without_dedicated_permission(): void
+    {
+        [$product, $variant] = $this->productWithVariants([
+            ['sku' => 'NO-COST-PERMISSION'],
+        ]);
+        $variant->update(['cost_price' => '40.00']);
+        $item = $this->priceItem($variant, '100.00');
+
+        $action = TestAction::make('edit_offer')
+            ->schemaComponent('offer_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction($action)
+            ->assertFormFieldHidden('cost_net')
+            ->assertActionDataSet([
+                'expected_item_id' => $item->id,
+                'expected_cost_net' => null,
+                'cost_net' => null,
+                'write_cost' => false,
+            ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewProduct::class, ['record' => $product->getRouteKey()])
+            ->assertSchemaComponentHidden('cost_price_summary', 'infolist')
+            ->assertSchemaComponentHidden('admin_margin', 'infolist');
+    }
+
+    #[Test]
+    public function dedicated_permission_exposes_cost_and_saves_it_with_the_offer(): void
+    {
+        [$product, $variant] = $this->productWithVariants([
+            ['sku' => 'COST-PERMISSION'],
+        ]);
+        $variant->update(['cost_price' => '40.00']);
+        $item = $this->priceItem($variant, '100.00');
+        $this->grantCostPermission();
+
+        $action = TestAction::make('edit_offer')
+            ->schemaComponent('offer_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction($action)
+            ->assertFormFieldVisible('cost_net')
+            ->assertActionDataSet([
+                'expected_item_id' => $item->id,
+                'expected_cost_net' => '40.00',
+                'cost_net' => '40.00',
+                'write_cost' => true,
+            ])
+            ->unmountAction()
+            ->callAction($action, [
+                'variant_id' => (string) $variant->id,
+                'expected_item_id' => $item->id,
+                'expected_regular_net' => '100.00',
+                'expected_sale_net' => null,
+                'expected_cost_net' => '40.00',
+                'write_cost' => true,
+                'effective_vat_rate' => '20.00',
+                'sell_net' => '95.00',
+                'compare_at_net' => '110.00',
+                'cost_net' => '55.00',
+            ])
+            ->assertNotified('Ціну оновлено');
+
+        $this->assertSame('55.00', (string) $variant->fresh()->cost_price);
+        $this->assertSame('110.00', (string) $item->fresh()->price);
+        $this->assertSame('95.00', (string) $item->fresh()->sale_price);
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewProduct::class, ['record' => $product->getRouteKey()])
+            ->assertSchemaComponentVisible('cost_price_summary', 'infolist')
+            ->assertSchemaComponentVisible('admin_margin', 'infolist');
+    }
+
+    #[Test]
     public function source_owned_product_offer_action_is_read_only(): void
     {
         [$product] = $this->productWithVariants([
@@ -244,6 +325,17 @@ final class MasterOfferWorkspaceUiTest extends TestCase
         }
 
         return [$product, ...$created];
+    }
+
+    private function grantCostPermission(): void
+    {
+        $role = $this->createRoleWithPermissions(
+            $this->workspace->id,
+            'Product cost manager',
+            [WorkspacePermissions::MANAGE_PRODUCT_COST],
+        );
+
+        $this->assignRoleToMembership($this->membership, $role);
     }
 
     private function priceItem(

@@ -28,6 +28,8 @@ final class WorkspacePermissions
 
     public const MANAGE_PRODUCTS = 'manage_products';
 
+    public const MANAGE_PRODUCT_COST = 'manage_product_cost';
+
     /**
      * @return list<string>
      */
@@ -46,6 +48,7 @@ final class WorkspacePermissions
             self::MANAGE_SYNC_CONFIGURATIONS,
             self::MANAGE_PRODUCT_STRUCTURE,
             self::MANAGE_PRODUCTS,
+            self::MANAGE_PRODUCT_COST,
         ];
     }
 }

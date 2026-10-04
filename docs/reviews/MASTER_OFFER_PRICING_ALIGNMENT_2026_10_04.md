@@ -65,6 +65,12 @@ The cache remains resolver fallback only. Once a default-list `quantity_min=1` i
 
 COST is written only to `ProductVariant.cost_price`.
 
+**[Resolved — Product Owner approved 2026-10-04]** COST is protected by a dedicated workspace permission `manage_product_cost`. The permission is part of the normal Workspace Access role matrix and is not automatically granted to existing roles. A workspace access administrator may grant it to any merchant-defined role (for example Administrator, B2B Manager, or a future content role) through the existing Roles UI.
+
+The Master Offer writer requires both `manage_products` and `manage_product_cost` when COST is part of the mutation. COST uses stale/CAS protection against the reviewed Variant value and is committed atomically with SELL / COMPARE_AT. If COST authorization is revoked while the form is open, the entire Offer save fails rather than partially saving price.
+
+Users without `manage_product_cost` must not receive COST in the merchant-facing form state and must not see COST or margin-derived values in Product list/view/edit surfaces.
+
 ## VAT
 
 Canonical SELL / COMPARE_AT storage remains net/VAT-exclusive. The Master editor writes net values. Gross values may be shown read-only through existing tax/default presentation. The editor does not create a new gross→net tax contract and does not change item-specific VAT in this slice.

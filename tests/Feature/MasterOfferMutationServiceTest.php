@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceUser;
 use App\Services\Pricing\MasterOfferMutationService;
 use App\Services\Pricing\MasterOfferReadService;
 use App\Services\Pricing\PriceResolver;
@@ -32,6 +33,8 @@ final class MasterOfferMutationServiceTest extends TestCase
 
     private User $actor;
 
+    private WorkspaceUser $membership;
+
     private PriceList $defaultPriceList;
 
     protected function setUp(): void
@@ -45,11 +48,11 @@ final class MasterOfferMutationServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $membership = $this->makeWorkspaceMembership($this->workspace, $this->actor);
+        $this->membership = $this->makeWorkspaceMembership($this->workspace, $this->actor);
         $role = $this->createRoleWithPermissions($this->workspace->id, 'Master offer manager', [
             WorkspacePermissions::MANAGE_PRODUCTS,
         ]);
-        $this->assignRoleToMembership($membership, $role);
+        $this->assignRoleToMembership($this->membership, $role);
 
         $this->defaultPriceList = PriceList::withoutWorkspaceScope()->firstOrCreate(
             [
@@ -304,6 +307,123 @@ final class MasterOfferMutationServiceTest extends TestCase
     }
 
     #[Test]
+    public function cost_is_written_atomically_only_with_dedicated_workspace_permission(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant();
+        $item = $this->priceItem($variant, '100.00');
+        $this->grantCostPermission();
+
+        app(MasterOfferMutationService::class)->setPrice(
+            $this->actor,
+            $this->workspace,
+            $product,
+            $variant,
+            expectedItemId: $item->id,
+            expectedRegularNet: '100.00',
+            expectedSaleNet: null,
+            sellNet: '90.00',
+            compareAtNet: '110.00',
+            writeCost: true,
+            expectedCostNet: '40.00',
+            costNet: '55.00',
+        );
+
+        $this->assertSame('110.00', (string) $item->fresh()->price);
+        $this->assertSame('90.00', (string) $item->fresh()->sale_price);
+        $this->assertSame('55.00', (string) $variant->fresh()->cost_price);
+    }
+
+    #[Test]
+    public function cost_write_without_dedicated_permission_rejects_the_whole_offer_mutation(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant();
+        $item = $this->priceItem($variant, '100.00');
+
+        $this->expectException(AuthorizationException::class);
+
+        try {
+            app(MasterOfferMutationService::class)->setPrice(
+                $this->actor,
+                $this->workspace,
+                $product,
+                $variant,
+                expectedItemId: $item->id,
+                expectedRegularNet: '100.00',
+                expectedSaleNet: null,
+                sellNet: '90.00',
+                compareAtNet: '110.00',
+                writeCost: true,
+                expectedCostNet: '40.00',
+                costNet: '55.00',
+            );
+        } finally {
+            $this->assertSame('100.00', (string) $item->fresh()->price);
+            $this->assertNull($item->fresh()->sale_price);
+            $this->assertSame('40.00', (string) $variant->fresh()->cost_price);
+        }
+    }
+
+    #[Test]
+    public function stale_cost_rejects_price_and_cost_together(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant();
+        $item = $this->priceItem($variant, '100.00');
+        $this->grantCostPermission();
+
+        $variant->update(['cost_price' => '42.00']);
+
+        $this->expectException(MasterOfferMutationException::class);
+        $this->expectExceptionMessage('змінилася');
+
+        try {
+            app(MasterOfferMutationService::class)->setPrice(
+                $this->actor,
+                $this->workspace,
+                $product,
+                $variant,
+                expectedItemId: $item->id,
+                expectedRegularNet: '100.00',
+                expectedSaleNet: null,
+                sellNet: '95.00',
+                compareAtNet: '110.00',
+                writeCost: true,
+                expectedCostNet: '40.00',
+                costNet: '50.00',
+            );
+        } finally {
+            $this->assertSame('100.00', (string) $item->fresh()->price);
+            $this->assertNull($item->fresh()->sale_price);
+            $this->assertSame('42.00', (string) $variant->fresh()->cost_price);
+        }
+    }
+
+    #[Test]
+    public function authorized_cost_editor_can_clear_cost_without_touching_base_price_cache(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant(basePriceCache: '77.00');
+        $item = $this->priceItem($variant, '100.00');
+        $this->grantCostPermission();
+
+        app(MasterOfferMutationService::class)->setPrice(
+            $this->actor,
+            $this->workspace,
+            $product,
+            $variant,
+            expectedItemId: $item->id,
+            expectedRegularNet: '100.00',
+            expectedSaleNet: null,
+            sellNet: '100.00',
+            compareAtNet: null,
+            writeCost: true,
+            expectedCostNet: '40.00',
+            costNet: null,
+        );
+
+        $this->assertNull($variant->fresh()->cost_price);
+        $this->assertSame('77.00', (string) $variant->fresh()->base_price_cache);
+    }
+
+    #[Test]
     public function source_owned_product_is_fail_closed_for_master_price_write(): void
     {
         [$product, $variant] = $this->manualProductWithVariant();
@@ -371,6 +491,17 @@ final class MasterOfferMutationServiceTest extends TestCase
         ]);
 
         return [$product, $variant];
+    }
+
+    private function grantCostPermission(): void
+    {
+        $role = $this->createRoleWithPermissions(
+            $this->workspace->id,
+            'Product cost manager',
+            [WorkspacePermissions::MANAGE_PRODUCT_COST],
+        );
+
+        $this->assignRoleToMembership($this->membership, $role);
     }
 
     private function priceItem(

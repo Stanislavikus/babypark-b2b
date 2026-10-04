@@ -371,3 +371,26 @@ Remaining Offer boundary:
 - `docs/02-ATTRIBUTE_DICTIONARY.md` requires financial fields such as COST to be gated behind a specific managerial permission, but current workspace RBAC has no pricing/cost permission.
 - Product-owner decision required: introduce `manage_product_cost` with no automatic grant (recommended) versus auto-granting it to every role that currently has `manage_products`.
 - SELL / COMPARE_AT implementation does not depend on this choice and is complete.
+
+
+### Checkpoint — Slice 4B permission-gated COST
+
+Product Owner selected **Option A** on 2026-10-04: `cost_price` receives its own assignable workspace permission rather than inheriting `manage_products`.
+
+Implemented locally:
+- canonical `WorkspacePermissions::MANAGE_PRODUCT_COST = manage_product_cost`;
+- UA/RU/EN merchant labels in the existing Workspace Access role matrix;
+- idempotent migration `2026_10_04_150000_add_manage_product_cost_permission.php` materializes the permission and grants it to **no role automatically**;
+- existing `/admin/workspace-access?activeTab=roles` automatically exposes it in Create/Edit Role permissions;
+- Master Offer writes COST only when the user has both `manage_products` and `manage_product_cost`;
+- COST CAS is checked under the same Variant lock and commits atomically with SELL/COMPARE_AT;
+- permission revoke during an open form rejects the whole save;
+- users without the permission receive no COST value in offer form state and do not see Product COST or margin-derived values in edit/view/list surfaces;
+- users with the permission can edit/clear `ProductVariant.cost_price` without changing `base_price_cache`.
+
+Focused evidence:
+- Pint changed PHP files PASS;
+- `git diff --check` PASS;
+- Workspace permission migration + Workspace Access localization + Workspace Authorization + Offer domain/UI + Master shell + PriceResolver + order pricing regression: **61 tests / 457 assertions PASS**, **1 existing skip**.
+
+No new hard-coded business role was introduced. Merchant-facing roles remain configurable through Workspace Access. A future Content Manager role should be created from actual duties using the existing role editor, not encoded into Pricing.

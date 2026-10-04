@@ -67,6 +67,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -185,10 +186,11 @@ class ProductResource extends Resource
                                     ? (app(ProductPricingSummary::class)->formatRrp($record) ?? '—')
                                     : '—'),
                             Placeholder::make('workspace_cost')
-                                ->label('Вхідна ціна')
+                                ->label('Собівартість')
                                 ->content(fn (?Product $record): string => $record
                                     ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
-                                    : '—'),
+                                    : '—')
+                                ->visible(fn (?Product $record): bool => self::canManageProductCost($record)),
                             SchemaActions::make([
                                 self::offerEditorAction(),
                             ])->key('offer_actions')->columnSpanFull(),
@@ -520,9 +522,10 @@ class ProductResource extends Resource
                         ->badge()
                         ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state)),
                     TextEntry::make('cost_price_summary')
-                        ->label('Вхідна ціна')
+                        ->label('Собівартість')
                         ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost()),
                     TextEntry::make('admin_rrp')
                         ->label('РРЦ')
                         ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
@@ -536,7 +539,8 @@ class ProductResource extends Resource
                             Livewire::current()?->marginFormat ?? 'percent'
                         ))
                         ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost()),
                     TextEntry::make('admin_status')
                         ->label('Статус')
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
@@ -714,9 +718,10 @@ class ProductResource extends Resource
                     }),
 
                 TextColumn::make('cost_price_summary')
-                    ->label('Вхідна ціна')
+                    ->label('Собівартість')
                     ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
                     ->placeholder('—')
+                    ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost())
                     ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
@@ -738,6 +743,7 @@ class ProductResource extends Resource
                     ))
                     ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
                     ->placeholder('—')
+                    ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost())
                     ->toggleable(in_array('margin', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
@@ -1118,14 +1124,21 @@ class ProductResource extends Resource
                         $offer = self::offerVariantState($record, $state);
                         $set('expected_item_id', $offer['expected_item_id']);
                         $set('expected_regular_net', $offer['expected_regular_net']);
+                        $canManageCost = self::canManageProductCost($record);
+
                         $set('expected_sale_net', $offer['expected_sale_net']);
+                        $set('expected_cost_net', $canManageCost ? $offer['expected_cost_net'] : null);
                         $set('sell_net', $offer['sell_net']);
                         $set('compare_at_net', $offer['compare_at_net']);
+                        $set('cost_net', $canManageCost ? $offer['cost_net'] : null);
+                        $set('write_cost', $canManageCost);
                         $set('effective_vat_rate', $offer['effective_vat_rate']);
                     }),
                 Hidden::make('expected_item_id'),
                 Hidden::make('expected_regular_net'),
                 Hidden::make('expected_sale_net'),
+                Hidden::make('expected_cost_net'),
+                Hidden::make('write_cost'),
                 Hidden::make('effective_vat_rate'),
                 Placeholder::make('offer_editor_state')
                     ->hiddenLabel()
@@ -1164,6 +1177,17 @@ class ProductResource extends Resource
                         $record,
                         $get('variant_id'),
                     )['editable']),
+                TextInput::make('cost_net')
+                    ->label('Собівартість')
+                    ->numeric()
+                    ->minValue(0)
+                    ->nullable()
+                    ->prefix(fn (Get $get, ?Product $record): string => self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['currency'])
+                    ->helperText('Внутрішня собівартість без ПДВ. Доступна лише ролям з окремим дозволом.')
+                    ->visible(fn (?Product $record): bool => self::canManageProductCost($record)),
                 Placeholder::make('offer_gross_preview')
                     ->label('З ПДВ')
                     ->content(function (Get $get): string {
@@ -1236,12 +1260,23 @@ class ProductResource extends Resource
                         expectedSaleNet: $data['expected_sale_net'] ?? null,
                         sellNet: $data['sell_net'],
                         compareAtNet: $data['compare_at_net'] ?? null,
+                        writeCost: (bool) ($data['write_cost'] ?? false),
+                        expectedCostNet: $data['expected_cost_net'] ?? null,
+                        costNet: $data['cost_net'] ?? null,
                     );
                 } catch (MasterOfferMutationException $exception) {
                     Notification::make()
                         ->warning()
                         ->title('Ціну не змінено')
                         ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                } catch (AuthorizationException) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Ціну не змінено')
+                        ->body('Ваші права на редагування ціни або собівартості змінилися. Оновіть сторінку.')
                         ->send();
 
                     throw new Halt;
@@ -1277,6 +1312,9 @@ class ProductResource extends Resource
      *   expected_sale_net:?string,
      *   sell_net:?string,
      *   compare_at_net:?string,
+     *   expected_cost_net:?string,
+     *   cost_net:?string,
+     *   write_cost:bool,
      *   effective_vat_rate:?string
      * }
      */
@@ -1286,13 +1324,18 @@ class ProductResource extends Resource
         $variantId = array_key_first($options);
         $offer = self::offerVariantState($record, $variantId);
 
+        $canManageCost = self::canManageProductCost($record);
+
         return [
             'variant_id' => $variantId !== null ? (string) $variantId : null,
             'expected_item_id' => $offer['expected_item_id'],
             'expected_regular_net' => $offer['expected_regular_net'],
             'expected_sale_net' => $offer['expected_sale_net'],
+            'expected_cost_net' => $canManageCost ? $offer['expected_cost_net'] : null,
             'sell_net' => $offer['sell_net'],
             'compare_at_net' => $offer['compare_at_net'],
+            'cost_net' => $canManageCost ? $offer['cost_net'] : null,
+            'write_cost' => $canManageCost,
             'effective_vat_rate' => $offer['effective_vat_rate'],
         ];
     }
@@ -1394,6 +1437,34 @@ class ProductResource extends Resource
         }
 
         return app(MasterOfferReadService::class)->state($variant);
+    }
+
+    private static function canManageProductCost(?Product $record): bool
+    {
+        if (! $record instanceof Product) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $workspace->id === (string) $record->workspace_id
+            && self::canManageCurrentWorkspaceProductCost();
+    }
+
+    private static function canManageCurrentWorkspaceProductCost(): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return app(WorkspaceAuthorization::class)->allows(
+            $actor,
+            $workspace,
+            WorkspacePermissions::MANAGE_PRODUCT_COST,
+        );
     }
 
     private static function inventoryEditorAction(): Action

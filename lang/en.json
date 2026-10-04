@@ -753,6 +753,7 @@
     "connectors.ui.layer_a.next_step.preview_permission_required": "Creating a test synchronization requires the appropriate access. Contact an authorized workspace administrator.",
     "workspace_access.permissions.manage_products": "Manage products",
     "workspace_access.permissions.manage_product_structure": "Manage product structure",
+    "workspace_access.permissions.manage_product_cost": "Manage product cost",
     "connectors.ui.layer_a.next_step.open_channel": "Open Magento channel",
     "product_channels.filter.label": "Channel",
     "product_channels.actions.add": "Add to channel",

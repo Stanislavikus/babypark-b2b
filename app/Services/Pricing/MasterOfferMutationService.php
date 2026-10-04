@@ -32,6 +32,9 @@ final class MasterOfferMutationService
         ?string $expectedSaleNet,
         string|float|int $sellNet,
         string|float|int|null $compareAtNet,
+        bool $writeCost = false,
+        ?string $expectedCostNet = null,
+        string|float|int|null $costNet = null,
     ): PriceListItem {
         $sell = $this->normalizeRequiredMoney($sellNet);
         $compareAt = $this->normalizeNullableMoney($compareAtNet);
@@ -46,6 +49,7 @@ final class MasterOfferMutationService
 
         $regular = $compareAt ?? $sell;
         $sale = $compareAt !== null ? $sell : null;
+        $cost = $writeCost ? $this->normalizeNullableCost($costNet) : null;
 
         return DB::transaction(function () use (
             $actor,
@@ -57,6 +61,9 @@ final class MasterOfferMutationService
             $expectedSaleNet,
             $regular,
             $sale,
+            $writeCost,
+            $expectedCostNet,
+            $cost,
         ): PriceListItem {
             $lockedWorkspace = Workspace::query()
                 ->whereKey($workspace->id)
@@ -64,6 +71,13 @@ final class MasterOfferMutationService
                 ->firstOrFail();
 
             if (! $this->authorization->allows($actor, $lockedWorkspace, WorkspacePermissions::MANAGE_PRODUCTS)) {
+                throw new AuthorizationException('This action is unauthorized.');
+            }
+
+            if (
+                $writeCost
+                && ! $this->authorization->allows($actor, $lockedWorkspace, WorkspacePermissions::MANAGE_PRODUCT_COST)
+            ) {
                 throw new AuthorizationException('This action is unauthorized.');
             }
 
@@ -86,6 +100,10 @@ final class MasterOfferMutationService
 
             if (! $lockedVariant instanceof ProductVariant) {
                 throw MasterOfferMutationException::variantUnavailable();
+            }
+
+            if ($writeCost && ! $this->sameMoney($lockedVariant->cost_price, $expectedCostNet)) {
+                throw MasterOfferMutationException::staleOffer();
             }
 
             $priceLists = PriceList::withoutWorkspaceScope()
@@ -139,10 +157,14 @@ final class MasterOfferMutationService
                     'sale_price' => $sale,
                 ]);
 
+                if ($writeCost) {
+                    $lockedVariant->update(['cost_price' => $cost]);
+                }
+
                 return $item->refresh();
             }
 
-            return PriceListItem::withoutWorkspaceScope()->create([
+            $item = PriceListItem::withoutWorkspaceScope()->create([
                 'workspace_id' => $lockedWorkspace->id,
                 'price_list_id' => $priceList->id,
                 'product_variant_id' => $lockedVariant->id,
@@ -154,6 +176,12 @@ final class MasterOfferMutationService
                 'valid_until' => null,
                 'status' => PriceListItemStatus::Active,
             ]);
+
+            if ($writeCost) {
+                $lockedVariant->update(['cost_price' => $cost]);
+            }
+
+            return $item;
         }, 3);
     }
 
@@ -210,6 +238,19 @@ final class MasterOfferMutationService
 
         if (! is_numeric($value)) {
             throw MasterOfferMutationException::invalidCompareAtPrice();
+        }
+
+        return number_format((float) $value, 2, '.', '');
+    }
+
+    private function normalizeNullableCost(string|float|int|null $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_numeric($value) || (float) $value < 0) {
+            throw MasterOfferMutationException::invalidCostPrice();
         }
 
         return number_format((float) $value, 2, '.', '');

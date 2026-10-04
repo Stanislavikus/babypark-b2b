@@ -753,6 +753,7 @@
     "connectors.ui.layer_a.next_step.preview_permission_required": "Для створення пробної синхронізації потрібен відповідний доступ. Зверніться до уповноваженого адміністратора робочого простору.",
     "workspace_access.permissions.manage_products": "Керування товарами",
     "workspace_access.permissions.manage_product_structure": "Керування структурою товарів",
+    "workspace_access.permissions.manage_product_cost": "Керування собівартістю товарів",
     "connectors.ui.layer_a.next_step.open_channel": "Відкрити канал Magento",
     "product_channels.filter.label": "Канал",
     "product_channels.actions.add": "Додати до каналу",
