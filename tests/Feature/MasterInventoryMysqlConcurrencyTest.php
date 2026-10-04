@@ -14,6 +14,7 @@ use App\Models\Stock;
 use App\Models\User;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -35,6 +36,7 @@ final class MasterInventoryMysqlConcurrencyTest extends TestCase
             $this->markTestSkipped('Master Inventory concurrency proof requires MySQL.');
         }
 
+        $this->seed(WorkspaceSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $workspace = $this->defaultWorkspace();
         $actor = User::factory()->create([
