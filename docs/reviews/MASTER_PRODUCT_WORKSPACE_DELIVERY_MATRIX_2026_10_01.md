@@ -18,7 +18,7 @@ between implementation campaigns.
 
 | Capability | Contract / owner | Runtime evidence on develop | Merchant surface | Verification | Status / next seam |
 |---|---|---|---|---|---|
-| Source-neutral manual Product creation | Product Core | nullable source identity + default Variant + Basic Product assignment | Create Product | feature tests + merged foundation | DONE |
+| Source-neutral manual Product creation | Product Core | nullable source identity + default Variant + Basic Product assignment; current campaign adds additive materialization for the already-approved `manage_products` permission after production DB drift was proven | Create Product | feature tests + CreateAction visibility regression | DONE runtime; deployment still requires normal role assignment of `manage_products` |
 | Workspace progressive shell | Product experience | ProductResource sections + right rail | Master Product Workspace | shell tests | DONE; final visual polish pending |
 | Product Type / grouped structure | Product Structure | ProductType, groups, placements, completeness | type/group actions + Characteristics | structure tests | DONE |
 | Governed Product/Variant fields | Field Foundation | FieldDefinition/Binding + governed writers | Product fields action | typed/CAS/stale tests | DONE |

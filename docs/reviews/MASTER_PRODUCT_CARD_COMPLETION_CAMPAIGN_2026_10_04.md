@@ -394,3 +394,54 @@ Focused evidence:
 - Workspace permission migration + Workspace Access localization + Workspace Authorization + Offer domain/UI + Master shell + PriceResolver + order pricing regression: **61 tests / 457 assertions PASS**, **1 existing skip**.
 
 No new hard-coded business role was introduced. Merchant-facing roles remain configurable through Workspace Access. A future Content Manager role should be created from actual duties using the existing role editor, not encoded into Pricing.
+
+
+## Checkpoint — Recovery after chat interruption: Product access + admin width
+
+Factual recovery on 2026-10-04:
+
+- the original campaign worktree survived the chat timeout cleanly;
+- local commits `55a1708` (Master Offer editing) and `459eefa` (permission-gated COST)
+  were recovered, re-tested and pushed to Draft PR #253;
+- deployed application code at `/var/www/babypark-b2b` is current `develop`
+  `d4c93d34317e7596709b8c66a1b5c07329a3e32b`;
+- read-only production DB inspection proved that `workspace_permissions` contains
+  neither `manage_products` nor `manage_product_structure`;
+- therefore the existing `CreateProduct` route/form is hidden by
+  `ProductResource::getCreateAuthorizationResponse()`, which correctly requires
+  effective `manage_products`.
+
+Root cause:
+
+- both permissions were added to the canonical code/seeder catalogue after the
+  original RBAC rollout;
+- the running production database never materialized those later catalogue rows;
+- no fallback to legacy Admin/Director role names is allowed.
+
+Shortest safe correction in this campaign:
+
+- add an idempotent additive migration that materializes the already-approved
+  `manage_products` and `manage_product_structure` permission rows;
+- grant neither permission automatically to a hard-coded role;
+- preserve existing rows/assignments on rollback because migration provenance
+  cannot safely distinguish rows previously materialized by a seeder;
+- continue assigning both permissions through the existing Workspace Access role editor;
+- regression-test that an actor with `manage_products` sees the Product-list Create action.
+
+Admin layout finding:
+
+- Magento `ManageAdobeRemoteCatalog` explicitly uses `Width::Full`;
+- ordinary admin pages inherit Filament's narrower default because the Admin panel
+  had no global max-content-width setting;
+- set only the Admin panel to `Width::Full`, preserving its normal inner padding
+  and leaving the customer Cabinet unchanged.
+
+Verification evidence:
+
+- Product permission migration + Admin width + Product creation + Workspace role UI focused gate:
+  **18 tests / 118 assertions PASS**;
+- combined RBAC + Product creation + Offer/COST + Master shell + PriceResolver + order pricing regression:
+  **80 tests / 577 assertions PASS**;
+- Pint changed PHP files PASS;
+- `git diff --check` PASS;
+- no production DB mutation, deployment or merge was performed.

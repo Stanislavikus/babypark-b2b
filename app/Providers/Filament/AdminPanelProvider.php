@@ -12,6 +12,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -35,6 +36,7 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Brand::primaryColor(),
             ])
             ->viteTheme('resources/css/filament/theme.css')
+            ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(
                 PanelsRenderHook::BODY_END,

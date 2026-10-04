@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
+use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
@@ -89,6 +90,44 @@ class MasterProductDraftCreationTest extends TestCase
             'name' => 'Wrong category product',
             'category_id' => $foreignCategory->id,
         ]);
+    }
+
+    #[Test]
+    public function authorized_workspace_user_sees_create_product_action_on_product_list(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $user = User::query()->create([
+            'name' => 'Product list editor',
+            'email' => 'product-list-editor@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Manager,
+            'is_active' => true,
+        ]);
+
+        $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(ListProducts::class)
+            ->assertActionVisible('create');
+    }
+
+    #[Test]
+    public function legacy_admin_role_without_manage_products_does_not_see_create_product_action(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Legacy admin only',
+            'email' => 'legacy-admin-only@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(ListProducts::class)
+            ->assertActionHidden('create');
     }
 
     #[Test]
