@@ -9,13 +9,17 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\ProductCategoryTreeOptions;
+use App\Support\Workspace\WorkspacePermissions;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class MasterProductCategoryTreeTest extends TestCase
 {
+    use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
 
     private Workspace $workspace;
@@ -26,6 +30,7 @@ class MasterProductCategoryTreeTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->workspace = Workspace::query()->where('is_default', true)->sole();
 
         $this->admin = User::query()->create([
@@ -35,6 +40,12 @@ class MasterProductCategoryTreeTest extends TestCase
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $membership = $this->makeWorkspaceMembership($this->workspace, $this->admin);
+        $role = $this->createRoleWithPermissions($this->workspace->id, 'Category product editor', [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }

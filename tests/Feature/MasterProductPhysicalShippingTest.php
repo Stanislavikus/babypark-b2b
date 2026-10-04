@@ -8,15 +8,19 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Workspace\WorkspacePermissions;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 final class MasterProductPhysicalShippingTest extends TestCase
 {
+    use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
 
     private Workspace $workspace;
@@ -27,11 +31,18 @@ final class MasterProductPhysicalShippingTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->workspace = Workspace::query()->where('is_default', true)->sole();
         $this->admin = User::factory()->create([
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $membership = $this->makeWorkspaceMembership($this->workspace, $this->admin);
+        $role = $this->createRoleWithPermissions($this->workspace->id, 'Physical product editor', [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }

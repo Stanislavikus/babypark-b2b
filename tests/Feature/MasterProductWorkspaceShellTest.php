@@ -58,6 +58,7 @@ class MasterProductWorkspaceShellTest extends TestCase
         ]);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->grantWorkspacePermission(WorkspacePermissions::MANAGE_PRODUCTS);
     }
 
     #[Test]
@@ -471,14 +472,16 @@ class MasterProductWorkspaceShellTest extends TestCase
     {
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
-        $membership = WorkspaceUser::query()->create([
-            'workspace_id' => $this->workspace->id,
-            'user_id' => $this->admin->id,
-            'is_active' => true,
-        ]);
+        $membership = WorkspaceUser::query()->firstOrCreate(
+            [
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->admin->id,
+            ],
+            ['is_active' => true],
+        );
         $role = WorkspaceRole::query()->create([
             'workspace_id' => $this->workspace->id,
-            'name' => 'Workspace structure editor',
+            'name' => 'Workspace permission '.$code,
         ]);
         $permission = WorkspacePermission::query()->where('code', $code)->sole();
 

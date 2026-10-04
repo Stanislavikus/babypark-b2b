@@ -360,7 +360,7 @@ class MasterProductWorkspaceFieldEditingTest extends TestCase
 
         Livewire::actingAs($viewer)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden('edit_product_fields');
+            ->assertForbidden();
     }
 
     /** @return array{Product, ProductVariant, FieldBinding, FieldBinding} */

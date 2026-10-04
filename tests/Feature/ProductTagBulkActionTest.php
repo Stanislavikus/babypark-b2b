@@ -10,14 +10,18 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\TagBulkAssignmentService;
+use App\Support\Workspace\WorkspacePermissions;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class ProductTagBulkActionTest extends TestCase
 {
+    use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
 
     private User $admin;
@@ -28,6 +32,7 @@ class ProductTagBulkActionTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->workspace = Workspace::query()->where('is_default', true)->sole();
 
         $this->admin = User::query()->create([
@@ -38,7 +43,30 @@ class ProductTagBulkActionTest extends TestCase
             'is_active' => true,
         ]);
 
+        $membership = $this->makeWorkspaceMembership($this->workspace, $this->admin);
+        $role = $this->createRoleWithPermissions($this->workspace->id, 'Bulk tag manager', [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
+
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+    }
+
+    public function test_bulk_tag_actions_are_hidden_without_manage_products_permission(): void
+    {
+        $viewer = User::query()->create([
+            'name' => 'Bulk tag viewer',
+            'email' => 'bulk-tag-viewer@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ]);
+        $this->makeWorkspaceMembership($this->workspace, $viewer);
+
+        Livewire::actingAs($viewer)
+            ->test(ListProducts::class)
+            ->assertTableBulkActionHidden('add_tags')
+            ->assertTableBulkActionHidden('remove_tags');
     }
 
     private function createProduct(string $sku, bool $isActive = true): Product

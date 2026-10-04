@@ -1020,6 +1020,7 @@ class ProductResource extends Resource
         return BulkAction::make($name)
             ->label($label)
             ->icon($icon)
+            ->visible(fn (): bool => self::canManageCurrentWorkspaceProducts())
             ->schema([
                 Select::make('tag_ids')
                     ->label('Теги')
@@ -1064,6 +1065,8 @@ class ProductResource extends Resource
                     ->visible(fn (Get $get): bool => filled($get('tag_ids'))),
             ])
             ->action(function (Collection $records, array $data, ListProducts $livewire) use ($operation, $successTitle, $failureTitle): void {
+                abort_unless(self::canManageCurrentWorkspaceProducts(), 403);
+
                 $workspaceId = app(WorkspaceContext::class)->id();
                 $productIds = $livewire->getSelectedTableRecords()->modelKeys();
                 $tagIds = $data['tag_ids'] ?? [];
@@ -2188,19 +2191,35 @@ HTML;
 
     public static function getCreateAuthorizationResponse(): Response
     {
+        return self::canManageCurrentWorkspaceProducts()
+            ? Response::allow()
+            : Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        if (! $record instanceof Product) {
+            return Response::deny();
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $record->workspace_id === (string) $workspace->id
+            && self::canManageCurrentWorkspaceProducts()
+                ? Response::allow()
+                : Response::deny();
+    }
+
+    private static function canManageCurrentWorkspaceProducts(): bool
+    {
         $actor = auth()->user();
 
-        if ($actor instanceof User) {
-            $allowed = app(WorkspaceAuthorization::class)->allows(
+        return $actor instanceof User
+            && app(WorkspaceAuthorization::class)->allows(
                 $actor,
                 app(WorkspaceContext::class)->current(),
                 WorkspacePermissions::MANAGE_PRODUCTS,
             );
-
-            return $allowed ? Response::allow() : Response::deny();
-        }
-
-        return Response::deny();
     }
 
     public static function getDeleteAuthorizationResponse(Model $record): Response

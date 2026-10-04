@@ -445,3 +445,43 @@ Verification evidence:
 - Pint changed PHP files PASS;
 - `git diff --check` PASS;
 - no production DB mutation, deployment or merge was performed.
+
+
+## Checkpoint — Product mutation RBAC blocker
+
+Classification: **BLOCKER — fixed in branch**.
+
+Counterexample / trace found during whole-card merchant-flow audit:
+
+1. The resolved Master Product contract makes `manage_products` the explicit workspace mutation authority.
+2. `ProductResource::getCreateAuthorizationResponse()` already enforced it.
+3. `ProductResource` had no edit authorization response and no ProductPolicy exists.
+4. Filament's resource authorization helper defaults a missing policy ability to allow when strict authorization is not enabled.
+5. Therefore a logged-in Admin-panel actor with no effective `manage_products` could mount `EditProduct` and reach ordinary Master form mutation.
+6. The custom Product-list bulk tag actions also had no `manage_products` visibility/execution gate; their low-level batch service does not take an actor.
+
+Violated invariant:
+
+- **Explicit workspace Product mutation authority = `manage_products`; legacy role names are not authority.**
+
+Minimal fix:
+
+- add `ProductResource::getEditAuthorizationResponse()`;
+- require current-workspace Product ownership plus effective `manage_products`;
+- keep Create on the same shared permission helper;
+- deny legacy Admin-without-permission at the resource boundary;
+- gate Product bulk add/remove tags by the same permission both in visibility and execution;
+- keep channel bulk on its existing `ProductChannelSelectionService` authorization;
+- do not introduce role-name fallbacks or a second Product authorization mechanism.
+
+Regression evidence:
+
+- explicit local Product edit: denied without `manage_products`, allowed after grant;
+- foreign-workspace Product edit: denied even with local permission;
+- direct `EditProduct` mount by legacy Admin without permission: 403;
+- bulk add/remove tags hidden without `manage_products`;
+- source-owned Product read-only tests now grant Product mutation authority first, so they continue testing source authority rather than relying on the old implicit allow;
+- complete Master Product UI regression after fixture alignment:
+  **111 tests / 760 assertions PASS**.
+
+No production mutation, deployment or merge was performed.
