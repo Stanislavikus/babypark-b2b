@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\MediaRole;
 use App\Enums\TagBulkOperation;
+use App\Exceptions\Availability\InventoryMutationException;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
@@ -15,10 +16,14 @@ use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\VariantMedia;
+use App\Models\Workspace;
+use App\Services\Availability\MasterInventoryMutationService;
+use App\Services\Availability\MasterInventoryReadService;
 use App\Services\Catalog\ProductCategoryTreeOptions;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
@@ -38,6 +43,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -49,6 +55,7 @@ use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\IconColumn;
@@ -203,13 +210,8 @@ class ProductResource extends Resource
                                     ? self::inventoryScopeLabel($record)
                                     : '—'),
                             SchemaActions::make([
-                                self::pendingCapabilityAction(
-                                    'edit_inventory',
-                                    'Редагувати залишки',
-                                    'Inventory runtime працює окремо за Variant + Location. Merchant editing/location workflow у Master Workspace ще не підключено.',
-                                    'heroicon-o-archive-box',
-                                ),
-                            ])->key('inventory_pending_actions')->columnSpanFull(),
+                                self::inventoryEditorAction(),
+                            ])->key('inventory_actions')->columnSpanFull(),
                         ])
                         ->columns(2)
                         ->visible(fn (?Product $record): bool => $record !== null),
@@ -1052,6 +1054,229 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
+
+    private static function inventoryEditorAction(): Action
+    {
+        return Action::make('edit_inventory')
+            ->label('Редагувати залишки')
+            ->icon('heroicon-o-archive-box')
+            ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
+            ->tooltip(fn (?Product $record): ?string => self::isSourceOwned($record)
+                ? 'Для товару з джерелом 1С залишок у Master поки доступний лише для перегляду.'
+                : null)
+            ->modalHeading('Залишки товару')
+            ->modalDescription('Змінюється Master-залишок конкретного варіанта. Доступно до продажу враховує тимчасові резерви автоматично.')
+            ->modalSubmitActionLabel('Зберегти залишок')
+            ->fillForm(fn (?Product $record): array => self::inventoryEditorFormState($record))
+            ->schema([
+                Select::make('variant_id')
+                    ->label('Варіант')
+                    ->options(fn (?Product $record): array => self::inventoryVariantOptions($record))
+                    ->required()
+                    ->live()
+                    ->hidden(fn (?Product $record): bool => count(self::inventoryVariantOptions($record)) <= 1)
+                    ->afterStateUpdated(function (mixed $state, Set $set, ?Product $record): void {
+                        $inventory = self::inventoryVariantState($record, $state);
+                        $set('expected_quantity', $inventory['current_quantity']);
+                        $set('new_quantity', $inventory['current_quantity']);
+                    }),
+                Hidden::make('expected_quantity'),
+                Placeholder::make('inventory_editor_state')
+                    ->hiddenLabel()
+                    ->content(function (Get $get, ?Product $record): string {
+                        $inventory = self::inventoryVariantState($record, $get('variant_id'));
+
+                        return $inventory['message'].
+                            ' Поточний залишок: '.$inventory['current_quantity'].' шт. · '.
+                            'Доступно до продажу: '.$inventory['net_available'].' шт.';
+                    }),
+                TextInput::make('new_quantity')
+                    ->label('Новий залишок')
+                    ->numeric()
+                    ->integer()
+                    ->minValue(0)
+                    ->required()
+                    ->suffix('шт.')
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::inventoryVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                TextInput::make('reason')
+                    ->label('Причина')
+                    ->placeholder('Необов’язково')
+                    ->maxLength(255),
+            ])
+            ->action(function (array $data, ?Product $record): void {
+                if (! $record instanceof Product) {
+                    throw new Halt;
+                }
+
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+
+                $variantId = self::inventoryResolvedVariantId($record, $data['variant_id'] ?? null);
+                $variant = ProductVariant::withoutWorkspaceScope()
+                    ->where('workspace_id', $record->workspace_id)
+                    ->where('product_id', $record->id)
+                    ->where('is_active', true)
+                    ->whereKey($variantId)
+                    ->first();
+
+                if (! $variant instanceof ProductVariant) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Варіант уже недоступний')
+                        ->body('Оновіть товар і повторіть дію.')
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $inventory = app(MasterInventoryReadService::class)->state($variant);
+                if (! $inventory['editable']) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Залишок лише для перегляду')
+                        ->body($inventory['message'])
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $workspace = Workspace::query()->findOrFail($record->workspace_id);
+
+                try {
+                    $stock = app(MasterInventoryMutationService::class)->setQuantity(
+                        $actor,
+                        $workspace,
+                        $record,
+                        $variant,
+                        expectedQuantity: (int) ($data['expected_quantity'] ?? -1),
+                        newQuantity: (int) $data['new_quantity'],
+                        reason: $data['reason'] ?? null,
+                    );
+                } catch (InventoryMutationException $exception) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Залишок не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $record->refresh();
+
+                Notification::make()
+                    ->success()
+                    ->title('Залишок оновлено')
+                    ->body('Новий залишок: '.(int) $stock->quantity.' шт.')
+                    ->send();
+            });
+    }
+
+    private static function inventoryResolvedVariantId(Product $record, mixed $requestedVariantId): int
+    {
+        $options = self::inventoryVariantOptions($record);
+
+        if (count($options) === 1) {
+            return (int) array_key_first($options);
+        }
+
+        return is_numeric($requestedVariantId) ? (int) $requestedVariantId : 0;
+    }
+
+    /**
+     * @return array{variant_id:?string,expected_quantity:int,new_quantity:int,reason:null}
+     */
+    private static function inventoryEditorFormState(?Product $record): array
+    {
+        $options = self::inventoryVariantOptions($record);
+        $variantId = array_key_first($options);
+        $inventory = self::inventoryVariantState($record, $variantId);
+
+        return [
+            'variant_id' => $variantId !== null ? (string) $variantId : null,
+            'expected_quantity' => $inventory['current_quantity'],
+            'new_quantity' => $inventory['current_quantity'],
+            'reason' => null,
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function inventoryVariantOptions(?Product $record): array
+    {
+        if (! $record instanceof Product) {
+            return [];
+        }
+
+        $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
+        $options = [];
+
+        foreach ($summary['rows'] as $index => $row) {
+            $parts = array_values(array_filter(
+                $row['options'],
+                static fn (string $value): bool => $value !== '' && $value !== '—',
+            ));
+            $label = $parts !== []
+                ? implode(' · ', $parts)
+                : ($summary['count'] > 1 ? 'Варіант '.($index + 1) : 'Товар');
+
+            if (filled($row['sku'])) {
+                $label .= ' · SKU '.$row['sku'];
+            }
+
+            $options[(string) $row['id']] = $label;
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array{
+     *   editable:bool,
+     *   state:string,
+     *   current_quantity:int,
+     *   net_available:int,
+     *   pending_quantity:int,
+     *   message:string
+     * }
+     */
+    private static function inventoryVariantState(?Product $record, mixed $variantId): array
+    {
+        if (! $record instanceof Product || ! is_numeric($variantId)) {
+            return [
+                'editable' => false,
+                'state' => 'variant_required',
+                'current_quantity' => 0,
+                'net_available' => 0,
+                'pending_quantity' => 0,
+                'message' => 'Оберіть варіант.',
+            ];
+        }
+
+        $variant = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $record->workspace_id)
+            ->where('product_id', $record->id)
+            ->where('is_active', true)
+            ->whereKey((int) $variantId)
+            ->first();
+
+        if (! $variant instanceof ProductVariant) {
+            return [
+                'editable' => false,
+                'state' => 'variant_unavailable',
+                'current_quantity' => 0,
+                'net_available' => 0,
+                'pending_quantity' => 0,
+                'message' => 'Варіант уже недоступний. Оновіть товар.',
+            ];
+        }
+
+        return app(MasterInventoryReadService::class)->state($variant);
+    }
 
     private static function pendingCapabilityAction(
         string $name,

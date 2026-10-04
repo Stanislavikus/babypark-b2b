@@ -251,3 +251,53 @@ Next exact work:
 - verify Characteristics/Variants/Media need composition only and avoid duplicate implementation;
 - inspect Physical/shipping applicability on current frozen fields;
 - perform Price owner preflight before any Price mutation code.
+
+
+## Checkpoint — Slice 2 Master Inventory editing
+
+Completed:
+- Added `MasterInventoryMutationService` as the Master-owned manual adjustment writer over the existing Inventory owner.
+- Added `MasterInventoryReadService` to expose editable/read-only state without duplicating Availability semantics in Filament.
+- Manual/source-neutral Product:
+  - simple Product keeps the internal Variant hidden and edits its stock directly;
+  - configurable Product selects one concrete current Variant and mutates only that Variant;
+  - first edit from zero lazily creates/reuses one safe location according to the frozen contract;
+  - exactly one Stock row is editable only when `Stock.quantity === ProductVariant.available_quantity_cache`;
+  - multiple Stock rows, cache/Stock mismatch, ambiguous default location, and legacy cache-without-Stock are fail-closed/read-only;
+  - every effective change writes one `InventoryRecord(source_type=manual_adjustment)`;
+  - stale expected quantity is rejected atomically.
+- Source-owned / 1C Product keeps Inventory read-only in the Master card until a separate approved authority/writeback contract exists.
+- Added `AvailabilityStatusProjector` and kept the already-existing conservative status behavior: positive allocatable balance -> `in_stock`, zero -> `out_of_stock`; no new low-stock/pre-order policy was invented.
+- Corrected `ReservationConfirmer` inside the approved inventory boundary:
+  - deterministic lock order Variant -> Stock rows -> Reservation;
+  - pending reservation that is already expired by time is rejected;
+  - insufficient allocatable balance is rejected instead of truncated with `max(0)`;
+  - when exactly one Stock row matches the cache it is decremented atomically with cache + ledger;
+  - legacy mismatched Stock stays on the compatibility path and is not silently rewritten.
+
+Evidence:
+- focused SQLite/UI/Availability gate: 23 tests / 102 assertions PASS.
+- broader pre-UI Inventory gate: 23 tests / 98 assertions with only the expected MySQL concurrency skip.
+- real disposable MySQL 8 concurrency proof: 1 test / 18 assertions PASS in 23.999s.
+  - simultaneous manual edits from expected 0 -> exactly one success + one stale;
+  - one Stock, one ledger movement, one internal default location;
+  - simultaneous confirmations of two qty=6 reservations against balance 10 -> one confirmed + one insufficient;
+  - final Stock/cache = 4, one reservation remains pending, no oversell.
+- Pint changed Inventory/UI files PASS.
+- `git diff --check` PASS.
+
+Deliberate boundaries:
+- multi-location mutation remains read-only in Master MVP; no aggregate quantity redistribution was invented.
+- source-owned/1C Inventory mutation remains read-only pending explicit authority.
+- `low_stock` / `pre_order` mutation semantics are not invented.
+- Price remains under the separate PRICE AMBIGUITY HALT below.
+
+### PRICE AMBIGUITY HALT — still open, non-blocking for other slices
+
+Current runtime cannot be mapped to the approved distinct `SELL / COMPARE_AT / COST` roles without an explicit semantic decision:
+- `PriceListItem.price` is regular net price and is itself SELL when `sale_price` is absent;
+- `sale_price` overrides it for effective SELL;
+- `recommended_retail_price_cache` is RRP/reference, not resolved SELL;
+- `base_price_cache` is resolver fallback;
+- `cost_price` is Variant internal cost.
+No newer [Resolved] mapping was found. Price code remains untouched until the requested Sonnet 5 semantic review returns.

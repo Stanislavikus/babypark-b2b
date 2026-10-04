@@ -161,6 +161,119 @@ class AvailabilityServicesTest extends TestCase
         app(ReservationConfirmer::class)->confirm($reservation);
     }
 
+    public function test_reservation_confirmer_rejects_pending_reservation_that_expired_by_time(): void
+    {
+        $variant = $this->createVariantWithCache(10);
+
+        $reservation = Reservation::create([
+            'workspace_id' => $variant->workspace_id,
+            'customer_id' => $this->createCustomer()->id,
+            'variant_id' => $variant->id,
+            'quantity' => 2,
+            'status' => ReservationStatus::Pending,
+            'expires_at' => now()->subMinute(),
+        ]);
+
+        try {
+            app(ReservationConfirmer::class)->confirm($reservation);
+            $this->fail('Expected time-expired pending reservation to be rejected.');
+        } catch (InvalidReservationTransitionException $exception) {
+            $this->assertStringContainsString('expired reservation', $exception->getMessage());
+        }
+
+        $this->assertSame(ReservationStatus::Pending, $reservation->fresh()->status);
+        $this->assertSame(10, $variant->fresh()->available_quantity_cache);
+        $this->assertSame(0, InventoryRecord::query()->where('product_variant_id', $variant->id)->count());
+    }
+
+    public function test_reservation_confirmer_rejects_insufficient_balance_without_truncation(): void
+    {
+        $variant = $this->createVariantWithCache(1);
+
+        $reservation = Reservation::create([
+            'workspace_id' => $variant->workspace_id,
+            'customer_id' => $this->createCustomer()->id,
+            'variant_id' => $variant->id,
+            'quantity' => 2,
+            'status' => ReservationStatus::Pending,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        try {
+            app(ReservationConfirmer::class)->confirm($reservation);
+            $this->fail('Expected insufficient allocatable balance to be rejected.');
+        } catch (InsufficientAvailabilityException $exception) {
+            $this->assertStringContainsString('available 1', $exception->getMessage());
+        }
+
+        $this->assertSame(ReservationStatus::Pending, $reservation->fresh()->status);
+        $this->assertSame(1, $variant->fresh()->available_quantity_cache);
+        $this->assertSame(0, InventoryRecord::query()->where('product_variant_id', $variant->id)->count());
+    }
+
+    public function test_reservation_confirmer_updates_single_stock_cache_and_ledger_atomically(): void
+    {
+        $product = $this->createProductWithStocks([
+            ['name' => 'Main', 'quantity' => 10],
+        ]);
+        $variant = $product->variants->sole();
+        $stock = $variant->stocks->sole();
+
+        $reservation = Reservation::create([
+            'workspace_id' => $variant->workspace_id,
+            'customer_id' => $this->createCustomer()->id,
+            'variant_id' => $variant->id,
+            'quantity' => 4,
+            'status' => ReservationStatus::Pending,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        app(ReservationConfirmer::class)->confirm($reservation);
+
+        $record = InventoryRecord::query()
+            ->where('product_variant_id', $variant->id)
+            ->sole();
+
+        $this->assertSame(ReservationStatus::Confirmed, $reservation->fresh()->status);
+        $this->assertSame(6, $stock->fresh()->quantity);
+        $this->assertSame(6, $variant->fresh()->available_quantity_cache);
+        $this->assertSame(-4, $record->quantity_change);
+        $this->assertSame(6, $record->resulting_quantity);
+        $this->assertSame($stock->inventory_location_id, $record->inventory_location_id);
+        $this->assertSame('Main', $record->location_name_snapshot);
+    }
+
+    public function test_reservation_confirmer_keeps_mismatched_single_stock_on_compatibility_path(): void
+    {
+        $product = $this->createProductWithStocks([
+            ['name' => 'Legacy', 'quantity' => 12],
+        ], availableCache: 10);
+        $variant = $product->variants->sole();
+        $stock = $variant->stocks->sole();
+
+        $reservation = Reservation::create([
+            'workspace_id' => $variant->workspace_id,
+            'customer_id' => $this->createCustomer()->id,
+            'variant_id' => $variant->id,
+            'quantity' => 3,
+            'status' => ReservationStatus::Pending,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        app(ReservationConfirmer::class)->confirm($reservation);
+
+        $record = InventoryRecord::query()
+            ->where('product_variant_id', $variant->id)
+            ->sole();
+
+        $this->assertSame(12, $stock->fresh()->quantity);
+        $this->assertSame(7, $variant->fresh()->available_quantity_cache);
+        $this->assertNull($record->inventory_location_id);
+        $this->assertNull($record->location_name_snapshot);
+        $this->assertSame(-3, $record->quantity_change);
+        $this->assertSame(7, $record->resulting_quantity);
+    }
+
     public function test_reservation_releaser_is_idempotent(): void
     {
         $variant = $this->createVariantWithCache(10);
