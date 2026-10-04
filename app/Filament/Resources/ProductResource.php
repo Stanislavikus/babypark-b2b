@@ -131,13 +131,13 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'import_spreadsheet',
                                     'Імпортувати Excel / CSV',
-                                    'Smart Import із нормалізацією заголовків та запам’ятовуванням mapping уже визначено в архітектурі, але runtime ще не підключено.',
+                                    'Імпорт Excel / CSV із розпізнаванням колонок і запам’ятовуванням відповідностей буде підключено окремо.',
                                     'heroicon-o-table-cells',
                                 ),
                                 self::pendingCapabilityAction(
                                     'fill_from_supplier_document',
                                     'Заповнити з файлу',
-                                    'Автоматичне вилучення характеристик із PDF/документа постачальника буде підключено разом з AI enrichment після обкатки основного Workspace.',
+                                    'Заповнення даних із PDF або документа постачальника буде доступне разом із помічником для обробки файлів.',
                                     'heroicon-o-document-arrow-up',
                                 ),
                             ])->key('basic_capability_actions')->columnSpanFull(),
@@ -145,7 +145,7 @@ class ProductResource extends Resource
                         ->columns(2),
 
                     Section::make('Медіа')
-                        ->description('Один логічний кадр у Workspace; технічні версії для каналів не дублюються в галереї.')
+                        ->description('Тут зберігаються вихідні зображення товару. Версії, підготовлені для окремих каналів, не дублюються в галереї.')
                         ->schema([
                             Placeholder::make('workspace_media')
                                 ->hiddenLabel()
@@ -154,19 +154,19 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'media_enhance',
                                     'Покращити',
-                                    'Покращення буде доступне лише для слабкого Original або явної творчої обробки. Автоматичний pipeline ще не підключено.',
+                                    'Покращення буде доступне для слабких вихідних зображень або коли потрібна свідома творча обробка.',
                                     'heroicon-o-sparkles',
                                 ),
                                 self::pendingCapabilityAction(
                                     'media_remove_background',
                                     'Видалити фон',
-                                    'Обробка фону є pixel-transform і буде підключена окремим media-processing runtime.',
+                                    'Автоматичне видалення або заміна фону буде підключено окремо.',
                                     'heroicon-o-photo',
                                 ),
                                 self::pendingCapabilityAction(
                                     'media_prepare_channel',
                                     'Підготувати для каналу',
-                                    'Формат, розмір, фон і metadata повинні визначатися destination profile. Загальний channel-artifact runtime ще не підключено.',
+                                    'Підготовка формату, розміру, фону та супровідних даних під вимоги конкретного каналу буде підключена окремо.',
                                     'heroicon-o-paper-airplane',
                                 ),
                             ])->key('media_pending_actions'),
@@ -310,7 +310,7 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'enrich_characteristics_from_file',
                                     'Заповнити характеристики з файлу',
-                                    'PDF/документ/зображення постачальника буде evidence для AI proposals. Автоматичне розкладання по полях підключимо разом з AI-модулем.',
+                                    'Автоматичне перенесення характеристик із PDF, документа або зображення постачальника буде підключено разом із AI-помічником.',
                                     'heroicon-o-document-text',
                                 ),
                             ])->key('characteristics_pending_actions'),
@@ -318,7 +318,7 @@ class ProductResource extends Resource
                         ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('SEO та пошук')
-                        ->description('Модуль показано для візуальної обкатки. Підключення keyword research, AI-content та SEO workflow виконаємо останнім.')
+                        ->description('Розділ показано для візуальної обкатки. Пошук ключових слів, AI-опис і аналіз пошуку підключимо на фінальному етапі.')
                         ->schema([
                             Placeholder::make('seo_connection_state')
                                 ->hiddenLabel()
@@ -359,19 +359,19 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'seo_keywords',
                                     'Отримати ключові слова',
-                                    'Search Brief і keyword provider навмисно відкладені до фінального SEO-модуля.',
+                                    'Пошук і підбір ключових слів буде доступний після підключення фінального SEO-модуля.',
                                     'heroicon-o-magnifying-glass',
                                 ),
                                 self::pendingCapabilityAction(
                                     'seo_ai_description',
                                     'Створити опис з AI',
-                                    'AI content proposal буде review-first і підключиться після обкатки основного Workspace.',
+                                    'AI зможе підготувати опис для перевірки перед збереженням після підключення фінального модуля.',
                                     'heroicon-o-sparkles',
                                 ),
                                 self::pendingCapabilityAction(
                                     'seo_performance',
                                     'Аналіз пошуку',
-                                    'GSC / Merchant / marketplace performance agent буде окремим фінальним SEO workflow.',
+                                    'Аналіз даних Google Search Console, Merchant Center і маркетплейсів буде підключено окремим фінальним етапом.',
                                     'heroicon-o-chart-bar',
                                 ),
                             ])->key('seo_pending_actions'),
@@ -481,7 +481,7 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'product_associations',
                                     'Related / Upsell / Cross-sell',
-                                    'Adobe V1 capability проінвентаризовано, але ProductAssociation runtime та merchant editor ще не підключені.',
+                                    'Редагування пов’язаних, рекомендованих і супутніх товарів для Magento буде підключено окремо.',
                                     'heroicon-o-link',
                                 ),
                             ])->key('channel_capability_actions'),

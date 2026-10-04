@@ -173,6 +173,70 @@ class MasterProductWorkspaceShellTest extends TestCase
     }
 
     #[Test]
+    public function pending_capability_copy_hides_internal_implementation_terms(): void
+    {
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => null,
+            'sku' => 'MERCHANT-COPY-001',
+            'name' => 'Merchant copy product',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'MERCHANT-COPY-001',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        $pendingActions = [
+            ['import_spreadsheet', 'basic_capability_actions'],
+            ['fill_from_supplier_document', 'basic_capability_actions'],
+            ['media_enhance', 'media_pending_actions'],
+            ['media_remove_background', 'media_pending_actions'],
+            ['media_prepare_channel', 'media_pending_actions'],
+            ['enrich_characteristics_from_file', 'characteristics_pending_actions'],
+            ['seo_keywords', 'seo_pending_actions'],
+            ['seo_ai_description', 'seo_pending_actions'],
+            ['seo_performance', 'seo_pending_actions'],
+            ['product_associations', 'channel_capability_actions'],
+        ];
+
+        $forbidden = [
+            'runtime',
+            'mapping',
+            'pipeline',
+            'pixel-transform',
+            'destination profile',
+            'metadata',
+            'evidence',
+            'proposals',
+            'keyword provider',
+            'content proposal',
+            'performance agent',
+            'ProductAssociation',
+            'merchant editor',
+            'SEO workflow',
+            'AI enrichment',
+        ];
+
+        foreach ($pendingActions as [$name, $component]) {
+            $livewire = Livewire::actingAs($this->admin)
+                ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+                ->mountAction(TestAction::make($name)->schemaComponent($component))
+                ->assertActionMounted(TestAction::make($name)->schemaComponent($component))
+                ->assertSee('Чекає на підключення');
+
+            foreach ($forbidden as $term) {
+                $livewire->assertDontSee($term, false);
+            }
+        }
+    }
+
+    #[Test]
     public function deferred_seo_fields_are_not_saved_from_master_workspace(): void
     {
         $product = Product::withoutWorkspaceScope()->create([

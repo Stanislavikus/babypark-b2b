@@ -485,3 +485,51 @@ Regression evidence:
   **111 tests / 760 assertions PASS**.
 
 No production mutation, deployment or merge was performed.
+
+
+## Checkpoint — integrated simple/configurable merchant journeys + copy pass
+
+Integrated application-flow evidence is now explicit rather than inferred from isolated section tests.
+
+Simple Product journey:
+
+- create a source-neutral Product through the real Filament Create Product page;
+- edit category, brand, merchant type, tags and physical/package facts through the Master form;
+- upload Product Media through the real media action;
+- write SELL / COMPARE_AT / permission-gated COST through the real Offer action;
+- write Inventory through the real Inventory action;
+- prove the hidden default Variant remains merchant-invisible while its offer/inventory state is updated;
+- verify ProductMedia, PriceListItem, Variant COST, Stock/cache and manual-adjustment InventoryRecord persistence.
+
+Configurable Product journey:
+
+- create through the same Product entry point;
+- promote the existing simple Variant through the real Variant action;
+- prove the original immutable VariantID is preserved;
+- upload common Product Media;
+- assign that existing asset as Variant Media to one concrete Variant through the real authoring action;
+- write Offer/COST and Inventory only to that selected Variant;
+- prove the sibling Variant receives no PriceListItem, Stock or VariantMedia side effect.
+
+Evidence:
+
+- focused connected journeys: **2 tests / 97 assertions PASS**;
+- full Master Product UI regression including both journeys:
+  **113 tests / 857 assertions PASS**;
+- this is application-level Livewire/Filament evidence, not a claim of deployed-browser visual acceptance.
+
+Merchant-copy pass:
+
+- retained every approved pending capability and the explicit **«Чекає на підключення»** state;
+- removed implementation vocabulary from user-facing explanations:
+  `runtime`, `mapping`, `pipeline`, `pixel-transform`, `destination profile`,
+  `metadata`, `evidence/proposals`, provider/workflow internals and ProductAssociation implementation terms;
+- rewrote the copy as ordinary merchant outcomes without changing capability scope or implementation state;
+- regression mounts all pending-action modals and proves the selected internal implementation terms are absent;
+- copy + journey gate: **11 tests / 359 assertions PASS**.
+
+Visual-evidence boundary:
+
+- the current connected Remote Desktop/repository tool stack exposes no browser/screenshot runner;
+- `composer.json` contains no Dusk/Playwright browser suite;
+- therefore final deployed visual/design acceptance remains a separate Product Owner gate and is not inferred from Livewire rendering tests.

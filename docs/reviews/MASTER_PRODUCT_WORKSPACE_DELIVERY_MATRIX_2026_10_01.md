@@ -57,8 +57,8 @@ between implementation campaigns.
 | Entity resolution before inbound authority | Identity / Authority | connector Entity Trust exists; universal inbound flow absent | connector-specific | certified Magento evidence | PARTIAL |
 | Import entry point converging on Master | Product creation | workspace_import_aliases exists; universal spreadsheet runtime absent | #251 visible Excel/CSV Smart Import pending action | pending modal + zero-mutation test | PARTIAL surface only; runtime remains a later non-AI import campaign |
 | Create with AI entry point converging on Master | Product creation / AI | absent | absent | absent | NOT STARTED |
-| Final integrated merchant E2E | Whole Workspace | individual slices only | incomplete | not yet run | NOT STARTED |
-| Final visual/design acceptance | UX | preliminary direction frozen | intentionally pending | product-owner visual review | INTENTIONALLY DEFERRED until functional coverage |
+| Final integrated merchant E2E | Whole Workspace | connected simple + configurable Master flows now exercise real Create/Edit/Media/Variant/Offer/Inventory surfaces in one stateful journey | Livewire-rendered Master Product Card | 2 journey tests / 97 assertions plus combined Master UI gate 113 tests / 857 assertions PASS | DONE for integrated application flow; deployed browser/visual acceptance remains separate |
+| Final visual/design acceptance | UX | functional coverage is now sufficient; Admin panel width and merchant copy were corrected in the current campaign | Product Card on deployed browser | current tool/repo stack has no browser screenshot runner; Product Owner visual review remains required after candidate deployment | PENDING real visual acceptance; do not infer it from Livewire tests |
 
 ## Current campaign pointer
 
