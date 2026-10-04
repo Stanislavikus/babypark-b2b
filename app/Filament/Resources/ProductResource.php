@@ -13,11 +13,13 @@ use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\VariantMedia;
+use App\Services\Catalog\ProductCategoryTreeOptions;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
@@ -357,8 +359,12 @@ class ProductResource extends Resource
                     Section::make('Організація')
                         ->schema([
                             Select::make('category_id')
-                                ->label('Внутрішня категорія')
+                                ->label('Категорія')
                                 ->relationship(name: 'category', titleAttribute: 'name')
+                                ->getOptionLabelFromRecordUsing(
+                                    fn (Category $record): string => app(ProductCategoryTreeOptions::class)->label($record)
+                                )
+                                ->helperText('Показано повний шлях: батьківська категорія › підкатегорія.')
                                 ->searchable()
                                 ->preload(),
                             TextInput::make('brand')

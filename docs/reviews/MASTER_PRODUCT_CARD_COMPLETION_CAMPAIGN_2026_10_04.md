@@ -190,3 +190,64 @@ Next exact work:
 Current blockers: **none**.
 
 Latest test evidence for this branch: none yet — branch starts at verified `develop`.
+
+
+## Phase 0 factual gap audit — 2026-10-04
+
+| Capability | Current UI on campaign base | Runtime owner | Concrete gap | Risk / path |
+|---|---|---|---|---|
+| Basic | editable name/description plus identifiers | Product / governed column writers | composition/polish only | GREEN/YELLOW; reuse |
+| Classification | Category/Brand/Tags/Product Type in Organization rail | Product relation/columns, TagManager, Product Structure | Category is a flat Select; hierarchy context is missing | YELLOW; hierarchy-aware selector over existing Category owner |
+| Characteristics | grouped completeness + governed field editor | FieldDefinition/FieldBinding + governed writers | composition only | YELLOW; reuse |
+| Variants | explicit axes/variants actions and summary | ProductVariantStructureService | composition only | YELLOW; reuse |
+| Product Media | add/reorder/remove common Originals | ProductMedia services | processing intentionally deferred | YELLOW; reuse |
+| Variant Media | #252 authoring/read services + drawer | VariantMediaReadService / VariantMediaMutationService | delivery matrix is stale; no redesign needed | YELLOW; reuse |
+| Price | read-only summary + pending edit action | PriceResolver / PriceList / PriceListItem / pricing owners | merchant mutation owner must be proven, including base_price_cache fallback and COST | ORANGE preflight; halt if ambiguous |
+| Inventory | read-only availability + pending edit action | AvailabilityResolver / Stock / InventoryRecord / Reservation writers | merchant mutation missing | ORANGE; frozen contract above |
+| Physical/shipping | existing Product columns editable for local/manual products | Product Core columns + existing authority rule | applicability/presentation polish remains | YELLOW; do not invent new shipping domain |
+| Right rail | Status/Organization/Data quality/Channels/Attention exists | Product summary + connector readiness | final composition/actionability polish | YELLOW |
+| SEO / Search Brief / AI | visible read-only/pending | deferred | intentionally excluded | deferred |
+| Import | pending action only | deferred Smart Import | intentionally excluded | deferred |
+
+### Phase 0 findings
+
+- Canonical Master `Category` has `workspace_id`, `name`, `parent_id` and stock-display threshold; it has no active/removed lifecycle field.
+- Provider/Magento category catalogue lifecycle must not be promoted into Master Category semantics.
+- No existing Master Category tree/drawer exists. `CategoryResource` is a flat administrative list and Product Workspace currently uses a flat relationship Select.
+- Therefore Slice 1 will expose full Workspace Category hierarchy by ancestor-aware labels/options over the existing relation. It will not create another Category owner or new lifecycle state.
+- Variant Media is already implemented by merged #252; only composition/reuse is allowed.
+- Delivery matrix row for Variant Media is stale and must be corrected during this campaign.
+
+### PRE-CODE ARCHITECTURAL ALIGNMENT
+
+* **Task Type:** UI business logic / catalog presentation over existing relations; later pricing and availability services under separately frozen contracts.
+* **Docs Checked:** `00-WHY.md`, `01-PRODUCT_VISION.md` progressive disclosure/readiness sections, `02-ATTRIBUTE_DICTIONARY.md` Product Fields/assignment/readiness sections, `03-DOMAIN_MODEL.md` Product Catalogue/Pricing/Availability and [Resolved] availability sections, `04-ARCHITECTURE_PRINCIPLES.md` 5-Layer Filter + mandates/checklist, `05-AI_WORKING_AGREEMENT.md`, Master Workspace contract/matrix, Product Media and Variant Media contracts.
+* **Affected Domain Contexts:** Product Catalogue, Attribute Dictionary, Pricing, Availability, Connectors (regression boundary only), Workspace.
+* **Primary Sources & Standards:** not required for Slice 1 because no external/provider semantics are introduced; current approved repo docs/code are authoritative.
+* **Architecture Checklist Result:** workspace isolation preserved; no new Product columns/fields; Product/Variant separation preserved; no Product God Object; hidden default Variant untouched; AvailabilityResolver remains net-stock reader; connector logic remains isolated; no client hardcoding; technical terms remain hidden; Filament validation standard remains unchanged.
+* **Architecture Risks Identified:** cross-workspace Category leakage, duplicate Category ownership, accidental provider lifecycle leakage into Master, later Price/Inventory authority/concurrency risk.
+* **Chosen Technical Approach:** reuse canonical Category relation and add a workspace-scoped hierarchy projection for merchant labels; later reuse existing Price/Inventory owners only after their gates.
+* **Non-Technical Simplicity Check:** merchant sees ordinary Category hierarchy/path, not remote IDs, provider catalogue state, EAV, resolver/cache/ledger terminology.
+* **Stop & Amend Required:** No for Slice 1. Price retains its explicit ambiguity gate; Inventory uses the frozen contract above.
+
+
+## Checkpoint — Slice 1 Classification hierarchy
+
+Completed:
+- Phase 0 factual gap audit and Strict Alignment gate.
+- Added workspace-scoped `ProductCategoryTreeOptions` projection.
+- Master Category selector now shows full ancestor path and retains canonical `Product.category_id` ownership.
+- Cross-workspace category selection remains rejected by the existing relationship field validation.
+- No Master active/removed Category lifecycle was invented; provider category lifecycle stays provider-owned.
+- Delivery Matrix corrected for merged #252 Variant Media and current campaign pointer.
+
+Evidence:
+- `MasterProductCategoryTreeTest`: 3 tests / 16 assertions PASS.
+- Combined Classification + Master shell run: 25 tests / 151 assertions, exit code 0.
+- Pint changed PHP files PASS.
+- `git diff --check` PASS.
+
+Next exact work:
+- verify Characteristics/Variants/Media need composition only and avoid duplicate implementation;
+- inspect Physical/shipping applicability on current frozen fields;
+- perform Price owner preflight before any Price mutation code.

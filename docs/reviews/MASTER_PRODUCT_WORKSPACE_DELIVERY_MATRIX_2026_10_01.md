@@ -24,7 +24,7 @@ between implementation campaigns.
 | Governed Product/Variant fields | Field Foundation | FieldDefinition/Binding + governed writers | Product fields action | typed/CAS/stale tests | DONE |
 | Explicit variant families | Product Core / Structure | ProductVariantAxis + structure service | Add variants / option / variant | 20 focused tests + MySQL full gate | DONE |
 | Immutable Variant identity during promotion | Product Core | existing Variant row preserved | hidden from merchant | focused regression | DONE |
-| Classification: Category / Brand / Tags / Product Type | Product Core | current canonical fields + ProductType | Organization rail | existing feature tests | PARTIAL; category UX/tree and final polish remain |
+| Classification: Category / Brand / Tags / Product Type | Product Core | current canonical fields + ProductType; Master Card campaign adds workspace-scoped ancestor-aware Category labels | Organization rail | classification + Master category-tree feature tests | PARTIAL; hierarchy-aware Category selection implemented in current campaign, final whole-card polish remains |
 | Offer presentation | Offer | PriceResolver / ProductPricingSummary | Price section read-only | pricing suite | PARTIAL; Master editing workflow remains |
 | Inventory presentation | Inventory & Fulfillment | AvailabilityResolver | Inventory section read-only | availability suite | PARTIAL; Master editing/location workflow remains |
 | Physical/shipping facts | Product Core / Fulfillment | current governed columns | collapsible section | current Product tests | PARTIAL; applicability/policy remains |
@@ -32,7 +32,7 @@ between implementation campaigns.
 | Media Original preservation | Media Policy v1 | #249 stores uploaded Original bytes without resize/re-encode; reusable workspace asset identity | Add media | MySQL #536 + upload/storage/hash tests PASS | PARTIAL; external ingest and real-target validation remain |
 | Media ingest diagnosis | Media Policy v1 | #249 records MIME, bytes, dimensions, hash and diagnosis envelope | normal gallery hides engineering details | focused tests | PARTIAL; weak-source/effective-quality diagnosis remains |
 | Product media associations / order / primary | Content & Assets | #249 ProductMedia, explicit sort, primary=position 0, common locale fallback | gallery + reorder/remove | MySQL #536 + Livewire/stale/order tests PASS | DONE for common Product gallery foundation |
-| Variant-specific media | Content & Assets | #249 VariantMedia persistence + isolation; not mixed into Magento Product media | no authoring UI yet | connector regression | PARTIAL; variant authoring/presentation remains |
+| Variant-specific media | Content & Assets | #249 persistence/isolation + #252 association uniqueness, read/mutation services and explicit-primary semantics; not mixed into Magento Product media | reusable Variant Media assignment drawer + row-state presentation | MySQL #549 + focused VariantMedia/UI + Magento media regression PASS | DONE for Master authoring foundation; processing/channel-specific media remains separate |
 | Semantic derivative lineage | Media Policy v1 | #249 parent_media_asset_id; gallery rejects derivative rows | not merchant-facing yet | lineage/original guard tests | PARTIAL; Improve/processing pipeline not implemented |
 | Transform only on destination or explicit intent | Media Policy v1 | no transform is performed on ingest | no transform UI yet | Original upload regression | PARTIAL; destination/Improve transforms remain |
 | Perceptual-quality optimization | Media Policy v1 | policy frozen; no optimizer runtime yet | absent | absent | NOT STARTED |
@@ -64,4 +64,5 @@ between implementation campaigns.
 
 Completed campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis — merged at `0578629fd4880cf16022409eb9af2689a7b810ee`; MySQL #536 PASS (3678 tests / 83,856 assertions).
 Completed campaign: PR #251 — expose and exercise the full non-SEO Master Product Workspace — merged at `dfa9a44bacc86b58f881063f242fa871bb399238`; MySQL #540 PASS (3681 tests / 83,890 assertions).
-Current campaign: PR #252 — Master Variant Media authoring. Contract frozen in `MASTER_VARIANT_MEDIA_AUTHORING_IMPLEMENTATION_CONTRACT_2026_10_03.md`; implementation will add locale-aware association uniqueness, VariantMedia read/mutation services, and one reusable media-first assignment drawer while preserving current Magento Product media export.
+Completed campaign: PR #252 — Master Variant Media authoring — merged at `d4c93d34317e7596709b8c66a1b5c07329a3e32b`; MySQL #549 PASS (3701 tests / 84,035 assertions).
+Current campaign: `feat/master-product-card-completion` — complete the approved non-SEO Master Product Card in one campaign; durable control/resume state lives in `MASTER_PRODUCT_CARD_COMPLETION_CAMPAIGN_2026_10_04.md`.
