@@ -30,4 +30,9 @@ final class AdobeProductClassificationException extends RuntimeException
     {
         return new self('At least one external Magento category is required for an explicit Product category override.');
     }
+
+    public static function categoryUnavailable(): self
+    {
+        return new self('One or more Magento categories are unavailable, inactive, missing, or structural-only.');
+    }
 }

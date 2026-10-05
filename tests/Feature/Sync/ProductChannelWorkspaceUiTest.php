@@ -15,6 +15,9 @@ use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\AdobeProductAttributeSet;
+use App\Models\AdobeProductAttributeSetOverride;
+use App\Models\AdobeProductCategory;
+use App\Models\AdobeProductCategoryOverride;
 use App\Models\AdobeProductTypeAttributeSetDefault;
 use App\Models\Category;
 use App\Models\ConnectorCategoryMapping;
@@ -26,6 +29,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
+use App\Services\Sync\AdobeProductClassificationReadService;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Sync\SyncDataSetupLandingService;
 use App\Services\Sync\SyncProductSelectionService;
@@ -228,6 +232,183 @@ class ProductChannelWorkspaceUiTest extends TestCase
                 ManageAdobeProductsChannel::getUrl(['account' => $account->id]),
             )
             ->assertActionShouldOpenUrlInNewTab($action);
+    }
+
+    #[Test]
+    public function master_card_magento_editor_overrides_and_resets_to_automatic_classification_without_changing_master(): void
+    {
+        $this->grantExactWorkspacePermissions($this->workspace, $this->actor, [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            WorkspacePermissions::RUN_SYNC_PREVIEW,
+        ]);
+
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+        $configuration = $this->createProductsExportConfiguration($account->id);
+
+        $masterCategory = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Master strollers',
+        ]);
+        $product = $this->createProduct('MASTER-MAGENTO-EDITOR', [
+            'category_id' => $masterCategory->id,
+        ]);
+        $originalProductTypeId = $product->product_type_id;
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'MASTER-MAGENTO-EDITOR',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        $source = app(ConnectorDiscoverySourceResolver::class)->resolve($account);
+        $setA = AdobeProductAttributeSet::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $source->id,
+            'provider_attribute_set_id' => 4,
+            'name' => 'Default',
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
+        ]);
+        $setB = AdobeProductAttributeSet::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $source->id,
+            'provider_attribute_set_id' => 9,
+            'name' => 'Strollers',
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
+        ]);
+
+        foreach ([
+            ['id' => '12', 'name' => 'Strollers'],
+            ['id' => '13', 'name' => 'Travel strollers'],
+        ] as $category) {
+            AdobeProductCategory::withoutWorkspaceScope()->create([
+                'workspace_id' => $this->workspace->id,
+                'connector_account_id' => $account->id,
+                'external_category_id' => $category['id'],
+                'parent_external_category_id' => '2',
+                'name' => $category['name'],
+                'provider_path' => '1/2/'.$category['id'],
+                'breadcrumb' => 'Baby > '.$category['name'],
+                'level' => 2,
+                'position' => 1,
+                'is_active' => true,
+                'first_seen_at' => now(),
+                'last_seen_at' => now(),
+                'missing_since' => null,
+            ]);
+        }
+
+        ConnectorCategoryMapping::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'category_id' => $masterCategory->id,
+            'external_category_id' => '12',
+        ]);
+
+        AdobeProductTypeAttributeSetDefault::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_type_id' => $product->product_type_id,
+            'adobe_product_attribute_set_id' => $setA->id,
+        ]);
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        $action = TestAction::make('configure_magento')
+            ->schemaComponent('channel_capability_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertActionVisible($action)
+            ->mountAction($action)
+            ->assertActionDataSet(fn (array $data): bool => (
+                ($data['account_id'] ?? null) === $account->id
+                && ($data['category_mode'] ?? null) === 'automatic'
+                && ($data['category_ids'] ?? null) === ['12']
+                && ($data['attribute_set_mode'] ?? null) === 'automatic'
+                && ($data['attribute_set_id'] ?? null) === $setA->id
+            ))
+            ->unmountAction()
+            ->callAction($action, [
+                'account_id' => $account->id,
+                'category_mode' => 'override',
+                'category_ids' => ['13'],
+                'attribute_set_mode' => 'override',
+                'attribute_set_id' => $setB->id,
+            ])
+            ->assertNotified('Magento класифікацію збережено');
+
+        $this->assertDatabaseHas('adobe_product_category_overrides', [
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_category_id' => '13',
+        ]);
+        $this->assertDatabaseHas('adobe_product_attribute_set_overrides', [
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'adobe_product_attribute_set_id' => $setB->id,
+        ]);
+
+        $override = app(AdobeProductClassificationReadService::class)->resolve($account, $product->fresh());
+        $this->assertSame(['13'], $override->externalCategoryIds);
+        $this->assertSame('product_override', $override->categorySource);
+        $this->assertSame($setB->id, $override->adobeProductAttributeSetId);
+        $this->assertSame('product_override', $override->attributeSetSource);
+
+        $product->refresh();
+        $this->assertSame($masterCategory->id, $product->category_id);
+        $this->assertSame($originalProductTypeId, $product->product_type_id);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->callAction($action, [
+                'account_id' => $account->id,
+                'category_mode' => 'automatic',
+                'category_ids' => ['13'],
+                'attribute_set_mode' => 'automatic',
+                'attribute_set_id' => $setB->id,
+            ])
+            ->assertNotified('Magento класифікацію збережено');
+
+        $this->assertFalse(AdobeProductCategoryOverride::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('connector_account_id', $account->id)
+            ->where('product_id', $product->id)
+            ->exists());
+        $this->assertFalse(AdobeProductAttributeSetOverride::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('connector_account_id', $account->id)
+            ->where('product_id', $product->id)
+            ->exists());
+
+        $automatic = app(AdobeProductClassificationReadService::class)->resolve($account, $product->fresh());
+        $this->assertSame(['12'], $automatic->externalCategoryIds);
+        $this->assertSame('category_mapping', $automatic->categorySource);
+        $this->assertSame($setA->id, $automatic->adobeProductAttributeSetId);
+        $this->assertSame('product_type_default', $automatic->attributeSetSource);
+
+        $product->refresh();
+        $this->assertSame($masterCategory->id, $product->category_id);
+        $this->assertSame($originalProductTypeId, $product->product_type_id);
     }
 
     #[Test]

@@ -35,6 +35,7 @@ use App\Services\Pricing\MasterOfferReadService;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Services\Sync\ProductChannelReadinessReadService;
+use App\Services\Sync\ProductMagentoClassificationEditor;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
@@ -42,6 +43,7 @@ use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\Workspace\WorkspaceContext;
+use App\Support\Sync\Exceptions\AdobeProductClassificationException;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -49,6 +51,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -61,6 +64,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -487,6 +491,7 @@ class ProductResource extends Resource
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildChannelWorkspaceHtml($record)),
                             SchemaActions::make([
+                                self::magentoClassificationAction(),
                                 Action::make('open_magento_v1')
                                     ->label('Відкрити Magento V1')
                                     ->icon('heroicon-o-arrow-top-right-on-square')
@@ -1700,6 +1705,222 @@ class ProductResource extends Resource
         }
 
         return app(MasterInventoryReadService::class)->state($variant);
+    }
+
+    private static function magentoClassificationAction(): Action
+    {
+        return Action::make('configure_magento')
+            ->label('Налаштувати Magento')
+            ->icon('heroicon-o-adjustments-horizontal')
+            ->color('primary')
+            ->slideOver()
+            ->modalWidth(Width::Large)
+            ->modalHeading('Magento · класифікація товару')
+            ->modalDescription('Master-дані не дублюються. Тут змінюються лише Magento Category та Attribute Set для вибраного каналу.')
+            ->modalSubmitActionLabel('Зберегти Magento')
+            ->visible(fn (?Product $record): bool => self::canManageMagentoClassification($record))
+            ->fillForm(function (?Product $record): array {
+                if (! $record instanceof Product) {
+                    return [];
+                }
+
+                $editor = app(ProductMagentoClassificationEditor::class);
+                $accountId = array_key_first($editor->accountOptions($record));
+
+                return is_string($accountId)
+                    ? $editor->formState($record, $accountId)
+                    : [];
+            })
+            ->schema([
+                Select::make('account_id')
+                    ->label('Magento магазин')
+                    ->options(fn (?Product $record): array => $record instanceof Product
+                        ? app(ProductMagentoClassificationEditor::class)->accountOptions($record)
+                        : [])
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function (mixed $state, Set $set, ?Product $record): void {
+                        if (! $record instanceof Product || ! is_string($state) || $state === '') {
+                            return;
+                        }
+
+                        foreach (app(ProductMagentoClassificationEditor::class)->formState($record, $state) as $key => $value) {
+                            $set($key, $value);
+                        }
+                    }),
+                Placeholder::make('magento_effective_classification')
+                    ->label('Поточний результат')
+                    ->content(fn (Get $get, ?Product $record): HtmlString => self::magentoClassificationSummary(
+                        $record,
+                        is_string($get('account_id')) ? $get('account_id') : null,
+                    )),
+                Radio::make('category_mode')
+                    ->label('Категорія Magento')
+                    ->options([
+                        'automatic' => 'Автоматично з Master Category',
+                        'override' => 'Власний вибір для цього товару',
+                    ])
+                    ->required()
+                    ->inline()
+                    ->live(),
+                Select::make('category_ids')
+                    ->label('Категорії Magento')
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
+                    ->options(fn (Get $get, ?Product $record): array => self::magentoCategoryOptions(
+                        $record,
+                        is_string($get('account_id')) ? $get('account_id') : null,
+                    ))
+                    ->required(fn (Get $get): bool => $get('category_mode') === 'override')
+                    ->visible(fn (Get $get): bool => $get('category_mode') === 'override')
+                    ->helperText('Показано лише актуальні активні Product-категорії; root/store-root не доступні.'),
+                Radio::make('attribute_set_mode')
+                    ->label('Attribute Set')
+                    ->options([
+                        'automatic' => 'Автоматично з Сімейства товару / remote truth',
+                        'override' => 'Власний вибір для цього товару',
+                    ])
+                    ->required()
+                    ->inline()
+                    ->live(),
+                Select::make('attribute_set_id')
+                    ->label('Magento Attribute Set')
+                    ->searchable()
+                    ->preload()
+                    ->options(fn (Get $get, ?Product $record): array => self::magentoAttributeSetOptions(
+                        $record,
+                        is_string($get('account_id')) ? $get('account_id') : null,
+                    ))
+                    ->required(fn (Get $get): bool => $get('attribute_set_mode') === 'override')
+                    ->visible(fn (Get $get): bool => $get('attribute_set_mode') === 'override'),
+            ])
+            ->action(function (array $data, ?Product $record): void {
+                if (! $record instanceof Product) {
+                    throw new Halt;
+                }
+
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+                $workspace = Workspace::query()->findOrFail($record->workspace_id);
+
+                try {
+                    app(ProductMagentoClassificationEditor::class)->apply(
+                        $actor,
+                        $workspace,
+                        $record,
+                        $data,
+                    );
+                } catch (AdobeProductClassificationException|AuthorizationException $exception) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Magento класифікацію не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $record->refresh();
+
+                Notification::make()
+                    ->success()
+                    ->title('Magento класифікацію збережено')
+                    ->send();
+            });
+    }
+
+    private static function canManageMagentoClassification(?Product $record): bool
+    {
+        if (! $record instanceof Product) {
+            return false;
+        }
+
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $workspace->id === (string) $record->workspace_id
+            && app(WorkspaceAuthorization::class)->allows(
+                $actor,
+                $workspace,
+                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            )
+            && app(ProductMagentoClassificationEditor::class)->accountOptions($record) !== [];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function magentoCategoryOptions(?Product $record, ?string $accountId): array
+    {
+        if (! $record instanceof Product || ! is_string($accountId) || $accountId === '') {
+            return [];
+        }
+
+        try {
+            return app(ProductMagentoClassificationEditor::class)->categoryOptions($record, $accountId);
+        } catch (AuthorizationException) {
+            return [];
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function magentoAttributeSetOptions(?Product $record, ?string $accountId): array
+    {
+        if (! $record instanceof Product || ! is_string($accountId) || $accountId === '') {
+            return [];
+        }
+
+        try {
+            return app(ProductMagentoClassificationEditor::class)->attributeSetOptions($record, $accountId);
+        } catch (AuthorizationException) {
+            return [];
+        }
+    }
+
+    private static function magentoClassificationSummary(?Product $record, ?string $accountId): HtmlString
+    {
+        if (! $record instanceof Product || ! is_string($accountId) || $accountId === '') {
+            return new HtmlString('—');
+        }
+
+        try {
+            $editor = app(ProductMagentoClassificationEditor::class);
+            $classification = $editor->effective($record, $accountId);
+            $categoryOptions = $editor->categoryOptions($record, $accountId);
+
+            $categories = collect($classification->externalCategoryIds)
+                ->map(fn (string $id): string => $categoryOptions[$id] ?? 'ID '.$id)
+                ->implode(', ');
+
+            $categorySource = match ($classification->categorySource) {
+                'product_override' => 'власний вибір',
+                'category_mapping' => 'автоматично з Master Category',
+                default => 'не визначено',
+            };
+
+            $attributeSource = match ($classification->attributeSetSource) {
+                'product_override' => 'власний вибір',
+                'product_type_default' => 'автоматично з Сімейства товару',
+                'observed_remote' => 'підтверджено Magento',
+                default => 'не визначено',
+            };
+
+            return new HtmlString(
+                '<div><strong>Категорія:</strong> '.e($categories !== '' ? $categories : 'не визначено').
+                ' <span style="color:#6b7280;">('.e($categorySource).')</span></div>'.
+                '<div style="margin-top:5px;"><strong>Attribute Set:</strong> '.e($classification->attributeSetName ?? 'не визначено').
+                ' <span style="color:#6b7280;">('.e($attributeSource).')</span></div>'
+            );
+        } catch (AdobeProductClassificationException|AuthorizationException) {
+            return new HtmlString('Не вдалося прочитати поточну Magento класифікацію.');
+        }
     }
 
     private static function draftLockedSection(
