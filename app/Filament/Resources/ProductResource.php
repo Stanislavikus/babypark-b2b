@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Enums\MediaRole;
 use App\Enums\TagBulkOperation;
+use App\Exceptions\Availability\InventoryMutationException;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
+use App\Exceptions\Pricing\MasterOfferMutationException;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Resources\ProductResource\Pages;
@@ -13,16 +15,25 @@ use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
+use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\VariantMedia;
+use App\Models\Workspace;
+use App\Services\Availability\MasterInventoryMutationService;
+use App\Services\Availability\MasterInventoryReadService;
+use App\Services\Catalog\ProductCategoryTreeOptions;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
+use App\Services\Pricing\MasterOfferMutationService;
+use App\Services\Pricing\MasterOfferReadService;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
+use App\Services\Sync\ProductChannelReadinessReadService;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
@@ -36,6 +47,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -47,6 +59,7 @@ use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\IconColumn;
@@ -54,6 +67,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -117,13 +131,13 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'import_spreadsheet',
                                     'Імпортувати Excel / CSV',
-                                    'Smart Import із нормалізацією заголовків та запам’ятовуванням mapping уже визначено в архітектурі, але runtime ще не підключено.',
+                                    'Імпорт Excel / CSV із розпізнаванням колонок і запам’ятовуванням відповідностей буде підключено окремо.',
                                     'heroicon-o-table-cells',
                                 ),
                                 self::pendingCapabilityAction(
                                     'fill_from_supplier_document',
                                     'Заповнити з файлу',
-                                    'Автоматичне вилучення характеристик із PDF/документа постачальника буде підключено разом з AI enrichment після обкатки основного Workspace.',
+                                    'Заповнення даних із PDF або документа постачальника буде доступне разом із помічником для обробки файлів.',
                                     'heroicon-o-document-arrow-up',
                                 ),
                             ])->key('basic_capability_actions')->columnSpanFull(),
@@ -131,7 +145,7 @@ class ProductResource extends Resource
                         ->columns(2),
 
                     Section::make('Медіа')
-                        ->description('Один логічний кадр у Workspace; технічні версії для каналів не дублюються в галереї.')
+                        ->description('Тут зберігаються вихідні зображення товару. Версії, підготовлені для окремих каналів, не дублюються в галереї.')
                         ->schema([
                             Placeholder::make('workspace_media')
                                 ->hiddenLabel()
@@ -140,19 +154,19 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'media_enhance',
                                     'Покращити',
-                                    'Покращення буде доступне лише для слабкого Original або явної творчої обробки. Автоматичний pipeline ще не підключено.',
+                                    'Покращення буде доступне для слабких вихідних зображень або коли потрібна свідома творча обробка.',
                                     'heroicon-o-sparkles',
                                 ),
                                 self::pendingCapabilityAction(
                                     'media_remove_background',
                                     'Видалити фон',
-                                    'Обробка фону є pixel-transform і буде підключена окремим media-processing runtime.',
+                                    'Автоматичне видалення або заміна фону буде підключено окремо.',
                                     'heroicon-o-photo',
                                 ),
                                 self::pendingCapabilityAction(
                                     'media_prepare_channel',
                                     'Підготувати для каналу',
-                                    'Формат, розмір, фон і metadata повинні визначатися destination profile. Загальний channel-artifact runtime ще не підключено.',
+                                    'Підготовка формату, розміру, фону та супровідних даних під вимоги конкретного каналу буде підключена окремо.',
                                     'heroicon-o-paper-airplane',
                                 ),
                             ])->key('media_pending_actions'),
@@ -172,18 +186,14 @@ class ProductResource extends Resource
                                     ? (app(ProductPricingSummary::class)->formatRrp($record) ?? '—')
                                     : '—'),
                             Placeholder::make('workspace_cost')
-                                ->label('Вхідна ціна')
+                                ->label('Собівартість')
                                 ->content(fn (?Product $record): string => $record
                                     ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
-                                    : '—'),
+                                    : '—')
+                                ->visible(fn (?Product $record): bool => self::canManageProductCost($record)),
                             SchemaActions::make([
-                                self::pendingCapabilityAction(
-                                    'edit_offer',
-                                    'Редагувати ціни',
-                                    'Master Offer уже має окремий runtime-власник, але merchant editing workflow ще не підключено до цієї картки.',
-                                    'heroicon-o-banknotes',
-                                ),
-                            ])->key('offer_pending_actions')->columnSpanFull(),
+                                self::offerEditorAction(),
+                            ])->key('offer_actions')->columnSpanFull(),
                         ])
                         ->columns(3)
                         ->visible(fn (?Product $record): bool => $record !== null),
@@ -201,18 +211,14 @@ class ProductResource extends Resource
                                     ? self::inventoryScopeLabel($record)
                                     : '—'),
                             SchemaActions::make([
-                                self::pendingCapabilityAction(
-                                    'edit_inventory',
-                                    'Редагувати залишки',
-                                    'Inventory runtime працює окремо за Variant + Location. Merchant editing/location workflow у Master Workspace ще не підключено.',
-                                    'heroicon-o-archive-box',
-                                ),
-                            ])->key('inventory_pending_actions')->columnSpanFull(),
+                                self::inventoryEditorAction(),
+                            ])->key('inventory_actions')->columnSpanFull(),
                         ])
                         ->columns(2)
                         ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('Доставка та фізичні дані')
+                        ->description('Вага, габарити та упаковка. Варіантні правила доставки й backorder залишаються у Характеристиках.')
                         ->schema([
                             TextInput::make('net_weight')
                                 ->label('Вага нетто')
@@ -227,22 +233,58 @@ class ProductResource extends Resource
                             TextInput::make('width_mm')
                                 ->label('Ширина')
                                 ->numeric()
+                                ->integer()
+                                ->minValue(0)
                                 ->suffix('мм')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             TextInput::make('height_mm')
                                 ->label('Висота')
                                 ->numeric()
+                                ->integer()
+                                ->minValue(0)
                                 ->suffix('мм')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             TextInput::make('depth_mm')
                                 ->label('Глибина')
                                 ->numeric()
+                                ->integer()
+                                ->minValue(0)
                                 ->suffix('мм')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             TextInput::make('volume_m3')
                                 ->label('Об’єм')
                                 ->numeric()
+                                ->minValue(0)
                                 ->suffix('м³')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('package_quantity')
+                                ->label('Кількість в упаковці')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('package_type')
+                                ->label('Тип упаковки')
+                                ->maxLength(255)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('units_per_box')
+                                ->label('Одиниць у коробці')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('boxes_per_pallet')
+                                ->label('Коробок на палеті')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('lead_time_days')
+                                ->label('Термін поставки')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->suffix('днів')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                         ])
                         ->columns(3)
@@ -268,7 +310,7 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'enrich_characteristics_from_file',
                                     'Заповнити характеристики з файлу',
-                                    'PDF/документ/зображення постачальника буде evidence для AI proposals. Автоматичне розкладання по полях підключимо разом з AI-модулем.',
+                                    'Автоматичне перенесення характеристик із PDF, документа або зображення постачальника буде підключено разом із AI-помічником.',
                                     'heroicon-o-document-text',
                                 ),
                             ])->key('characteristics_pending_actions'),
@@ -276,7 +318,7 @@ class ProductResource extends Resource
                         ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('SEO та пошук')
-                        ->description('Модуль показано для візуальної обкатки. Підключення keyword research, AI-content та SEO workflow виконаємо останнім.')
+                        ->description('Розділ показано для візуальної обкатки. Пошук ключових слів, AI-опис і аналіз пошуку підключимо на фінальному етапі.')
                         ->schema([
                             Placeholder::make('seo_connection_state')
                                 ->hiddenLabel()
@@ -317,19 +359,19 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'seo_keywords',
                                     'Отримати ключові слова',
-                                    'Search Brief і keyword provider навмисно відкладені до фінального SEO-модуля.',
+                                    'Пошук і підбір ключових слів буде доступний після підключення фінального SEO-модуля.',
                                     'heroicon-o-magnifying-glass',
                                 ),
                                 self::pendingCapabilityAction(
                                     'seo_ai_description',
                                     'Створити опис з AI',
-                                    'AI content proposal буде review-first і підключиться після обкатки основного Workspace.',
+                                    'AI зможе підготувати опис для перевірки перед збереженням після підключення фінального модуля.',
                                     'heroicon-o-sparkles',
                                 ),
                                 self::pendingCapabilityAction(
                                     'seo_performance',
                                     'Аналіз пошуку',
-                                    'GSC / Merchant / marketplace performance agent буде окремим фінальним SEO workflow.',
+                                    'Аналіз даних Google Search Console, Merchant Center і маркетплейсів буде підключено окремим фінальним етапом.',
                                     'heroicon-o-chart-bar',
                                 ),
                             ])->key('seo_pending_actions'),
@@ -342,12 +384,15 @@ class ProductResource extends Resource
                     Section::make('Статус')
                         ->schema([
                             Placeholder::make('workspace_lifecycle')
-                                ->label('Master')
+                                ->label('Стан у Master')
                                 ->content(fn (?Product $record): string => $record
-                                    ? ($record->is_active ? 'Активний' : 'Неактивний')
+                                    ? ($record->is_active ? 'Активний запис' : 'Неактивний запис')
                                     : 'Нова чернетка'),
+                            Placeholder::make('workspace_publication_boundary')
+                                ->label('Публікація')
+                                ->content('Окремо для кожного каналу'),
                             Placeholder::make('workspace_source')
-                                ->label('Джерело')
+                                ->label('Джерело даних')
                                 ->content(fn (?Product $record): string => self::isSourceOwned($record)
                                     ? '1С · авторитетне джерело'
                                     : 'Master Workspace'),
@@ -357,8 +402,12 @@ class ProductResource extends Resource
                     Section::make('Організація')
                         ->schema([
                             Select::make('category_id')
-                                ->label('Внутрішня категорія')
+                                ->label('Категорія')
                                 ->relationship(name: 'category', titleAttribute: 'name')
+                                ->getOptionLabelFromRecordUsing(
+                                    fn (Category $record): string => app(ProductCategoryTreeOptions::class)->label($record)
+                                )
+                                ->helperText('Показано повний шлях: батьківська категорія › підкатегорія.')
                                 ->searchable()
                                 ->preload(),
                             TextInput::make('brand')
@@ -432,7 +481,7 @@ class ProductResource extends Resource
                                 self::pendingCapabilityAction(
                                     'product_associations',
                                     'Related / Upsell / Cross-sell',
-                                    'Adobe V1 capability проінвентаризовано, але ProductAssociation runtime та merchant editor ще не підключені.',
+                                    'Редагування пов’язаних, рекомендованих і супутніх товарів для Magento буде підключено окремо.',
                                     'heroicon-o-link',
                                 ),
                             ])->key('channel_capability_actions'),
@@ -473,9 +522,10 @@ class ProductResource extends Resource
                         ->badge()
                         ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state)),
                     TextEntry::make('cost_price_summary')
-                        ->label('Вхідна ціна')
+                        ->label('Собівартість')
                         ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost()),
                     TextEntry::make('admin_rrp')
                         ->label('РРЦ')
                         ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
@@ -489,7 +539,8 @@ class ProductResource extends Resource
                             Livewire::current()?->marginFormat ?? 'percent'
                         ))
                         ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost()),
                     TextEntry::make('admin_status')
                         ->label('Статус')
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
@@ -667,9 +718,10 @@ class ProductResource extends Resource
                     }),
 
                 TextColumn::make('cost_price_summary')
-                    ->label('Вхідна ціна')
+                    ->label('Собівартість')
                     ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
                     ->placeholder('—')
+                    ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost())
                     ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
@@ -691,6 +743,7 @@ class ProductResource extends Resource
                     ))
                     ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
                     ->placeholder('—')
+                    ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost())
                     ->toggleable(in_array('margin', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
@@ -967,6 +1020,7 @@ class ProductResource extends Resource
         return BulkAction::make($name)
             ->label($label)
             ->icon($icon)
+            ->visible(fn (): bool => self::canManageCurrentWorkspaceProducts())
             ->schema([
                 Select::make('tag_ids')
                     ->label('Теги')
@@ -1011,6 +1065,8 @@ class ProductResource extends Resource
                     ->visible(fn (Get $get): bool => filled($get('tag_ids'))),
             ])
             ->action(function (Collection $records, array $data, ListProducts $livewire) use ($operation, $successTitle, $failureTitle): void {
+                abort_unless(self::canManageCurrentWorkspaceProducts(), 403);
+
                 $workspaceId = app(WorkspaceContext::class)->id();
                 $productIds = $livewire->getSelectedTableRecords()->modelKeys();
                 $tagIds = $data['tag_ids'] ?? [];
@@ -1046,6 +1102,600 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
+
+    private static function offerEditorAction(): Action
+    {
+        return Action::make('edit_offer')
+            ->label('Редагувати ціни')
+            ->icon('heroicon-o-banknotes')
+            ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
+            ->tooltip(fn (?Product $record): ?string => self::isSourceOwned($record)
+                ? 'Для товару з джерелом 1С ціна в Master поки доступна лише для перегляду.'
+                : null)
+            ->modalHeading('Ціна товару')
+            ->modalDescription('Редагуйте поточну ціну та, за потреби, ціну до знижки. У Master ці значення зберігаються без ПДВ; сума з ПДВ розраховується автоматично.')
+            ->modalSubmitActionLabel('Зберегти ціну')
+            ->fillForm(fn (?Product $record): array => self::offerEditorFormState($record))
+            ->schema([
+                Select::make('variant_id')
+                    ->label('Варіант')
+                    ->options(fn (?Product $record): array => self::offerVariantOptions($record))
+                    ->required()
+                    ->live()
+                    ->hidden(fn (?Product $record): bool => count(self::offerVariantOptions($record)) <= 1)
+                    ->afterStateUpdated(function (mixed $state, Set $set, ?Product $record): void {
+                        $offer = self::offerVariantState($record, $state);
+                        $set('expected_item_id', $offer['expected_item_id']);
+                        $set('expected_regular_net', $offer['expected_regular_net']);
+                        $canManageCost = self::canManageProductCost($record);
+
+                        $set('expected_sale_net', $offer['expected_sale_net']);
+                        $set('expected_cost_net', $canManageCost ? $offer['expected_cost_net'] : null);
+                        $set('sell_net', $offer['sell_net']);
+                        $set('compare_at_net', $offer['compare_at_net']);
+                        $set('cost_net', $canManageCost ? $offer['cost_net'] : null);
+                        $set('write_cost', $canManageCost);
+                        $set('effective_vat_rate', $offer['effective_vat_rate']);
+                    }),
+                Hidden::make('expected_item_id'),
+                Hidden::make('expected_regular_net'),
+                Hidden::make('expected_sale_net'),
+                Hidden::make('expected_cost_net'),
+                Hidden::make('write_cost'),
+                Hidden::make('effective_vat_rate'),
+                Placeholder::make('offer_editor_state')
+                    ->hiddenLabel()
+                    ->content(function (Get $get, ?Product $record): string {
+                        $offer = self::offerVariantState($record, $get('variant_id'));
+
+                        return $offer['message'];
+                    }),
+                TextInput::make('sell_net')
+                    ->label('Ціна')
+                    ->numeric()
+                    ->gt(0)
+                    ->required()
+                    ->prefix(fn (Get $get, ?Product $record): string => self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['currency'])
+                    ->helperText('Поточна ціна продажу без ПДВ.')
+                    ->live(onBlur: true)
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                TextInput::make('compare_at_net')
+                    ->label('Ціна до знижки')
+                    ->numeric()
+                    ->nullable()
+                    ->gt('sell_net')
+                    ->prefix(fn (Get $get, ?Product $record): string => self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['currency'])
+                    ->helperText('Необов’язково. Для акції має бути вищою за поточну ціну.')
+                    ->live(onBlur: true)
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                TextInput::make('cost_net')
+                    ->label('Собівартість')
+                    ->numeric()
+                    ->minValue(0)
+                    ->nullable()
+                    ->prefix(fn (Get $get, ?Product $record): string => self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['currency'])
+                    ->helperText('Внутрішня собівартість без ПДВ. Доступна лише ролям з окремим дозволом.')
+                    ->visible(fn (?Product $record): bool => self::canManageProductCost($record))
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                Placeholder::make('offer_gross_preview')
+                    ->label('З ПДВ')
+                    ->content(function (Get $get): string {
+                        $sell = $get('sell_net');
+                        $compareAt = $get('compare_at_net');
+                        $vat = $get('effective_vat_rate');
+
+                        if (! is_numeric($sell) || ! is_numeric($vat)) {
+                            return '—';
+                        }
+
+                        $sellGross = round((float) $sell * (1 + (float) $vat / 100), 2);
+                        $label = number_format($sellGross, 2, '.', ' ');
+
+                        if (is_numeric($compareAt) && (float) $compareAt > (float) $sell) {
+                            $compareGross = round((float) $compareAt * (1 + (float) $vat / 100), 2);
+                            $label .= ' · до знижки '.number_format($compareGross, 2, '.', ' ');
+                        }
+
+                        return $label.' · ПДВ '.number_format((float) $vat, 2, '.', '').'%';
+                    }),
+            ])
+            ->action(function (array $data, ?Product $record): void {
+                if (! $record instanceof Product) {
+                    throw new Halt;
+                }
+
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+
+                $variantId = self::offerResolvedVariantId($record, $data['variant_id'] ?? null);
+                $variant = ProductVariant::withoutWorkspaceScope()
+                    ->where('workspace_id', $record->workspace_id)
+                    ->where('product_id', $record->id)
+                    ->where('is_active', true)
+                    ->whereKey($variantId)
+                    ->first();
+
+                if (! $variant instanceof ProductVariant) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Варіант уже недоступний')
+                        ->body('Оновіть товар і повторіть дію.')
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $offer = app(MasterOfferReadService::class)->state($variant);
+                if (! $offer['editable']) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Ціна лише для перегляду')
+                        ->body($offer['message'])
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $workspace = Workspace::query()->findOrFail($record->workspace_id);
+
+                try {
+                    $item = app(MasterOfferMutationService::class)->setPrice(
+                        $actor,
+                        $workspace,
+                        $record,
+                        $variant,
+                        expectedItemId: $data['expected_item_id'] ?? null,
+                        expectedRegularNet: $data['expected_regular_net'] ?? null,
+                        expectedSaleNet: $data['expected_sale_net'] ?? null,
+                        sellNet: $data['sell_net'],
+                        compareAtNet: $data['compare_at_net'] ?? null,
+                        writeCost: (bool) ($data['write_cost'] ?? false),
+                        expectedCostNet: $data['expected_cost_net'] ?? null,
+                        costNet: $data['cost_net'] ?? null,
+                    );
+                } catch (MasterOfferMutationException $exception) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Ціну не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                } catch (AuthorizationException) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Ціну не змінено')
+                        ->body('Ваші права на редагування ціни або собівартості змінилися. Оновіть сторінку.')
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $record->refresh();
+
+                $currentSell = $item->sale_price ?? $item->price;
+                Notification::make()
+                    ->success()
+                    ->title('Ціну оновлено')
+                    ->body('Поточна ціна: '.number_format((float) $currentSell, 2, '.', ' ').' '.$item->priceList?->currency)
+                    ->send();
+            });
+    }
+
+    private static function offerResolvedVariantId(Product $record, mixed $requestedVariantId): int
+    {
+        $options = self::offerVariantOptions($record);
+
+        if (count($options) === 1) {
+            return (int) array_key_first($options);
+        }
+
+        return is_numeric($requestedVariantId) ? (int) $requestedVariantId : 0;
+    }
+
+    /**
+     * @return array{
+     *   variant_id:?string,
+     *   expected_item_id:?string,
+     *   expected_regular_net:?string,
+     *   expected_sale_net:?string,
+     *   sell_net:?string,
+     *   compare_at_net:?string,
+     *   expected_cost_net:?string,
+     *   cost_net:?string,
+     *   write_cost:bool,
+     *   effective_vat_rate:?string
+     * }
+     */
+    private static function offerEditorFormState(?Product $record): array
+    {
+        $options = self::offerVariantOptions($record);
+        $variantId = array_key_first($options);
+        $offer = self::offerVariantState($record, $variantId);
+
+        $canManageCost = self::canManageProductCost($record);
+
+        return [
+            'variant_id' => $variantId !== null ? (string) $variantId : null,
+            'expected_item_id' => $offer['expected_item_id'],
+            'expected_regular_net' => $offer['expected_regular_net'],
+            'expected_sale_net' => $offer['expected_sale_net'],
+            'expected_cost_net' => $canManageCost ? $offer['expected_cost_net'] : null,
+            'sell_net' => $offer['sell_net'],
+            'compare_at_net' => $offer['compare_at_net'],
+            'cost_net' => $canManageCost ? $offer['cost_net'] : null,
+            'write_cost' => $canManageCost,
+            'effective_vat_rate' => $offer['effective_vat_rate'],
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function offerVariantOptions(?Product $record): array
+    {
+        if (! $record instanceof Product) {
+            return [];
+        }
+
+        $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
+        $options = [];
+
+        foreach ($summary['rows'] as $index => $row) {
+            $parts = array_values(array_filter(
+                $row['options'],
+                static fn (string $value): bool => $value !== '' && $value !== '—',
+            ));
+            $label = $parts !== []
+                ? implode(' · ', $parts)
+                : ($summary['count'] > 1 ? 'Варіант '.($index + 1) : 'Товар');
+
+            if (filled($row['sku'])) {
+                $label .= ' · SKU '.$row['sku'];
+            }
+
+            $options[(string) $row['id']] = $label;
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array{
+     *   editable:bool,
+     *   state:string,
+     *   sell_net:?string,
+     *   compare_at_net:?string,
+     *   cost_net:?string,
+     *   sell_gross:?string,
+     *   compare_at_gross:?string,
+     *   currency:string,
+     *   effective_vat_rate:?string,
+     *   expected_item_id:?string,
+     *   expected_regular_net:?string,
+     *   expected_sale_net:?string,
+     *   expected_cost_net:?string,
+     *   message:string
+     * }
+     */
+    private static function offerVariantState(?Product $record, mixed $variantId): array
+    {
+        if (! $record instanceof Product || ! is_numeric($variantId)) {
+            return [
+                'editable' => false,
+                'state' => 'variant_required',
+                'sell_net' => null,
+                'compare_at_net' => null,
+                'cost_net' => null,
+                'sell_gross' => null,
+                'compare_at_gross' => null,
+                'currency' => 'UAH',
+                'effective_vat_rate' => null,
+                'expected_item_id' => null,
+                'expected_regular_net' => null,
+                'expected_sale_net' => null,
+                'expected_cost_net' => null,
+                'message' => 'Оберіть варіант.',
+            ];
+        }
+
+        $variant = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $record->workspace_id)
+            ->where('product_id', $record->id)
+            ->where('is_active', true)
+            ->whereKey((int) $variantId)
+            ->first();
+
+        if (! $variant instanceof ProductVariant) {
+            return [
+                'editable' => false,
+                'state' => 'variant_unavailable',
+                'sell_net' => null,
+                'compare_at_net' => null,
+                'cost_net' => null,
+                'sell_gross' => null,
+                'compare_at_gross' => null,
+                'currency' => 'UAH',
+                'effective_vat_rate' => null,
+                'expected_item_id' => null,
+                'expected_regular_net' => null,
+                'expected_sale_net' => null,
+                'expected_cost_net' => null,
+                'message' => 'Варіант уже недоступний. Оновіть товар.',
+            ];
+        }
+
+        return app(MasterOfferReadService::class)->state($variant);
+    }
+
+    private static function canManageProductCost(?Product $record): bool
+    {
+        if (! $record instanceof Product) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $workspace->id === (string) $record->workspace_id
+            && self::canManageCurrentWorkspaceProductCost();
+    }
+
+    private static function canManageCurrentWorkspaceProductCost(): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return app(WorkspaceAuthorization::class)->allows(
+            $actor,
+            $workspace,
+            WorkspacePermissions::MANAGE_PRODUCT_COST,
+        );
+    }
+
+    private static function inventoryEditorAction(): Action
+    {
+        return Action::make('edit_inventory')
+            ->label('Редагувати залишки')
+            ->icon('heroicon-o-archive-box')
+            ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
+            ->tooltip(fn (?Product $record): ?string => self::isSourceOwned($record)
+                ? 'Для товару з джерелом 1С залишок у Master поки доступний лише для перегляду.'
+                : null)
+            ->modalHeading('Залишки товару')
+            ->modalDescription('Змінюється Master-залишок конкретного варіанта. Доступно до продажу враховує тимчасові резерви автоматично.')
+            ->modalSubmitActionLabel('Зберегти залишок')
+            ->fillForm(fn (?Product $record): array => self::inventoryEditorFormState($record))
+            ->schema([
+                Select::make('variant_id')
+                    ->label('Варіант')
+                    ->options(fn (?Product $record): array => self::inventoryVariantOptions($record))
+                    ->required()
+                    ->live()
+                    ->hidden(fn (?Product $record): bool => count(self::inventoryVariantOptions($record)) <= 1)
+                    ->afterStateUpdated(function (mixed $state, Set $set, ?Product $record): void {
+                        $inventory = self::inventoryVariantState($record, $state);
+                        $set('expected_quantity', $inventory['current_quantity']);
+                        $set('new_quantity', $inventory['current_quantity']);
+                    }),
+                Hidden::make('expected_quantity'),
+                Placeholder::make('inventory_editor_state')
+                    ->hiddenLabel()
+                    ->content(function (Get $get, ?Product $record): string {
+                        $inventory = self::inventoryVariantState($record, $get('variant_id'));
+
+                        return $inventory['message'].
+                            ' Поточний залишок: '.$inventory['current_quantity'].' шт. · '.
+                            'Доступно до продажу: '.$inventory['net_available'].' шт.';
+                    }),
+                TextInput::make('new_quantity')
+                    ->label('Новий залишок')
+                    ->numeric()
+                    ->integer()
+                    ->minValue(0)
+                    ->required()
+                    ->suffix('шт.')
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::inventoryVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                TextInput::make('reason')
+                    ->label('Причина')
+                    ->placeholder('Необов’язково')
+                    ->maxLength(255),
+            ])
+            ->action(function (array $data, ?Product $record): void {
+                if (! $record instanceof Product) {
+                    throw new Halt;
+                }
+
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+
+                $variantId = self::inventoryResolvedVariantId($record, $data['variant_id'] ?? null);
+                $variant = ProductVariant::withoutWorkspaceScope()
+                    ->where('workspace_id', $record->workspace_id)
+                    ->where('product_id', $record->id)
+                    ->where('is_active', true)
+                    ->whereKey($variantId)
+                    ->first();
+
+                if (! $variant instanceof ProductVariant) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Варіант уже недоступний')
+                        ->body('Оновіть товар і повторіть дію.')
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $inventory = app(MasterInventoryReadService::class)->state($variant);
+                if (! $inventory['editable']) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Залишок лише для перегляду')
+                        ->body($inventory['message'])
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $workspace = Workspace::query()->findOrFail($record->workspace_id);
+
+                try {
+                    $stock = app(MasterInventoryMutationService::class)->setQuantity(
+                        $actor,
+                        $workspace,
+                        $record,
+                        $variant,
+                        expectedQuantity: (int) ($data['expected_quantity'] ?? -1),
+                        newQuantity: (int) $data['new_quantity'],
+                        reason: $data['reason'] ?? null,
+                    );
+                } catch (InventoryMutationException $exception) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Залишок не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $record->refresh();
+
+                Notification::make()
+                    ->success()
+                    ->title('Залишок оновлено')
+                    ->body('Новий залишок: '.(int) $stock->quantity.' шт.')
+                    ->send();
+            });
+    }
+
+    private static function inventoryResolvedVariantId(Product $record, mixed $requestedVariantId): int
+    {
+        $options = self::inventoryVariantOptions($record);
+
+        if (count($options) === 1) {
+            return (int) array_key_first($options);
+        }
+
+        return is_numeric($requestedVariantId) ? (int) $requestedVariantId : 0;
+    }
+
+    /**
+     * @return array{variant_id:?string,expected_quantity:int,new_quantity:int,reason:null}
+     */
+    private static function inventoryEditorFormState(?Product $record): array
+    {
+        $options = self::inventoryVariantOptions($record);
+        $variantId = array_key_first($options);
+        $inventory = self::inventoryVariantState($record, $variantId);
+
+        return [
+            'variant_id' => $variantId !== null ? (string) $variantId : null,
+            'expected_quantity' => $inventory['current_quantity'],
+            'new_quantity' => $inventory['current_quantity'],
+            'reason' => null,
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function inventoryVariantOptions(?Product $record): array
+    {
+        if (! $record instanceof Product) {
+            return [];
+        }
+
+        $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
+        $options = [];
+
+        foreach ($summary['rows'] as $index => $row) {
+            $parts = array_values(array_filter(
+                $row['options'],
+                static fn (string $value): bool => $value !== '' && $value !== '—',
+            ));
+            $label = $parts !== []
+                ? implode(' · ', $parts)
+                : ($summary['count'] > 1 ? 'Варіант '.($index + 1) : 'Товар');
+
+            if (filled($row['sku'])) {
+                $label .= ' · SKU '.$row['sku'];
+            }
+
+            $options[(string) $row['id']] = $label;
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array{
+     *   editable:bool,
+     *   state:string,
+     *   current_quantity:int,
+     *   net_available:int,
+     *   pending_quantity:int,
+     *   message:string
+     * }
+     */
+    private static function inventoryVariantState(?Product $record, mixed $variantId): array
+    {
+        if (! $record instanceof Product || ! is_numeric($variantId)) {
+            return [
+                'editable' => false,
+                'state' => 'variant_required',
+                'current_quantity' => 0,
+                'net_available' => 0,
+                'pending_quantity' => 0,
+                'message' => 'Оберіть варіант.',
+            ];
+        }
+
+        $variant = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $record->workspace_id)
+            ->where('product_id', $record->id)
+            ->where('is_active', true)
+            ->whereKey((int) $variantId)
+            ->first();
+
+        if (! $variant instanceof ProductVariant) {
+            return [
+                'editable' => false,
+                'state' => 'variant_unavailable',
+                'current_quantity' => 0,
+                'net_available' => 0,
+                'pending_quantity' => 0,
+                'message' => 'Варіант уже недоступний. Оновіть товар.',
+            ];
+        }
+
+        return app(MasterInventoryReadService::class)->state($variant);
+    }
 
     private static function pendingCapabilityAction(
         string $name,
@@ -1376,7 +2026,7 @@ class ProductResource extends Resource
             '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:5px;overflow:hidden;">'.
                 '<div style="height:100%;width:'.$structure['percentage'].'%;background:currentColor;border-radius:999px;"></div>'.
             '</div>'.
-            '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Інформаційно · не є готовністю конкретного каналу.</div>'
+            '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Це повнота Master-даних, а не готовність конкретного каналу.</div>'
         );
     }
 
@@ -1386,24 +2036,45 @@ class ProductResource extends Resource
             return new HtmlString('—');
         }
 
-        $labels = app(ProductWorkspaceSummaryService::class)->channelLabels($record);
+        $channels = app(ProductChannelReadinessReadService::class)->rows($record);
 
-        if ($labels === []) {
+        if ($channels === []) {
             return new HtmlString(
                 '<div style="color:#6b7280;">Товар ще не додано до жодного каналу публікації.</div>'
             );
         }
 
-        $rows = collect($labels)
-            ->map(function (string $label): string {
-                return '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f3f4f6;">'.
-                    '<span>'.e($label).'</span>'.
-                    '<span style="font-size:11px;color:#6b7280;white-space:nowrap;">Додано</span>'.
+        $hasMagento = false;
+        $rows = collect($channels)
+            ->map(function (array $channel) use (&$hasMagento): string {
+                $isMagento = $channel['platform'] === 'adobe_commerce';
+                $hasMagento = $hasMagento || $isMagento;
+
+                $statusColor = match ($channel['status_label']) {
+                    'Класифікація готова' => '#166534',
+                    'Потрібне налаштування', 'Потрібна перевірка' => '#92400e',
+                    default => '#6b7280',
+                };
+
+                $details = collect($channel['details'])
+                    ->map(fn (string $detail): string => '<div style="margin-top:3px;font-size:11px;color:#6b7280;">'.e($detail).'</div>')
+                    ->implode('');
+
+                return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">'.
+                    '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;">'.
+                        '<span>'.e($channel['label']).'</span>'.
+                        '<span style="font-size:11px;color:'.$statusColor.';white-space:nowrap;">'.e($channel['status_label']).'</span>'.
+                    '</div>'.
+                    $details.
                 '</div>';
             })
             ->implode('');
 
-        return new HtmlString($rows);
+        $footer = $hasMagento
+            ? '<div style="margin-top:7px;font-size:11px;color:#9ca3af;">Для Magento тут показано лише стан класифікації. Готовність до публікації перевіряється в каналі окремо.</div>'
+            : '';
+
+        return new HtmlString($rows.$footer);
     }
 
     private static function buildAttentionHtml(?Product $record): HtmlString
@@ -1435,7 +2106,7 @@ class ProductResource extends Resource
         return new HtmlString(
             '<div style="margin-bottom:6px;color:#92400e;">Потрібна увага до Master-даних</div>'.
             '<ul style="margin:0;padding-left:18px;color:#6b7280;">'.$items.$structureItem.'</ul>'.
-            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Канальні помилки та readiness відображаються окремо.</div>'
+            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Помилки та готовність каналів перевіряються окремо.</div>'
         );
     }
 
@@ -1524,19 +2195,35 @@ HTML;
 
     public static function getCreateAuthorizationResponse(): Response
     {
+        return self::canManageCurrentWorkspaceProducts()
+            ? Response::allow()
+            : Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        if (! $record instanceof Product) {
+            return Response::deny();
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $record->workspace_id === (string) $workspace->id
+            && self::canManageCurrentWorkspaceProducts()
+                ? Response::allow()
+                : Response::deny();
+    }
+
+    private static function canManageCurrentWorkspaceProducts(): bool
+    {
         $actor = auth()->user();
 
-        if ($actor instanceof User) {
-            $allowed = app(WorkspaceAuthorization::class)->allows(
+        return $actor instanceof User
+            && app(WorkspaceAuthorization::class)->allows(
                 $actor,
                 app(WorkspaceContext::class)->current(),
                 WorkspacePermissions::MANAGE_PRODUCTS,
             );
-
-            return $allowed ? Response::allow() : Response::deny();
-        }
-
-        return Response::deny();
     }
 
     public static function getDeleteAuthorizationResponse(Model $record): Response

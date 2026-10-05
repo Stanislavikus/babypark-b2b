@@ -14,14 +14,19 @@ use App\Services\Pricing\Resolution\PriceResolutionReason;
 use App\Services\Pricing\Resolution\PriceResolutionSource;
 use App\Services\Pricing\Resolution\PriceResolutionStep;
 use App\Services\Pricing\Resolution\PriceResolutionStepStatus;
+use App\Support\Workspace\WorkspacePermissions;
 use Carbon\CarbonImmutable;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesPricingFixtures;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class PriceInspectorActionResolverTest extends TestCase
 {
-    use CreatesPricingFixtures;
+    use CreatesPricingFixtures, InteractsWithWorkspaceRbac {
+        CreatesPricingFixtures::defaultWorkspace insteadof InteractsWithWorkspaceRbac;
+    }
     use RefreshDatabase;
 
     private PriceInspectorActionResolver $resolver;
@@ -29,6 +34,7 @@ class PriceInspectorActionResolverTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->resolver = app(PriceInspectorActionResolver::class);
     }
 
@@ -201,6 +207,14 @@ class PriceInspectorActionResolverTest extends TestCase
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $workspace = Workspace::query()->findOrFail($variant->workspace_id);
+        $membership = $this->makeWorkspaceMembership($workspace, $admin);
+        $role = $this->createRoleWithPermissions($workspace->id, 'Resolver product editor '.uniqid(), [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
+        $this->actingAs($admin);
 
         return new PriceInspectorContext(
             customer: $customer,

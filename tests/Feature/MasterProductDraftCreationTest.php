@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
+use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
@@ -92,6 +94,108 @@ class MasterProductDraftCreationTest extends TestCase
     }
 
     #[Test]
+    public function authorized_workspace_user_sees_create_product_action_on_product_list(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $user = User::query()->create([
+            'name' => 'Product list editor',
+            'email' => 'product-list-editor@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Manager,
+            'is_active' => true,
+        ]);
+
+        $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(ListProducts::class)
+            ->assertActionVisible('create');
+    }
+
+    #[Test]
+    public function legacy_admin_role_without_manage_products_does_not_see_create_product_action(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Legacy admin only',
+            'email' => 'legacy-admin-only@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(ListProducts::class)
+            ->assertActionHidden('create');
+    }
+
+    #[Test]
+    public function product_edit_requires_manage_products_and_matching_workspace(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $foreignWorkspace = Workspace::query()->create([
+            'name' => 'Foreign edit workspace',
+            'is_default' => false,
+        ]);
+        $user = User::query()->create([
+            'name' => 'Edit authorization actor',
+            'email' => 'edit-authorization@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ]);
+        $localProduct = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => null,
+            'name' => 'Local edit product',
+            'is_active' => true,
+        ]);
+        $foreignProduct = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $foreignWorkspace->id,
+            'onec_guid' => null,
+            'name' => 'Foreign edit product',
+            'is_active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->actingAs($user);
+
+        $this->assertTrue(ProductResource::getEditAuthorizationResponse($localProduct)->denied());
+
+        $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
+
+        $this->assertTrue(ProductResource::getEditAuthorizationResponse($localProduct)->allowed());
+        $this->assertTrue(ProductResource::getEditAuthorizationResponse($foreignProduct)->denied());
+    }
+
+    #[Test]
+    public function legacy_admin_without_manage_products_cannot_mount_product_editor(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $user = User::query()->create([
+            'name' => 'Unauthorized product editor',
+            'email' => 'unauthorized-product-editor@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ]);
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => null,
+            'name' => 'Protected product',
+            'is_active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertForbidden();
+    }
+
+    #[Test]
     public function authorized_workspace_user_can_create_product_from_filament_and_is_redirected_to_edit_workspace(): void
     {
         $workspace = Workspace::query()->where('is_default', true)->sole();
@@ -142,6 +246,8 @@ class MasterProductDraftCreationTest extends TestCase
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
 
         $product = Product::withoutWorkspaceScope()->create([
             'workspace_id' => $workspace->id,

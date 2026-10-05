@@ -13,16 +13,20 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\ProductFields\ProductColumnVisibility;
+use App\Support\Workspace\WorkspacePermissions;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use DomainException;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class ProductClassificationUiTest extends TestCase
 {
+    use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
 
     private User $admin;
@@ -33,6 +37,7 @@ class ProductClassificationUiTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->workspace = Workspace::query()->where('is_default', true)->sole();
 
         $this->admin = User::query()->create([
@@ -42,6 +47,12 @@ class ProductClassificationUiTest extends TestCase
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $membership = $this->makeWorkspaceMembership($this->workspace, $this->admin);
+        $role = $this->createRoleWithPermissions($this->workspace->id, 'Classification product editor', [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
