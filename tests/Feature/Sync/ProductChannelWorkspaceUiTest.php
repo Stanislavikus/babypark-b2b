@@ -31,6 +31,7 @@ use App\Models\WorkspaceUser;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Services\Sync\AdobeProductClassificationReadService;
 use App\Services\Sync\ProductChannelSelectionService;
+use App\Services\Sync\ProductMagentoClassificationEditor;
 use App\Services\Sync\SyncDataSetupLandingService;
 use App\Services\Sync\SyncProductSelectionService;
 use App\Support\Workspace\WorkspacePermissions;
@@ -543,7 +544,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
 
         $product->load('syncChannelSelections.syncConfiguration.connectorAccount.connectorDefinition');
 
-        $editor = app(\App\Services\Sync\ProductMagentoClassificationEditor::class);
+        $editor = app(ProductMagentoClassificationEditor::class);
         $this->assertArrayHasKey($account->id, $editor->accountOptions($product));
 
         app(ProductChannelSelectionService::class)->remove(
@@ -555,7 +556,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
 
         $this->assertSame([], $editor->accountOptions($product));
 
-        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+        $this->expectException(AuthorizationException::class);
         $editor->formState($product, $account->id);
     }
 

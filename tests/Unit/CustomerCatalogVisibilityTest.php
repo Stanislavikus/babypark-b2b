@@ -3,8 +3,8 @@
 namespace Tests\Unit;
 
 use App\Enums\CatalogProductDisplayState;
-use App\Enums\ProductLifecycleStatus;
 use App\Enums\CatalogSort;
+use App\Enums\ProductLifecycleStatus;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Models\ProductVariant;

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Sync\AdobeProductEffectiveClassification;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class ProductMagentoClassificationEditor
@@ -228,9 +229,9 @@ final class ProductMagentoClassificationEditor
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, ConnectorAccount>
+     * @return Collection<int, ConnectorAccount>
      */
-    private function selectedAccounts(Product $product): \Illuminate\Support\Collection
+    private function selectedAccounts(Product $product): Collection
     {
         return SyncConfigurationProductSelection::withoutWorkspaceScope()
             ->where('workspace_id', $product->workspace_id)
