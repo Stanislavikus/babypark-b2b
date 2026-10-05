@@ -657,3 +657,57 @@ Current branch regression after Findings A–C:
 - disposable MySQL database was removed after the proof.
 
 The earlier GitHub MySQL run on `0d6f818` is now stale by definition because this review produced additional fixes. Final CI evidence must be taken only from the workflow started for the next pushed exact HEAD.
+
+
+## Candidate CI correction — permission catalogue count fallout
+
+GitHub MySQL workflow **#37236564717** on candidate HEAD
+`010f5cd0a0fb8907d398ca69a51ee806dcb27d6d` failed at the
+`SyncRun persistence foundation tests (MySQL)` step.
+
+Root cause:
+
+- the branch intentionally adds the already-approved canonical
+  `manage_product_cost` permission;
+- `WorkspacePermissions::catalogue()` therefore correctly contains **13**
+  permissions;
+- five older test files still hard-coded the previous catalogue size **12**;
+- GitHub stopped on `SyncRunPersistenceFoundationTest` before the later RBAC
+  and full-suite steps could run.
+
+Classification: **test-contract fallout — branch-owned, fixed in branch**.
+
+Minimal correction:
+
+- exact catalogue-size assertions are updated from 12 to 13;
+- seeder row-count assertions now compare against
+  `count(WorkspacePermissions::catalogue())`, while existing canonical-code
+  equality and no-auto-grant assertions remain intact;
+- no production RBAC behavior or role assignment was changed.
+
+Focused regression after correction:
+
+- SyncRun / sync permission / RBAC catalogue group:
+  **87 tests / 246 assertions PASS**.
+
+### Clean-base control for unrelated local full-suite failures
+
+A separate local full-suite run on the candidate exposed 16 failures around
+Price Inspector / presentation / toolbar/form Ukrainian copy. These are **not**
+attributed to this campaign:
+
+- the exact same focused set was run from a detached clean
+  `origin/develop` worktree at
+  `d4c93d34317e7596709b8c66a1b5c07329a3e32b`;
+- clean base reproduced the same **16 failed / 78 warnings / 478 assertions**;
+- local repository testing has no `.env`, so Laravel falls back to
+  `config/app.php` default `APP_LOCALE=en`;
+- GitHub CI's Prepare application step copies `.env.example`, which explicitly
+  sets `APP_LOCALE=uk` and `APP_FALLBACK_LOCALE=uk`.
+
+Therefore the local English-vs-Ukrainian presentation failures are a proven
+pre-existing local test-environment baseline and are not modified or imported
+into PR #253.
+
+The next pushed HEAD requires a fresh exact-HEAD MySQL workflow; #37236564717
+remains historical failure evidence only.
