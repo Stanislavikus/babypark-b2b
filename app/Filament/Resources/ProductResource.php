@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\MediaRole;
+use App\Enums\ProductLifecycleStatus;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Availability\InventoryMutationException;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
@@ -62,7 +63,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -105,7 +105,7 @@ class ProductResource extends Resource
                     Section::make('Основна інформація')
                         ->description(fn (?Product $record): string => self::isSourceOwned($record)
                             ? 'Основні ідентифікаційні дані надходять з 1С. Контент і внутрішня організація редагуються окремо.'
-                            : 'Master-дані товару. SKU та GTIN необов’язкові для чернетки.')
+                            : 'Master-дані товару. Для чернетки достатньо заповнити лише «Назва».')
                         ->schema([
                             TextInput::make('name')
                                 ->label('Назва')
@@ -386,7 +386,7 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_lifecycle')
                                 ->label('Стан у Master')
                                 ->content(fn (?Product $record): string => $record
-                                    ? ($record->is_active ? 'Активний запис' : 'Неактивний запис')
+                                    ? (($record->lifecycle_status ?? ($record->is_active ? ProductLifecycleStatus::Active : ProductLifecycleStatus::Archived))->label())
                                     : 'Нова чернетка'),
                             Placeholder::make('workspace_publication_boundary')
                                 ->label('Публікація')
@@ -420,7 +420,8 @@ class ProductResource extends Resource
                                     ? app(ProductWorkspaceSummaryService::class)->productTypeLabel($record)
                                     : 'Базовий товар буде призначено автоматично'),
                             TextInput::make('merchant_type')
-                                ->label('Внутрішній тип')
+                                ->label('Внутрішня класифікація')
+                                ->helperText('Вільна внутрішня мітка. Не визначає характеристики, варіанти або сімейство товару.')
                                 ->maxLength(255)
                                 ->datalist(fn (): array => Product::query()
                                     ->distinct()
@@ -543,14 +544,14 @@ class ProductResource extends Resource
                         ->visible(fn (): bool => self::canManageCurrentWorkspaceProductCost()),
                     TextEntry::make('admin_status')
                         ->label('Статус')
-                        ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
+                        ->getStateUsing(fn (Product $record): string => self::productLifecycleLabel($record))
                         ->badge()
-                        ->color(fn (string $state): string => $state === 'Активний' ? 'success' : 'gray'),
+                        ->color(fn (string $state): string => self::productLifecycleColor($state)),
                 ])->columns(2),
 
                 Section::make('Класифікація')->schema([
                     TextEntry::make('merchant_type')
-                        ->label('Внутрішній тип товару')
+                        ->label('Внутрішня класифікація')
                         ->placeholder('—'),
                     TextEntry::make('tags.name')
                         ->label('Теги')
@@ -673,11 +674,13 @@ class ProductResource extends Resource
                     }),
 
                 // 7. Статус
-                IconColumn::make('is_active')
+                TextColumn::make('lifecycle_status')
                     ->label('Статус')
-                    ->boolean()
+                    ->getStateUsing(fn (Product $record): string => self::productLifecycleLabel($record))
+                    ->badge()
+                    ->color(fn (string $state): string => self::productLifecycleColor($state))
                     ->sortable(query: function (Builder $query, string $direction): Builder {
-                        return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
+                        return $query->orderBy('lifecycle_status', $direction)->orderBy('id', $direction);
                     }),
 
                 TextColumn::make('sync_channels')
@@ -760,7 +763,7 @@ class ProductResource extends Resource
                     ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
 
                 TextColumn::make('merchant_type')
-                    ->label('Внутрішній тип товару')
+                    ->label('Внутрішня класифікація')
                     ->searchable()
                     ->sortable()
                     ->placeholder('—')
@@ -801,14 +804,21 @@ class ProductResource extends Resource
                     ->label('Статус')
                     ->placeholder('Всі')
                     ->options([
-                        'active' => 'Тільки активні',
-                        'inactive' => 'Тільки неактивні',
+                        'working' => 'Чернетки й активні',
+                        ProductLifecycleStatus::Draft->value => 'Тільки чернетки',
+                        ProductLifecycleStatus::Active->value => 'Тільки активні',
+                        ProductLifecycleStatus::Archived->value => 'Тільки архівні',
                     ])
-                    ->default('active')
+                    ->default('working')
                     ->query(function (Builder $query, array $data): Builder {
                         return match ($data['value'] ?? null) {
-                            'active' => $query->where('is_active', true),
-                            'inactive' => $query->where('is_active', false),
+                            'working' => $query->whereIn('lifecycle_status', [
+                                ProductLifecycleStatus::Draft->value,
+                                ProductLifecycleStatus::Active->value,
+                            ]),
+                            ProductLifecycleStatus::Draft->value => $query->where('lifecycle_status', ProductLifecycleStatus::Draft->value),
+                            ProductLifecycleStatus::Active->value => $query->where('lifecycle_status', ProductLifecycleStatus::Active->value),
+                            ProductLifecycleStatus::Archived->value => $query->where('lifecycle_status', ProductLifecycleStatus::Archived->value),
                             default => $query,
                         };
                     }),
@@ -846,7 +856,7 @@ class ProductResource extends Resource
                     ->preload(),
 
                 SelectFilter::make('merchant_type')
-                    ->label('Внутрішній тип товару')
+                    ->label('Внутрішня класифікація')
                     ->options(fn (): array => Product::query()
                         ->distinct()
                         ->orderBy('merchant_type')
@@ -2191,6 +2201,22 @@ HTML;
 </a>
 <span style="display:block; margin-top:4px; font-size:11px; color:#9ca3af;">🔍 Відкрити фото</span>
 HTML;
+    }
+
+    private static function productLifecycleLabel(Product $record): string
+    {
+        return ($record->lifecycle_status
+            ?? ($record->is_active ? ProductLifecycleStatus::Active : ProductLifecycleStatus::Archived))
+            ->label();
+    }
+
+    private static function productLifecycleColor(string $state): string
+    {
+        return match ($state) {
+            ProductLifecycleStatus::Active->label() => 'success',
+            ProductLifecycleStatus::Draft->label() => 'warning',
+            default => 'gray',
+        };
     }
 
     public static function getCreateAuthorizationResponse(): Response

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ProductLifecycleStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
@@ -41,6 +42,8 @@ class MasterProductDraftCreationTest extends TestCase
 
         $this->assertNull($product->onec_guid);
         $this->assertNull($product->sku);
+        $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
+        $this->assertFalse($product->is_active);
         $this->assertNotNull($product->product_type_id);
         $this->assertCount(1, $product->variants);
 
@@ -49,6 +52,7 @@ class MasterProductDraftCreationTest extends TestCase
         $this->assertSame($workspace->id, $variant->workspace_id);
         $this->assertNull($variant->onec_guid);
         $this->assertNull($variant->sku);
+        $this->assertTrue($variant->is_active);
         $this->assertSame([], $variant->attributes);
     }
 
@@ -232,6 +236,8 @@ class MasterProductDraftCreationTest extends TestCase
         $this->assertNull($product->sku);
         $this->assertSame('BabyPark Test', $product->brand);
         $this->assertSame('test-product', $product->merchant_type);
+        $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
+        $this->assertFalse($product->is_active);
         $this->assertCount(1, $product->variants);
     }
 

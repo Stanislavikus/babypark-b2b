@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Services\Catalog\MasterProductDraftCreator;
 use App\Support\Workspace\WorkspaceContext;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -19,7 +20,7 @@ class CreateProduct extends CreateRecord
 
     public function getSubheading(): ?string
     {
-        return 'Створіть Master Product. SKU та канал публікації можна додати пізніше.';
+        return 'Для чернетки достатньо заповнити лише «Назва». Решту даних можна додати пізніше.';
     }
 
     protected function handleRecordCreation(array $data): Model
@@ -32,7 +33,19 @@ class CreateProduct extends CreateRecord
 
     protected function getCreatedNotificationTitle(): ?string
     {
-        return 'Товар створено';
+        return 'Чернетку збережено';
+    }
+
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()
+            ->label('Зберегти чернетку');
+    }
+
+    protected function getCreateAnotherFormAction(): Action
+    {
+        return parent::getCreateAnotherFormAction()
+            ->label('Зберегти й додати ще товар');
     }
 
     protected function getRedirectUrl(): string

@@ -3,10 +3,12 @@
 namespace Tests\Unit;
 
 use App\Enums\CatalogProductDisplayState;
+use App\Enums\ProductLifecycleStatus;
 use App\Enums\CatalogSort;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\Catalog\MasterProductDraftCreator;
 use App\Services\Pricing\CustomerCatalogQuery;
 use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Support\CatalogRowData;
@@ -195,6 +197,19 @@ class CustomerCatalogVisibilityTest extends TestCase
         $this->assertSame(CatalogProductDisplayState::PriceUnavailable, $row->displayState);
         $this->assertNull($row->displayedVariant);
         $this->assertCatalogContainsProduct($customer, $product->id);
+    }
+
+    public function test_source_neutral_master_draft_is_hidden_from_native_b2b_catalog(): void
+    {
+        $customer = $this->createCustomer();
+
+        $product = app(MasterProductDraftCreator::class)->create($customer->workspace, [
+            'name' => 'B2B hidden draft',
+        ]);
+
+        $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
+        $this->assertFalse($product->is_active);
+        $this->assertNotContains($product->id, $this->catalogProductIds($customer));
     }
 
     public function test_inactive_product_is_hidden(): void

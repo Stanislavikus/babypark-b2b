@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProductLifecycleStatus;
 use App\Services\ProductStructure\BasicProductStructureReconciler;
 use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Workspace\BelongsToWorkspace;
@@ -49,6 +50,7 @@ class Product extends Model
         'meta_description',
         'url',
         'is_active',
+        'lifecycle_status',
         'synced_at',
     ];
 
@@ -80,6 +82,7 @@ class Product extends Model
         return [
             'images' => 'array',
             'is_active' => 'boolean',
+            'lifecycle_status' => ProductLifecycleStatus::class,
             'synced_at' => 'datetime',
             'min_order_quantity' => 'integer',
             'order_step' => 'integer',
