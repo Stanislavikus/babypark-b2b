@@ -57,6 +57,19 @@ class Product extends Model
     protected static function booted(): void
     {
         static::creating(function (Product $product): void {
+            $lifecycle = $product->lifecycle_status;
+
+            if ($lifecycle instanceof ProductLifecycleStatus) {
+                $product->setAttribute('is_active', $lifecycle->compatibilityIsActive());
+            } else {
+                $product->setAttribute(
+                    'lifecycle_status',
+                    $product->getAttribute('is_active') === false
+                        ? ProductLifecycleStatus::Archived
+                        : ProductLifecycleStatus::Active,
+                );
+            }
+
             if ($product->getAttribute('product_type_id') !== null) {
                 return;
             }
@@ -71,6 +84,20 @@ class Product extends Model
         });
 
         static::updating(function (Product $product): void {
+            if ($product->isDirty('lifecycle_status')) {
+                $status = $product->lifecycle_status;
+                if ($status instanceof ProductLifecycleStatus) {
+                    $product->setAttribute('is_active', $status->compatibilityIsActive());
+                }
+            } elseif ($product->isDirty('is_active')) {
+                $product->setAttribute(
+                    'lifecycle_status',
+                    $product->is_active
+                        ? ProductLifecycleStatus::Active
+                        : ProductLifecycleStatus::Archived,
+                );
+            }
+
             if ($product->isDirty('images') && Schema::hasTable('product_media')) {
                 throw ProductMediaException::legacyWriteForbidden();
             }

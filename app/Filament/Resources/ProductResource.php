@@ -41,7 +41,6 @@ use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
-use App\Support\ProductTableLink;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
@@ -129,20 +128,26 @@ class ProductResource extends Resource
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             SchemaActions::make([
                                 self::pendingCapabilityAction(
-                                    'import_spreadsheet',
-                                    'Імпортувати Excel / CSV',
-                                    'Імпорт Excel / CSV із розпізнаванням колонок і запам’ятовуванням відповідностей буде підключено окремо.',
-                                    'heroicon-o-table-cells',
-                                ),
+                                    'create_with_ai',
+                                    'Створити з AI',
+                                    'AI підготує керовані пропозиції для Master-даних. Фактичні значення не будуть записані без звичайного підтвердження.',
+                                    'heroicon-o-sparkles',
+                                )->color('primary'),
                                 self::pendingCapabilityAction(
                                     'fill_from_supplier_document',
                                     'Заповнити з файлу',
-                                    'Заповнення даних із PDF або документа постачальника буде доступне разом із помічником для обробки файлів.',
+                                    'Заповнення даних цього товару із PDF, документа або зображення постачальника буде доступне разом із AI-помічником.',
                                     'heroicon-o-document-arrow-up',
                                 ),
                             ])->key('basic_capability_actions')->columnSpanFull(),
                         ])
                         ->columns(2),
+
+                    self::draftLockedSection(
+                        'draft_media_locked',
+                        'Медіа',
+                        'Тут зберігаються вихідні зображення товару.'
+                    ),
 
                     Section::make('Медіа')
                         ->description('Тут зберігаються вихідні зображення товару. Версії, підготовлені для окремих каналів, не дублюються в галереї.')
@@ -173,6 +178,8 @@ class ProductResource extends Resource
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
 
+                    self::draftLockedSection('draft_price_locked', 'Ціна'),
+
                     Section::make('Ціна')
                         ->schema([
                             Placeholder::make('workspace_sale_price')
@@ -198,6 +205,8 @@ class ProductResource extends Resource
                         ->columns(3)
                         ->visible(fn (?Product $record): bool => $record !== null),
 
+                    self::draftLockedSection('draft_inventory_locked', 'Залишки'),
+
                     Section::make('Залишки')
                         ->schema([
                             Placeholder::make('workspace_availability')
@@ -216,6 +225,12 @@ class ProductResource extends Resource
                         ])
                         ->columns(2)
                         ->visible(fn (?Product $record): bool => $record !== null),
+
+                    self::draftLockedSection(
+                        'draft_shipping_locked',
+                        'Доставка та фізичні дані',
+                        'Вага, габарити та упаковка.'
+                    ),
 
                     Section::make('Доставка та фізичні дані')
                         ->description('Вага, габарити та упаковка. Варіантні правила доставки й backorder залишаються у Характеристиках.')
@@ -292,6 +307,8 @@ class ProductResource extends Resource
                         ->collapsed()
                         ->visible(fn (?Product $record): bool => $record !== null),
 
+                    self::draftLockedSection('draft_variants_locked', 'Варіанти'),
+
                     Section::make('Варіанти')
                         ->schema([
                             Placeholder::make('workspace_variants')
@@ -299,6 +316,12 @@ class ProductResource extends Resource
                                 ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
+
+                    self::draftLockedSection(
+                        'draft_characteristics_locked',
+                        'Характеристики',
+                        'Групи визначаються сімейством товару.'
+                    ),
 
                     Section::make('Характеристики')
                         ->description('Групи визначаються типом товару. Обов’язкові поля показуються першими; поля каналу сюди не дублюються.')
@@ -316,6 +339,8 @@ class ProductResource extends Resource
                             ])->key('characteristics_pending_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
+
+                    self::draftLockedSection('draft_seo_locked', 'SEO та пошук'),
 
                     Section::make('SEO та пошук')
                         ->description('Розділ показано для візуальної обкатки. Пошук ключових слів, AI-опис і аналіз пошуку підключимо на фінальному етапі.')
@@ -339,21 +364,6 @@ class ProductResource extends Resource
                                 ->maxLength(500)
                                 ->disabled()
                                 ->dehydrated(false)
-                                ->columnSpanFull(),
-                            TextInput::make('url')
-                                ->label('URL товару на сайті')
-                                ->url()
-                                ->placeholder('https://babypark.ua/product/...')
-                                ->maxLength(2048)
-                                ->disabled()
-                                ->dehydrated(false)
-                                ->suffixAction(
-                                    Action::make('open_url')
-                                        ->icon('heroicon-m-arrow-top-right-on-square')
-                                        ->url(fn (?string $state) => $state)
-                                        ->openUrlInNewTab()
-                                        ->visible(fn (?string $state) => filled($state))
-                                )
                                 ->columnSpanFull(),
                             SchemaActions::make([
                                 self::pendingCapabilityAction(
@@ -415,7 +425,7 @@ class ProductResource extends Resource
                                 ->maxLength(255)
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             Placeholder::make('workspace_product_type')
-                                ->label('Тип товару')
+                                ->label('Сімейство товару')
                                 ->content(fn (?Product $record): string => $record
                                     ? app(ProductWorkspaceSummaryService::class)->productTypeLabel($record)
                                     : 'Базовий товар буде призначено автоматично'),
@@ -459,6 +469,8 @@ class ProductResource extends Resource
                                 ->visible(fn (?Product $record): bool => $record === null),
                         ]),
 
+                    self::draftLockedSection('draft_quality_locked', 'Якість даних'),
+
                     Section::make('Якість даних')
                         ->schema([
                             Placeholder::make('workspace_quality')
@@ -466,6 +478,8 @@ class ProductResource extends Resource
                                 ->content(fn (?Product $record): HtmlString => self::buildBasicQualityHtml($record)),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
+
+                    self::draftLockedSection('draft_channels_locked', 'Канали публікації'),
 
                     Section::make('Канали публікації')
                         ->schema([
@@ -488,6 +502,8 @@ class ProductResource extends Resource
                             ])->key('channel_capability_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
+
+                    self::draftLockedSection('draft_attention_locked', 'Потребує уваги'),
 
                     Section::make('Потребує уваги')
                         ->schema([
@@ -559,20 +575,7 @@ class ProductResource extends Resource
                         ->placeholder('—'),
                 ])->columns(2),
 
-                Section::make('Сайт')->schema([
-                    // Left: clickable URL
-                    TextEntry::make('url')
-                        ->label('URL товару на сайті')
-                        ->placeholder('—')
-                        ->url(fn (?string $state) => $state)
-                        ->openUrlInNewTab()
-                        ->icon('heroicon-m-arrow-top-right-on-square')
-                        ->iconColor('primary')
-                        ->formatStateUsing(fn (?string $state) => $state
-                            ? parse_url($state, PHP_URL_HOST).rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
-                            : null),
-
-                    // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
+                Section::make('Медіа')->schema([
                     TextEntry::make('photo_preview')
                         ->label('Фото товару')
                         ->getStateUsing(function ($record) {
@@ -753,14 +756,6 @@ class ProductResource extends Resource
                             PricingSqlExpressions::adminMarginSortSql('products.id')." {$direction}"
                         );
                     }),
-
-                // Clickable external link column
-                TextColumn::make('url')
-                    ->label('URL на сайті')
-                    ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
-                    ->tooltip(fn (?string $state) => $state)
-                    ->disableClick()
-                    ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
 
                 TextColumn::make('merchant_type')
                     ->label('Внутрішня класифікація')
@@ -1707,6 +1702,24 @@ class ProductResource extends Resource
         return app(MasterInventoryReadService::class)->state($variant);
     }
 
+    private static function draftLockedSection(
+        string $key,
+        string $title,
+        ?string $description = null,
+    ): Section {
+        $section = Section::make($title)
+            ->schema([
+                Placeholder::make($key)
+                    ->hiddenLabel()
+                    ->content('Доступно після збереження чернетки.'),
+            ])
+            ->visible(fn (?Product $record): bool => $record === null);
+
+        return $description === null
+            ? $section
+            : $section->description($description);
+    }
+
     private static function pendingCapabilityAction(
         string $name,
         string $label,
@@ -1982,9 +1995,12 @@ class ProductResource extends Resource
                         '</div>';
                 }
 
-                $progress = $group['required'] > 0
-                    ? $group['filled'].'/'.$group['required'].' обов’язкових · '.$group['percentage'].'%'
-                    : 'Обов’язкових полів немає';
+                $missingRequired = max(0, (int) $group['required'] - (int) $group['filled']);
+                $progress = $group['required'] === 0
+                    ? 'Обов’язкових полів немає'
+                    : ($missingRequired === 0
+                        ? 'Обов’язкові поля заповнені'
+                        : 'Потрібно заповнити: '.$missingRequired);
 
                 $missing = collect($group['missing'])
                     ->take(4)
@@ -2021,22 +2037,23 @@ class ProductResource extends Resource
         $basic = $service->basicCompleteness($record);
         $structure = $service->structureCompleteness($record);
 
+        $basicText = $basic['missing'] === []
+            ? 'Основні Master-дані заповнені'
+            : 'Додатково можна заповнити: '.implode(', ', $basic['missing']);
+
+        $missingStructure = $structure['missing_product'] + $structure['missing_variant'];
+        $structureText = $structure['total'] === 0
+            ? 'Обов’язкових характеристик немає'
+            : ($missingStructure === 0
+                ? 'Обов’язкові характеристики заповнені'
+                : 'Потрібно заповнити обов’язкових характеристик: '.$missingStructure);
+
         return new HtmlString(
-            '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;">'.
-                '<span>Базові дані</span>'.
-                '<strong>'.$basic['percentage'].'%</strong>'.
-            '</div>'.
-            '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:5px;overflow:hidden;">'.
-                '<div style="height:100%;width:'.$basic['percentage'].'%;background:currentColor;border-radius:999px;"></div>'.
-            '</div>'.
-            '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-top:12px;">'.
-                '<span>Характеристики</span>'.
-                '<strong>'.$structure['percentage'].'%</strong>'.
-            '</div>'.
-            '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:5px;overflow:hidden;">'.
-                '<div style="height:100%;width:'.$structure['percentage'].'%;background:currentColor;border-radius:999px;"></div>'.
-            '</div>'.
-            '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Це повнота Master-даних, а не готовність конкретного каналу.</div>'
+            '<div><strong>Master</strong></div>'.
+            '<div style="margin-top:4px;color:#6b7280;">'.e($basicText).'</div>'.
+            '<div style="margin-top:10px;"><strong>Характеристики</strong></div>'.
+            '<div style="margin-top:4px;color:#6b7280;">'.e($structureText).'</div>'.
+            '<div style="margin-top:8px;font-size:11px;color:#9ca3af;">Готовність до конкретної дії перевіряється окремо для B2B або каналу публікації.</div>'
         );
     }
 
@@ -2203,11 +2220,15 @@ HTML;
 HTML;
     }
 
+    private static function productLifecycleStatus(Product $record): ProductLifecycleStatus
+    {
+        return $record->lifecycle_status
+            ?? ($record->is_active ? ProductLifecycleStatus::Active : ProductLifecycleStatus::Archived);
+    }
+
     private static function productLifecycleLabel(Product $record): string
     {
-        return ($record->lifecycle_status
-            ?? ($record->is_active ? ProductLifecycleStatus::Active : ProductLifecycleStatus::Archived))
-            ->label();
+        return self::productLifecycleStatus($record)->label();
     }
 
     private static function productLifecycleColor(string $state): string

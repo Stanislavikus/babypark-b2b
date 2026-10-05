@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
+use App\Enums\ProductLifecycleStatus;
+use App\Exceptions\Catalog\MasterProductLifecycleMutationException;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditor;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditStaleException;
@@ -14,6 +16,7 @@ use App\Models\User;
 use App\Models\VariantFieldValue;
 use App\Models\VariantMedia;
 use App\Models\Workspace;
+use App\Services\Catalog\MasterProductLifecycleMutationService;
 use App\Services\Catalog\ProductMediaMutationService;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductVariantStructureService;
@@ -52,6 +55,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
@@ -77,6 +81,20 @@ class EditProduct extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->lifecycleAction(
+                'activate_product',
+                ProductLifecycleStatus::Active,
+                'Активувати',
+                'heroicon-o-check-circle',
+                'success',
+            ),
+            $this->lifecycleAction(
+                'archive_product',
+                ProductLifecycleStatus::Archived,
+                'Архівувати',
+                'heroicon-o-archive-box',
+                'gray',
+            ),
             $this->promoteVariantsAction(),
             $this->addVariantAxisAction(),
             $this->addVariantAction(),
@@ -86,6 +104,73 @@ class EditProduct extends EditRecord
             $this->optionalGroupsAction(),
             ViewAction::make()->label('Перегляд'),
         ];
+    }
+
+    private function lifecycleAction(
+        string $name,
+        ProductLifecycleStatus $target,
+        string $label,
+        string $icon,
+        string $color,
+    ): Action {
+        return Action::make($name)
+            ->label($label)
+            ->icon($icon)
+            ->color($color)
+            ->requiresConfirmation()
+            ->visible(fn (): bool => $this->canManageProducts()
+                && $this->variantShapeIsManuallyEditable()
+                && $this->currentLifecycle() !== $target)
+            ->action(function () use ($target): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User && $this->canManageProducts(), 403);
+
+                $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
+                $expected = $this->currentLifecycle();
+
+                try {
+                    app(MasterProductLifecycleMutationService::class)->transition(
+                        $actor,
+                        $workspace,
+                        $this->record,
+                        $expected,
+                        $target,
+                    );
+                } catch (MasterProductLifecycleMutationException $exception) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Стан товару не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    return;
+                } catch (AuthorizationException) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Стан товару не змінено')
+                        ->body('Ваші права на редагування товару змінилися. Оновіть сторінку.')
+                        ->send();
+
+                    return;
+                }
+
+                $this->record->refresh();
+
+                Notification::make()
+                    ->success()
+                    ->title($target === ProductLifecycleStatus::Active
+                        ? 'Товар активовано'
+                        : 'Товар архівовано')
+                    ->send();
+            });
+    }
+
+    private function currentLifecycle(): ProductLifecycleStatus
+    {
+        return $this->record->lifecycle_status
+            ?? ($this->record->is_active
+                ? ProductLifecycleStatus::Active
+                : ProductLifecycleStatus::Archived);
     }
 
     private function mediaActions(): ActionGroup
