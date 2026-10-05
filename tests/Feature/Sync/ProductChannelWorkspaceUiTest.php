@@ -412,6 +412,154 @@ class ProductChannelWorkspaceUiTest extends TestCase
     }
 
     #[Test]
+    public function trusted_magento_product_exposes_remote_attribute_set_as_read_only_and_tampered_override_rolls_back(): void
+    {
+        $this->grantExactWorkspacePermissions($this->workspace, $this->actor, [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            WorkspacePermissions::RUN_SYNC_PREVIEW,
+        ]);
+
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $product = $this->createProduct('MASTER-MAGENTO-TRUSTED');
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'MASTER-MAGENTO-TRUSTED',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        $source = app(ConnectorDiscoverySourceResolver::class)->resolve($account);
+        $set = AdobeProductAttributeSet::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $source->id,
+            'provider_attribute_set_id' => 9,
+            'name' => 'Strollers',
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
+        ]);
+        AdobeProductCategory::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'external_category_id' => '13',
+            'parent_external_category_id' => '2',
+            'name' => 'Travel strollers',
+            'provider_path' => '1/2/13',
+            'breadcrumb' => 'Baby > Travel strollers',
+            'level' => 2,
+            'position' => 1,
+            'is_active' => true,
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
+        ]);
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        $membership = WorkspaceUser::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('user_id', $this->actor->id)
+            ->firstOrFail();
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'product_variant_id' => null,
+            'external_identifier' => 'MASTER-MAGENTO-TRUSTED',
+            'trust_origin' => ExternalRecordLinkTrustOrigin::MerchantConfirmed->value,
+            'external_record_discriminator' => '777',
+            'established_by_workspace_user_id' => $membership->id,
+            'established_at' => now(),
+        ]);
+
+        $action = TestAction::make('configure_magento')
+            ->schemaComponent('channel_capability_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction($action)
+            ->assertActionDataSet(fn (array $data): bool => (
+                ($data['account_id'] ?? null) === $account->id
+                && ($data['attribute_set_mode'] ?? null) === 'observed_remote'
+            ))
+            ->unmountAction()
+            ->callAction($action, [
+                'account_id' => $account->id,
+                'category_mode' => 'override',
+                'category_ids' => ['13'],
+                'attribute_set_mode' => 'override',
+                'attribute_set_id' => $set->id,
+            ])
+            ->assertHasActionErrors(['attribute_set_mode']);
+
+        $this->assertDatabaseMissing('adobe_product_category_overrides', [
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+        ]);
+        $this->assertDatabaseMissing('adobe_product_attribute_set_overrides', [
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+        ]);
+    }
+
+    #[Test]
+    public function magento_editor_rechecks_current_selection_instead_of_trusting_a_stale_loaded_relation(): void
+    {
+        $this->grantExactWorkspacePermissions($this->workspace, $this->actor, [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $product = $this->createProduct('MASTER-MAGENTO-STALE-SELECTION');
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        $product->load('syncChannelSelections.syncConfiguration.connectorAccount.connectorDefinition');
+
+        $editor = app(\App\Services\Sync\ProductMagentoClassificationEditor::class);
+        $this->assertArrayHasKey($account->id, $editor->accountOptions($product));
+
+        app(ProductChannelSelectionService::class)->remove(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        $this->assertSame([], $editor->accountOptions($product));
+
+        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+        $editor->formState($product, $account->id);
+    }
+
+    #[Test]
     public function selected_magento_product_shows_ready_classification_without_claiming_publication_readiness(): void
     {
         $this->grantExactWorkspacePermissions($this->workspace, $this->actor, [

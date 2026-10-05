@@ -8,6 +8,7 @@ use App\Models\AdobeProductCategory;
 use App\Models\AdobeProductCategoryOverride;
 use App\Models\ConnectorAccount;
 use App\Models\Product;
+use App\Models\SyncConfigurationProductSelection;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Sync\AdobeProductEffectiveClassification;
@@ -68,9 +69,13 @@ final class ProductMagentoClassificationEditor
             'category_ids' => $categoryOverrides !== []
                 ? $categoryOverrides
                 : $classification->externalCategoryIds,
-            'attribute_set_mode' => $attributeOverride === null ? 'automatic' : 'override',
-            'attribute_set_id' => $attributeOverride?->adobe_product_attribute_set_id
-                ?? $classification->adobeProductAttributeSetId,
+            'attribute_set_mode' => $classification->hasTrustedRemoteSubject
+                ? 'observed_remote'
+                : ($attributeOverride === null ? 'automatic' : 'override'),
+            'attribute_set_id' => $classification->hasTrustedRemoteSubject
+                ? $classification->adobeProductAttributeSetId
+                : ($attributeOverride?->adobe_product_attribute_set_id
+                    ?? $classification->adobeProductAttributeSetId),
         ];
     }
 
@@ -165,6 +170,16 @@ final class ProductMagentoClassificationEditor
                 throw new AuthorizationException('Invalid Magento category mode.');
             }
 
+            $currentClassification = $this->readService->resolve($account, $product);
+
+            if ($currentClassification->hasTrustedRemoteSubject) {
+                if (($data['attribute_set_mode'] ?? null) !== 'observed_remote') {
+                    throw new AuthorizationException('Existing trusted Magento Product Attribute Set is read-only.');
+                }
+
+                return;
+            }
+
             if (($data['attribute_set_mode'] ?? null) === 'override') {
                 $attributeSetId = trim((string) ($data['attribute_set_id'] ?? ''));
                 $attributeSet = AdobeProductAttributeSet::withoutWorkspaceScope()
@@ -217,12 +232,12 @@ final class ProductMagentoClassificationEditor
      */
     private function selectedAccounts(Product $product): \Illuminate\Support\Collection
     {
-        $product->loadMissing(
-            'syncChannelSelections.syncConfiguration.connectorAccount.connectorDefinition',
-        );
-
-        return $product->syncChannelSelections
-            ->map(fn ($selection) => $selection->syncConfiguration?->connectorAccount)
+        return SyncConfigurationProductSelection::withoutWorkspaceScope()
+            ->where('workspace_id', $product->workspace_id)
+            ->where('product_id', $product->id)
+            ->with('syncConfiguration.connectorAccount.connectorDefinition')
+            ->get()
+            ->map(fn (SyncConfigurationProductSelection $selection) => $selection->syncConfiguration?->connectorAccount)
             ->filter(fn ($account): bool => $account instanceof ConnectorAccount
                 && $account->connectorDefinition?->code === 'adobe_commerce')
             ->unique('id')
