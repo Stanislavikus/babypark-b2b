@@ -39,7 +39,7 @@ final class ProductMagentoClassificationEditor
      *   account_id:string,
      *   category_mode:'automatic'|'override',
      *   category_ids:list<string>,
-     *   attribute_set_mode:'automatic'|'override',
+     *   attribute_set_mode:'automatic'|'override'|'observed_remote',
      *   attribute_set_id:?string
      * }
      */

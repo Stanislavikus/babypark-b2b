@@ -1777,10 +1777,10 @@ class ProductResource extends Resource
                     ->helperText('Показано лише актуальні активні Product-категорії; root/store-root не доступні.'),
                 Radio::make('attribute_set_mode')
                     ->label('Attribute Set')
-                    ->options([
-                        'automatic' => 'Автоматично з Сімейства товару / remote truth',
-                        'override' => 'Власний вибір для цього товару',
-                    ])
+                    ->options(fn (Get $get, ?Product $record): array => self::magentoAttributeSetModeOptions(
+                        $record,
+                        is_string($get('account_id')) ? $get('account_id') : null,
+                    ))
                     ->required()
                     ->inline()
                     ->live(),
@@ -1866,6 +1866,37 @@ class ProductResource extends Resource
         } catch (AuthorizationException) {
             return [];
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function magentoAttributeSetModeOptions(?Product $record, ?string $accountId): array
+    {
+        if (! $record instanceof Product || ! is_string($accountId) || $accountId === '') {
+            return [
+                'automatic' => 'Автоматично з Сімейства товару',
+                'override' => 'Власний вибір для цього товару',
+            ];
+        }
+
+        try {
+            $classification = app(ProductMagentoClassificationEditor::class)->effective($record, $accountId);
+
+            if ($classification->hasTrustedRemoteSubject) {
+                return [
+                    'observed_remote' => 'Визначається Magento · лише перегляд',
+                ];
+            }
+        } catch (AdobeProductClassificationException|AuthorizationException) {
+            // The action summary will surface the read problem. Keep the safe unlinked options
+            // unavailable to a tampered account because apply() re-authorizes and fails closed.
+        }
+
+        return [
+            'automatic' => 'Автоматично з Сімейства товару',
+            'override' => 'Власний вибір для цього товару',
+        ];
     }
 
     /**
