@@ -58,14 +58,15 @@ class FilamentTableLiveFilterBridgeTest extends TestCase
             'Global Table::configureUsing must keep Filament tables non-deferred (Filament 3 live UX).',
         );
 
-        // ProductResource defaults the status filter to "active".
+        // ProductResource defaults the lifecycle filter to the working set:
+        // Draft + Active are visible; Archived is excluded.
         $component
             ->assertCanSeeTableRecords([$active])
             ->assertCanNotSeeTableRecords([$inactive]);
 
         // Changing the filter must update the query immediately — no applyTableFilters call.
         $component
-            ->filterTable('status', 'inactive')
+            ->filterTable('status', 'archived')
             ->assertCanSeeTableRecords([$inactive])
             ->assertCanNotSeeTableRecords([$active]);
 
