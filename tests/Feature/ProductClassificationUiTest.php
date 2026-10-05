@@ -94,7 +94,7 @@ class ProductClassificationUiTest extends TestCase
         Livewire::actingAs($this->admin)
             ->test(ViewProduct::class, ['record' => $product->getRouteKey()])
             ->assertSee('Класифікація')
-            ->assertSee('Внутрішній тип товару')
+            ->assertSee('Внутрішня класифікація')
             ->assertSee('Коляска');
     }
 

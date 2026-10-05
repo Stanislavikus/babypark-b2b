@@ -8,6 +8,7 @@ use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Enums\UserRole;
+use App\Filament\Resources\ProductResource\Pages\CreateProduct;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\AttributeGroup;
 use App\Models\FieldBinding;
@@ -62,6 +63,35 @@ class MasterProductWorkspaceShellTest extends TestCase
     }
 
     #[Test]
+    public function create_page_renders_the_full_master_card_shell_before_first_save(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(CreateProduct::class)
+            ->assertSee('Для чернетки достатньо заповнити лише «Назва».')
+            ->assertSee('Основна інформація')
+            ->assertSee('Медіа')
+            ->assertSee('Ціна')
+            ->assertSee('Залишки')
+            ->assertSee('Доставка та фізичні дані')
+            ->assertSee('Варіанти')
+            ->assertSee('Характеристики')
+            ->assertSee('SEO та пошук')
+            ->assertSee('Якість даних')
+            ->assertSee('Канали публікації')
+            ->assertSee('Потребує уваги')
+            ->assertSee('Доступно після збереження чернетки.')
+            ->assertSee('Створити з AI')
+            ->assertSee('Заповнити з файлу')
+            ->assertSee('Сімейство товару')
+            ->assertSee('Внутрішня класифікація')
+            ->assertSee('Нова чернетка')
+            ->assertSee('Зберегти чернетку')
+            ->assertSee('Зберегти й додати ще товар')
+            ->assertDontSee('Імпортувати Excel / CSV')
+            ->assertDontSee('URL товару на сайті');
+    }
+
+    #[Test]
     public function edit_page_renders_the_visible_master_product_workspace_sections(): void
     {
         $product = Product::withoutWorkspaceScope()->create([
@@ -101,7 +131,8 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertSee('Якість даних')
             ->assertSee('Канали публікації')
             ->assertSee('Потребує уваги')
-            ->assertSee('Імпортувати Excel / CSV')
+            ->assertDontSee('Імпортувати Excel / CSV')
+            ->assertSee('Створити з AI')
             ->assertSee('Заповнити з файлу')
             ->assertSee('Покращити')
             ->assertSee('Видалити фон')
@@ -121,7 +152,7 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertSee('2 медіа · поточний Master-набір')
             ->assertSee('Стан у Master')
             ->assertSee('Окремо для кожного каналу')
-            ->assertSee('Це повнота Master-даних, а не готовність конкретного каналу.');
+            ->assertSee('Готовність до конкретної дії перевіряється окремо для B2B або каналу публікації.');
     }
 
     #[Test]
@@ -159,11 +190,11 @@ class MasterProductWorkspaceShellTest extends TestCase
         Livewire::actingAs($this->admin)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
             ->mountAction(
-                TestAction::make('import_spreadsheet')
+                TestAction::make('create_with_ai')
                     ->schemaComponent('basic_capability_actions'),
             )
             ->assertActionMounted(
-                TestAction::make('import_spreadsheet')
+                TestAction::make('create_with_ai')
                     ->schemaComponent('basic_capability_actions'),
             )
             ->assertSee('Чекає на підключення')
@@ -193,7 +224,7 @@ class MasterProductWorkspaceShellTest extends TestCase
         ]);
 
         $pendingActions = [
-            ['import_spreadsheet', 'basic_capability_actions'],
+            ['create_with_ai', 'basic_capability_actions'],
             ['fill_from_supplier_document', 'basic_capability_actions'],
             ['media_enhance', 'media_pending_actions'],
             ['media_remove_background', 'media_pending_actions'],
@@ -266,7 +297,6 @@ class MasterProductWorkspaceShellTest extends TestCase
                 'name' => 'SEO deferred product updated',
                 'meta_title' => 'Must not save',
                 'meta_description' => 'Must not save',
-                'url' => 'https://example.test/must-not-save',
             ])
             ->call('save')
             ->assertHasNoFormErrors();

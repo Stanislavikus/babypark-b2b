@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\ProductLifecycleStatus;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -62,7 +63,8 @@ final class MasterProductDraftCreator
                 'merchant_type' => $merchantType,
                 'description' => $description,
                 'url' => $url,
-                'is_active' => true,
+                'is_active' => false,
+                'lifecycle_status' => ProductLifecycleStatus::Draft,
             ]);
 
             ProductVariant::withoutWorkspaceScope()->create([

@@ -1719,6 +1719,12 @@ Examples: platform video asset; platform instruction/document asset; bundle/kit 
 
 A ProductType defines an internal template for product structure.
 
+**[Resolved addendum — 2026-10-05]** ProductType defines the admissible Product/Variant
+field structure and variant-axis candidates. It does **not** classify a concrete Product as
+Simple/Configurable, and it is **not** equivalent to any provider schema such as a Magento
+Attribute Set. A concrete Product may have no declared axes or may later gain one or more axes
+without changing this semantic boundary.
+
 In the user interface, this may be called:
 
 - Product Type
@@ -10418,7 +10424,9 @@ replacement of what already exists, but an addition alongside it:
   above): an unstructured internal label a merchant can set for their own organization, with no
   taxonomy backing and no attribute-unlocking behavior. Implemented as `products.merchant_type`
   (nullable string column), deliberately not a generic `type` column to keep it unambiguous in
-  code as well as in docs.
+  code as well as in docs. **[Resolved addendum — 2026-10-05]** This field does not control
+  fields, variants, completeness, readiness, or provider classification; merchant-facing Product
+  UI labels it `Внутрішня класифікація` rather than implying structural ProductType semantics.
 - **Tags** (free-form, optional, multiple per product): the loosest layer, for filtering/
   collections on top of Merchant/Catalogue Category — never a substitute for it. Implemented as
   a workspace-owned `tags` table + `product_tag` pivot with `workspace_id` isolation enforcement.

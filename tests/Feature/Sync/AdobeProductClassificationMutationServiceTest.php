@@ -3,6 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Models\AdobeProductAttributeSet;
+use App\Models\AdobeProductCategory;
 use App\Models\AdobeProductCategoryOverride;
 use App\Models\Product;
 use App\Models\ProductType;
@@ -56,6 +57,8 @@ class AdobeProductClassificationMutationServiceTest extends TestCase
         $product = $this->product($workspace);
         $setA = $this->attributeSet($account, 9, 'Default');
         $setB = $this->attributeSet($account, 10, 'Strollers');
+        $this->category($account, '6', 'Strollers');
+        $this->category($account, '8', 'Travel');
 
         $default = $this->service->setProductTypeAttributeSetDefault(
             $actor,
@@ -220,6 +223,7 @@ class AdobeProductClassificationMutationServiceTest extends TestCase
             [WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS],
         );
         $product = $this->product($workspace);
+        $this->category($account, '6', 'Strollers');
 
         $this->service->replaceProductCategoryOverrides(
             $actor,
@@ -246,6 +250,64 @@ class AdobeProductClassificationMutationServiceTest extends TestCase
                 'product_id' => $product->id,
                 'external_category_id' => '6',
             ]);
+        }
+    }
+
+    #[Test]
+    public function inactive_missing_and_structural_categories_are_rejected_without_erasing_existing_override(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantExactWorkspacePermissions(
+            $workspace,
+            $actor,
+            [WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS],
+        );
+        $product = $this->product($workspace);
+
+        $this->category($account, '6', 'Valid category');
+        $inactive = $this->category($account, '7', 'Inactive category');
+        $inactive->forceFill(['is_active' => false])->save();
+
+        $missing = $this->category($account, '8', 'Missing category');
+        $missing->forceFill(['missing_since' => now()])->save();
+
+        $this->category($account, '1', 'Store root', level: 1);
+
+        $this->service->replaceProductCategoryOverrides(
+            $actor,
+            $workspace,
+            $account,
+            $product,
+            ['6'],
+        );
+
+        foreach (['7', '8', '1', '999'] as $invalidId) {
+            try {
+                $this->service->replaceProductCategoryOverrides(
+                    $actor,
+                    $workspace,
+                    $account,
+                    $product,
+                    [$invalidId],
+                );
+
+                $this->fail("Expected category {$invalidId} to be rejected.");
+            } catch (AdobeProductClassificationException $exception) {
+                $this->assertSame(
+                    'One or more Magento categories are unavailable, inactive, missing, or structural-only.',
+                    $exception->getMessage(),
+                );
+            }
+
+            $this->assertDatabaseHas('adobe_product_category_overrides', [
+                'workspace_id' => $workspace->id,
+                'connector_account_id' => $account->id,
+                'product_id' => $product->id,
+                'external_category_id' => '6',
+            ]);
+            $this->assertDatabaseCount('adobe_product_category_overrides', 1);
         }
     }
 
@@ -294,6 +356,25 @@ class AdobeProductClassificationMutationServiceTest extends TestCase
             'sku' => 'CLASSIFY-'.Str::random(8),
             'name' => 'Classification fixture',
             'is_active' => true,
+        ]);
+    }
+
+    private function category($account, string $externalId, string $name, int $level = 2): AdobeProductCategory
+    {
+        return AdobeProductCategory::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'external_category_id' => $externalId,
+            'parent_external_category_id' => $level > 1 ? '1' : null,
+            'name' => $name,
+            'provider_path' => $level > 1 ? '1/'.$externalId : $externalId,
+            'breadcrumb' => $name,
+            'level' => $level,
+            'position' => 1,
+            'is_active' => true,
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
         ]);
     }
 

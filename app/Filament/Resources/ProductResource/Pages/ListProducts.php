@@ -6,6 +6,7 @@ use App\Filament\Concerns\HasMarginFormatToggle;
 use App\Filament\Resources\ProductResource;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Support\Workspace\WorkspaceContext;
+use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Contracts\Support\Htmlable;
@@ -39,7 +40,13 @@ class ListProducts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->label('Створити товар'),
+            Action::make('import_products')
+                ->label('Імпортувати товари')
+                ->icon('heroicon-o-arrow-up-tray')
+                ->disabled()
+                ->tooltip('Імпорт Excel / CSV буде підключено окремим етапом.'),
         ];
     }
 }

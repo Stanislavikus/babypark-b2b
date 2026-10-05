@@ -4,6 +4,7 @@ namespace App\Services\Sync;
 
 use App\Models\AdobeProductAttributeSet;
 use App\Models\AdobeProductAttributeSetOverride;
+use App\Models\AdobeProductCategory;
 use App\Models\AdobeProductCategoryOverride;
 use App\Models\AdobeProductTypeAttributeSetDefault;
 use App\Models\ConnectorAccount;
@@ -152,6 +153,25 @@ final class AdobeProductClassificationMutationService
 
             if ($normalized === []) {
                 throw AdobeProductClassificationException::categoriesRequired();
+            }
+
+            $availableCategoryIds = AdobeProductCategory::withoutWorkspaceScope()
+                ->where('workspace_id', $lockedWorkspace->id)
+                ->where('connector_account_id', $account->id)
+                ->whereIn('external_category_id', $normalized)
+                ->whereNull('missing_since')
+                ->where('is_active', true)
+                ->where('level', '>=', 2)
+                ->orderBy('external_category_id')
+                ->lockForUpdate()
+                ->pluck('external_category_id')
+                ->map(static fn ($value): string => (string) $value)
+                ->all();
+
+            sort($availableCategoryIds, SORT_STRING);
+
+            if ($availableCategoryIds !== $normalized) {
+                throw AdobeProductClassificationException::categoryUnavailable();
             }
 
             AdobeProductCategoryOverride::withoutWorkspaceScope()

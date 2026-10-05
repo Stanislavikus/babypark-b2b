@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ProductLifecycleStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
@@ -41,6 +42,8 @@ class MasterProductDraftCreationTest extends TestCase
 
         $this->assertNull($product->onec_guid);
         $this->assertNull($product->sku);
+        $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
+        $this->assertFalse($product->is_active);
         $this->assertNotNull($product->product_type_id);
         $this->assertCount(1, $product->variants);
 
@@ -49,6 +52,7 @@ class MasterProductDraftCreationTest extends TestCase
         $this->assertSame($workspace->id, $variant->workspace_id);
         $this->assertNull($variant->onec_guid);
         $this->assertNull($variant->sku);
+        $this->assertTrue($variant->is_active);
         $this->assertSame([], $variant->attributes);
     }
 
@@ -110,7 +114,49 @@ class MasterProductDraftCreationTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(ListProducts::class)
-            ->assertActionVisible('create');
+            ->assertActionVisible('create')
+            ->assertActionVisible('import_products');
+    }
+
+    #[Test]
+    public function product_list_default_working_view_keeps_drafts_and_active_products_visible_but_hides_archived(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $user = User::query()->create([
+            'name' => 'Product list lifecycle editor',
+            'email' => 'product-list-lifecycle@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Manager,
+            'is_active' => true,
+        ]);
+
+        $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
+
+        $draft = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => null,
+            'name' => 'Visible draft',
+            'lifecycle_status' => ProductLifecycleStatus::Draft,
+        ]);
+        $active = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => null,
+            'name' => 'Visible active',
+            'lifecycle_status' => ProductLifecycleStatus::Active,
+        ]);
+        $archived = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => null,
+            'name' => 'Hidden archived',
+            'lifecycle_status' => ProductLifecycleStatus::Archived,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(ListProducts::class)
+            ->assertCanSeeTableRecords([$draft, $active])
+            ->assertCanNotSeeTableRecords([$archived]);
     }
 
     #[Test]
@@ -232,6 +278,8 @@ class MasterProductDraftCreationTest extends TestCase
         $this->assertNull($product->sku);
         $this->assertSame('BabyPark Test', $product->brand);
         $this->assertSame('test-product', $product->merchant_type);
+        $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
+        $this->assertFalse($product->is_active);
         $this->assertCount(1, $product->variants);
     }
 

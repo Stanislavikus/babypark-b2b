@@ -193,7 +193,7 @@ Only **one** field is strictly required to save a product record:
 
 - name
 
-If the user drops an entry with just a name, the system generates an internal product ID / internal SKU and saves it. All other metadata can be progressively enriched later. 
+If the user creates an entry with just a name, the system generates internal Product identity and saves it as a draft. SKU and GTIN may remain absent until explicitly supplied or produced by a separately Resolved identity policy. The platform must not guess an external SKU merely to persist a draft. All other metadata can be progressively enriched later.
 
 ### Required for B2B Publication
 
