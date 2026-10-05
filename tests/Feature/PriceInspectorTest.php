@@ -13,18 +13,23 @@ use App\Models\Workspace;
 use App\Services\Pricing\PriceResolver;
 use App\Services\Pricing\Resolution\PriceResolutionStatus;
 use App\Services\Pricing\Resolution\PriceResolutionTracePresenter;
+use App\Support\Workspace\WorkspacePermissions;
 use Carbon\CarbonImmutable;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesPricingFixtures;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class PriceInspectorTest extends TestCase
 {
-    use CreatesPricingFixtures;
+    use CreatesPricingFixtures, InteractsWithWorkspaceRbac {
+        CreatesPricingFixtures::defaultWorkspace insteadof InteractsWithWorkspaceRbac;
+    }
     use RefreshDatabase;
 
     private User $admin;
@@ -34,6 +39,7 @@ class PriceInspectorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         $this->workspace = $this->defaultWorkspace();
 
@@ -44,6 +50,12 @@ class PriceInspectorTest extends TestCase
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $membership = $this->makeWorkspaceMembership($this->workspace, $this->admin);
+        $role = $this->createRoleWithPermissions($this->workspace->id, 'Price inspector product editor', [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }

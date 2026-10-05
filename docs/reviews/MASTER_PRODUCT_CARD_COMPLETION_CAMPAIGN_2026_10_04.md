@@ -690,24 +690,55 @@ Focused regression after correction:
 - SyncRun / sync permission / RBAC catalogue group:
   **87 tests / 246 assertions PASS**.
 
-### Clean-base control for unrelated local full-suite failures
+### Full-suite follow-up — locale-sensitive output and Price Inspector RBAC fixtures
 
-A separate local full-suite run on the candidate exposed 16 failures around
-Price Inspector / presentation / toolbar/form Ukrainian copy. These are **not**
-attributed to this campaign:
+The local full-suite run on candidate HEAD `010f5cd` finished with
+**25 failures**. The failure set decomposed into two independently verified
+classes:
 
-- the exact same focused set was run from a detached clean
-  `origin/develop` worktree at
-  `d4c93d34317e7596709b8c66a1b5c07329a3e32b`;
-- clean base reproduced the same **16 failed / 78 warnings / 478 assertions**;
-- local repository testing has no `.env`, so Laravel falls back to
-  `config/app.php` default `APP_LOCALE=en`;
-- GitHub CI's Prepare application step copies `.env.example`, which explicitly
-  sets `APP_LOCALE=uk` and `APP_FALLBACK_LOCALE=uk`.
+1. **9 branch-owned stale permission-count assertions** — corrected above.
+2. **16 presentation / Price Inspector failures** observed while local testing
+   had no `.env` and therefore used Laravel's default `APP_LOCALE=en`.
 
-Therefore the local English-vs-Ukrainian presentation failures are a proven
-pre-existing local test-environment baseline and are not modified or imported
-into PR #253.
+A first attempt to compare those 16 failures against a detached
+`origin/develop` worktree used the candidate worktree's `vendor` directory
+through a symlink. Because Composer's generated PSR-4 loader can resolve the
+application base through that physical vendor path, that comparison is
+**withdrawn and must not be treated as clean-base evidence**.
 
-The next pushed HEAD requires a fresh exact-HEAD MySQL workflow; #37236564717
-remains historical failure evidence only.
+The useful deterministic split came from rerunning the same eight failing test
+files in the CI locale:
+
+- `APP_LOCALE=uk APP_FALLBACK_LOCALE=uk` reduced the set from 16 failures to
+  **6**;
+- all remaining 6 failures were Product actions in Price Inspector that now
+  correctly depend on `ProductResource::canEdit()`;
+- those tests still modelled a legacy `Admin` actor without effective
+  `manage_products`, so the new explicit Product mutation authority hid the
+  expected edit links.
+
+Classification: **branch-owned test-fixture fallout — fixed in branch**.
+
+Minimal correction:
+
+- Price Inspector unit and feature fixtures that expect Product edit actions now
+  create a real Workspace membership and role with
+  `manage_products`;
+- feature tests continue authenticating that actor through Livewire;
+- unit tests authenticate the same actor represented in
+  `PriceInspectorContext`;
+- no Product authorization, Price Inspector production logic or legacy-role
+  fallback was weakened.
+
+Regression:
+
+- the complete previous eight-file failure set under CI-like Ukrainian locale:
+  **94 tests / 521 assertions PASS**.
+
+CI environment fact:
+
+- GitHub's Prepare application step copies `.env.example`, where
+  `APP_LOCALE=uk` and `APP_FALLBACK_LOCALE=uk` are explicit.
+
+The next pushed HEAD requires a fresh exact-HEAD MySQL workflow. Workflows
+#37236564717 and #37269317005 are historical intermediate evidence only.

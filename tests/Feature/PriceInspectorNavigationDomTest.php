@@ -6,15 +6,20 @@ use App\Enums\UserRole;
 use App\Filament\Pages\PriceInspector;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Workspace\WorkspacePermissions;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesPricingFixtures;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class PriceInspectorNavigationDomTest extends TestCase
 {
-    use CreatesPricingFixtures;
+    use CreatesPricingFixtures, InteractsWithWorkspaceRbac {
+        CreatesPricingFixtures::defaultWorkspace insteadof InteractsWithWorkspaceRbac;
+    }
     use RefreshDatabase;
 
     private User $admin;
@@ -24,6 +29,7 @@ class PriceInspectorNavigationDomTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         $this->workspace = $this->defaultWorkspace();
         $this->admin = User::query()->create([
@@ -33,6 +39,12 @@ class PriceInspectorNavigationDomTest extends TestCase
             'role' => UserRole::Admin,
             'is_active' => true,
         ]);
+
+        $membership = $this->makeWorkspaceMembership($this->workspace, $this->admin);
+        $role = $this->createRoleWithPermissions($this->workspace->id, 'Price inspector navigation editor', [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $this->assignRoleToMembership($membership, $role);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
