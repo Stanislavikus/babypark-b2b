@@ -81,20 +81,6 @@ class EditProduct extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            $this->lifecycleAction(
-                'activate_product',
-                ProductLifecycleStatus::Active,
-                'Активувати',
-                'heroicon-o-check-circle',
-                'success',
-            ),
-            $this->lifecycleAction(
-                'archive_product',
-                ProductLifecycleStatus::Archived,
-                'Архівувати',
-                'heroicon-o-archive-box',
-                'gray',
-            ),
             $this->promoteVariantsAction(),
             $this->addVariantAxisAction(),
             $this->addVariantAction(),
@@ -106,63 +92,57 @@ class EditProduct extends EditRecord
         ];
     }
 
-    private function lifecycleAction(
-        string $name,
-        ProductLifecycleStatus $target,
-        string $label,
-        string $icon,
-        string $color,
-    ): Action {
-        return Action::make($name)
-            ->label($label)
-            ->icon($icon)
-            ->color($color)
-            ->requiresConfirmation()
-            ->visible(fn (): bool => $this->canManageProducts()
-                && $this->variantShapeIsManuallyEditable()
-                && $this->currentLifecycle() !== $target)
-            ->action(function () use ($target): void {
-                $actor = auth()->user();
-                abort_unless($actor instanceof User && $this->canManageProducts(), 403);
+    protected function afterSave(): void
+    {
+        $requested = ProductLifecycleStatus::tryFrom(
+            (string) data_get($this->data, 'master_lifecycle_status'),
+        );
 
-                $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
-                $expected = $this->currentLifecycle();
+        if (! $requested instanceof ProductLifecycleStatus) {
+            return;
+        }
 
-                try {
-                    app(MasterProductLifecycleMutationService::class)->transition(
-                        $actor,
-                        $workspace,
-                        $this->record,
-                        $expected,
-                        $target,
-                    );
-                } catch (MasterProductLifecycleMutationException $exception) {
-                    Notification::make()
-                        ->warning()
-                        ->title('Стан товару не змінено')
-                        ->body($exception->getMessage())
-                        ->send();
+        $expected = $this->currentLifecycle();
 
-                    return;
-                } catch (AuthorizationException) {
-                    Notification::make()
-                        ->warning()
-                        ->title('Стан товару не змінено')
-                        ->body('Ваші права на редагування товару змінилися. Оновіть сторінку.')
-                        ->send();
+        if ($expected === $requested) {
+            return;
+        }
 
-                    return;
-                }
+        $actor = auth()->user();
+        abort_unless($actor instanceof User && $this->canManageProducts(), 403);
 
-                $this->record->refresh();
+        $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
 
-                Notification::make()
-                    ->success()
-                    ->title($target === ProductLifecycleStatus::Active
-                        ? 'Товар активовано'
-                        : 'Товар архівовано')
-                    ->send();
-            });
+        try {
+            $this->record = app(MasterProductLifecycleMutationService::class)->transition(
+                $actor,
+                $workspace,
+                $this->record,
+                $expected,
+                $requested,
+            );
+            data_set($this->data, 'master_lifecycle_status', $requested->value);
+        } catch (MasterProductLifecycleMutationException $exception) {
+            data_set($this->data, 'master_lifecycle_status', $expected->value);
+
+            Notification::make()
+                ->warning()
+                ->title('Стан товару не змінено')
+                ->body($exception->getMessage())
+                ->send();
+
+            throw (new Halt)->rollBackDatabaseTransaction();
+        } catch (AuthorizationException) {
+            data_set($this->data, 'master_lifecycle_status', $expected->value);
+
+            Notification::make()
+                ->warning()
+                ->title('Стан товару не змінено')
+                ->body('Ваші права на редагування товару змінилися. Оновіть сторінку.')
+                ->send();
+
+            throw (new Halt)->rollBackDatabaseTransaction();
+        }
     }
 
     private function currentLifecycle(): ProductLifecycleStatus

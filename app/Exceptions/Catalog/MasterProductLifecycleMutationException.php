@@ -15,9 +15,4 @@ final class MasterProductLifecycleMutationException extends RuntimeException
     {
         return new self('Стан товару змінився після відкриття картки. Оновіть сторінку і повторіть дію.');
     }
-
-    public static function unsupportedTarget(): self
-    {
-        return new self('Цей перехід стану недоступний.');
-    }
 }

@@ -284,6 +284,61 @@ class MasterProductDraftCreationTest extends TestCase
     }
 
     #[Test]
+    public function create_card_saves_selected_lifecycle_and_direct_physical_fields_in_one_submit(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $user = User::query()->create([
+            'name' => 'Full card creator',
+            'email' => 'full-card-creator@babypark.ua',
+            'password' => 'password',
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ]);
+
+        $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($user)
+            ->test(CreateProduct::class)
+            ->fillForm([
+                'name' => 'Full card product',
+                'master_lifecycle_status' => ProductLifecycleStatus::Active->value,
+                'net_weight' => '1.250',
+                'gross_weight' => '1.500',
+                'width_mm' => 420,
+                'height_mm' => 310,
+                'depth_mm' => 210,
+                'volume_m3' => '0.027342',
+                'package_quantity' => 2,
+                'package_type' => 'Коробка',
+                'units_per_box' => 4,
+                'boxes_per_pallet' => 12,
+                'lead_time_days' => 3,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $product = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('name', 'Full card product')
+            ->sole();
+
+        $this->assertSame(ProductLifecycleStatus::Active, $product->lifecycle_status);
+        $this->assertTrue($product->is_active);
+        $this->assertSame('1.250', $product->net_weight);
+        $this->assertSame('1.500', $product->gross_weight);
+        $this->assertSame(420, $product->width_mm);
+        $this->assertSame(310, $product->height_mm);
+        $this->assertSame(210, $product->depth_mm);
+        $this->assertSame('0.027342', $product->volume_m3);
+        $this->assertSame(2, $product->package_quantity);
+        $this->assertSame('Коробка', $product->package_type);
+        $this->assertSame(4, $product->units_per_box);
+        $this->assertSame(12, $product->boxes_per_pallet);
+        $this->assertSame(3, $product->lead_time_days);
+    }
+
+    #[Test]
     public function onec_owned_identity_fields_remain_read_only_in_existing_product_editor(): void
     {
         $workspace = Workspace::query()->where('is_default', true)->sole();

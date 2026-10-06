@@ -27,6 +27,21 @@ final class MasterProductDraftCreator
         $merchantType = $this->nullableTrimmedString($input['merchant_type'] ?? null);
         $description = $this->nullableTrimmedString($input['description'] ?? null);
         $url = $this->nullableTrimmedString($input['url'] ?? null);
+        $lifecycle = ProductLifecycleStatus::tryFrom((string) ($input['lifecycle_status'] ?? ''))
+            ?? ProductLifecycleStatus::Draft;
+        $physical = [
+            'net_weight' => $input['net_weight'] ?? null,
+            'gross_weight' => $input['gross_weight'] ?? null,
+            'width_mm' => $input['width_mm'] ?? null,
+            'height_mm' => $input['height_mm'] ?? null,
+            'depth_mm' => $input['depth_mm'] ?? null,
+            'volume_m3' => $input['volume_m3'] ?? null,
+            'package_quantity' => $input['package_quantity'] ?? null,
+            'package_type' => $this->nullableTrimmedString($input['package_type'] ?? null),
+            'units_per_box' => $input['units_per_box'] ?? null,
+            'boxes_per_pallet' => $input['boxes_per_pallet'] ?? null,
+            'lead_time_days' => $input['lead_time_days'] ?? null,
+        ];
 
         if ($categoryId !== null && $categoryId !== '') {
             $categoryExists = Category::withoutWorkspaceScope()
@@ -51,6 +66,8 @@ final class MasterProductDraftCreator
             $merchantType,
             $description,
             $url,
+            $lifecycle,
+            $physical,
         ): Product {
             $product = Product::withoutWorkspaceScope()->create([
                 'workspace_id' => $workspace->id,
@@ -63,8 +80,9 @@ final class MasterProductDraftCreator
                 'merchant_type' => $merchantType,
                 'description' => $description,
                 'url' => $url,
-                'is_active' => false,
-                'lifecycle_status' => ProductLifecycleStatus::Draft,
+                ...$physical,
+                'is_active' => $lifecycle->compatibilityIsActive(),
+                'lifecycle_status' => $lifecycle,
             ]);
 
             ProductVariant::withoutWorkspaceScope()->create([

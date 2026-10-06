@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
+use App\Enums\ProductLifecycleStatus;
 use App\Filament\Resources\ProductResource;
 use App\Services\Catalog\MasterProductDraftCreator;
 use App\Support\Workspace\WorkspaceContext;
@@ -25,6 +26,10 @@ class CreateProduct extends CreateRecord
 
     protected function handleRecordCreation(array $data): Model
     {
+        $data['lifecycle_status'] = ProductLifecycleStatus::tryFrom(
+            (string) data_get($this->data, 'master_lifecycle_status'),
+        )?->value ?? ProductLifecycleStatus::Draft->value;
+
         return app(MasterProductDraftCreator::class)->create(
             app(WorkspaceContext::class)->current(),
             $data,
@@ -33,13 +38,13 @@ class CreateProduct extends CreateRecord
 
     protected function getCreatedNotificationTitle(): ?string
     {
-        return 'Чернетку збережено';
+        return 'Товар збережено';
     }
 
     protected function getCreateFormAction(): Action
     {
         return parent::getCreateFormAction()
-            ->label('Зберегти чернетку');
+            ->label('Зберегти');
     }
 
     protected function getCreateAnotherFormAction(): Action
