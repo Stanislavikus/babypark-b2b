@@ -20,3 +20,116 @@
     --color-primary-600: #d97706;
     --color-primary-700: #b45309;
 }
+
+/* Category Tree: keep the package as the interaction engine, but present it
+   with the same visual language as native Filament tables. */
+.bp-category-tree-frame {
+    @apply overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10;
+}
+
+.bp-category-tree-table {
+    min-width: 58rem;
+}
+
+.bp-category-tree-header,
+.bp-category-tree-row {
+    display: grid;
+    grid-template-columns:
+        minmax(18rem, 1fr)
+        minmax(7rem, 0.36fr)
+        minmax(6rem, 0.3fr)
+        minmax(10rem, 0.46fr)
+        minmax(7rem, 0.34fr)
+        8rem;
+}
+
+.bp-category-tree-header {
+    @apply border-b border-gray-200 dark:border-white/5;
+}
+
+.bp-category-tree-header-cell {
+    @apply flex min-h-12 items-center gap-x-1 px-3 py-3.5 text-start text-sm font-semibold text-gray-950 dark:text-white;
+}
+
+button.bp-category-tree-header-cell {
+    @apply cursor-pointer rounded-none border-0 bg-transparent outline-none transition hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-inset dark:hover:bg-white/5 dark:focus-visible:ring-primary-500;
+}
+
+.bp-category-tree-header-cell--sorted {
+    @apply bg-gray-50 dark:bg-white/5;
+}
+
+.bp-category-tree-header-cell--actions {
+    @apply justify-end pe-6;
+}
+
+.bp-category-tree-sort-icon {
+    @apply h-4 w-4 shrink-0 text-gray-400 transition dark:text-gray-500;
+}
+
+.bp-category-tree-sort-icon--active {
+    @apply text-gray-950 dark:text-white;
+}
+
+.bp-category-tree-sort-icon--asc {
+    @apply rotate-180;
+}
+
+.bp-category-tree-body {
+    @apply space-y-0;
+}
+
+.bp-category-tree-table .fi-tree-node-row {
+    @apply grid cursor-default gap-0 rounded-none border-0 border-b border-gray-200 bg-white p-0 text-sm shadow-none transition-colors last:border-b-0 hover:bg-gray-50 dark:border-white/5 dark:bg-gray-900 dark:hover:bg-white/5;
+    grid-template-columns:
+        minmax(18rem, 1fr)
+        minmax(7rem, 0.36fr)
+        minmax(6rem, 0.3fr)
+        minmax(10rem, 0.46fr)
+        minmax(7rem, 0.34fr)
+        8rem;
+}
+
+.bp-category-tree-table .fi-tree-node-row--selected {
+    box-shadow: inset 3px 0 0 var(--primary-500);
+}
+
+.bp-category-tree-cell {
+    @apply flex min-h-14 items-center px-3 py-3 text-sm text-gray-950 dark:text-white;
+}
+
+.bp-category-tree-name-cell {
+    @apply gap-x-2 font-medium;
+}
+
+.bp-category-tree-number-cell {
+    @apply tabular-nums text-gray-700 dark:text-gray-300;
+}
+
+.bp-category-tree-status {
+    @apply inline-flex items-center rounded-md px-2 py-1 text-xs font-medium;
+}
+
+.bp-category-tree-status--active {
+    @apply bg-success-50 text-success-700 dark:bg-success-400/10 dark:text-success-400;
+}
+
+.bp-category-tree-status--inactive {
+    @apply bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400;
+}
+
+.bp-category-tree-actions-cell {
+    @apply justify-end pe-6;
+}
+
+.bp-category-tree-table .fi-tree-node-label {
+    @apply min-w-0 flex-1 truncate text-sm font-medium text-gray-950 dark:text-white;
+}
+
+.bp-category-tree-table .fi-tree-node-toggle {
+    @apply h-5 w-5;
+}
+
+.bp-category-tree-root-drop-zone {
+    @apply min-h-10 border-b border-gray-200 dark:border-white/5;
+}

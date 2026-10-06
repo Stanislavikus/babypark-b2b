@@ -14,6 +14,7 @@ use App\Services\Catalog\CategoryHierarchyService;
 use App\Services\Catalog\CategoryTreeMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -337,11 +338,76 @@ class CategoryTreeManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->actor)
+        $component = Livewire::actingAs($this->actor)
             ->test(ManageCategoryTree::class)
-            ->assertSet('treeNodes.0.tree_label', 'Коляски · товарів: 1')
-            ->assertSet('treeNodes.0.children.0.tree_label', 'Прогулянкові · товарів: 1')
-            ->assertSee('Додати категорію');
+            ->assertSet('treeNodes.0.tree_label', 'Коляски')
+            ->assertSet('treeNodes.0.children_count', 1)
+            ->assertSet('treeNodes.0.products_count', 1)
+            ->assertSet('treeNodes.0.stock_display_threshold', 10)
+            ->assertSet('treeNodes.0.children.0.tree_label', 'Прогулянкові')
+            ->assertSet('treeNodes.0.children.0.products_count', 1)
+            ->assertSee('Додати категорію')
+            ->assertSee('Категорія')
+            ->assertSee('Підкатегорії')
+            ->assertSee('Товарів')
+            ->assertSee('Поріг відображення')
+            ->assertSee('Стан')
+            ->assertSee('Дії')
+            ->assertSee('Згорнути все')
+            ->assertSee('Розгорнути все');
+
+        $toolbarActions = $component->instance()->getCachedTree()->getToolbarActions();
+
+        $this->assertFalse(collect($toolbarActions)->contains(
+            fn (mixed $action): bool => $action instanceof ActionGroup,
+        ));
+        $this->assertStringContainsString('collapseAll()', $component->html());
+        $this->assertStringContainsString('expandAll()', $component->html());
+    }
+
+    #[Test]
+    public function category_tree_sorts_siblings_without_mutating_manual_order(): void
+    {
+        $rootB = $this->category('B category');
+        $rootA = $this->category('A category');
+        $rootB->update(['sort_order' => 0, 'stock_display_threshold' => 3]);
+        $rootA->update(['sort_order' => 1, 'stock_display_threshold' => 20]);
+        $this->category('A child', $rootA);
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(ManageCategoryTree::class)
+            ->assertSet('treeNodes.0.id', $rootB->id)
+            ->assertSet('treeNodes.1.id', $rootA->id);
+
+        $this->assertTrue($component->instance()->getCachedTree()->isDraggable());
+
+        $component
+            ->call('sortTree', 'name')
+            ->assertSet('treeSortColumn', 'name')
+            ->assertSet('treeSortDirection', 'asc')
+            ->assertSet('treeNodes.0.id', $rootA->id)
+            ->assertSet('treeNodes.1.id', $rootB->id);
+
+        $this->assertFalse($component->instance()->getCachedTree()->isDraggable());
+
+        $component
+            ->call('sortTree', 'name')
+            ->assertSet('treeSortDirection', 'desc')
+            ->assertSet('treeNodes.0.id', $rootB->id)
+            ->assertSet('treeNodes.1.id', $rootA->id)
+            ->call('sortTree', 'children_count')
+            ->assertSet('treeSortColumn', 'children_count')
+            ->assertSet('treeSortDirection', 'asc')
+            ->assertSet('treeNodes.0.id', $rootB->id)
+            ->assertSet('treeNodes.1.id', $rootA->id)
+            ->call('resetTreeSort')
+            ->assertSet('treeSortColumn', 'manual')
+            ->assertSet('treeNodes.0.id', $rootB->id)
+            ->assertSet('treeNodes.1.id', $rootA->id);
+
+        $this->assertTrue($component->instance()->getCachedTree()->isDraggable());
+        $this->assertSame(0, $rootB->fresh()->sort_order);
+        $this->assertSame(1, $rootA->fresh()->sort_order);
     }
 
     private function category(string $name, ?Category $parent = null): Category

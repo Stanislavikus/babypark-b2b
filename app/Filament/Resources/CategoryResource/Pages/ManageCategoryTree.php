@@ -12,6 +12,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -24,6 +25,18 @@ class ManageCategoryTree extends TreePage
 
     protected static ?string $title = 'Категорії';
 
+    public string $treeSortColumn = 'manual';
+
+    public string $treeSortDirection = 'asc';
+
+    private const TREE_SORT_COLUMNS = [
+        'name',
+        'children_count',
+        'products_count',
+        'stock_display_threshold',
+        'is_active',
+    ];
+
     public function tree(Tree $tree): Tree
     {
         return $tree
@@ -34,6 +47,7 @@ class ManageCategoryTree extends TreePage
             ->labelField('tree_label')
             ->searchable()
             ->maxVisibleDepth(20)
+            ->draggable(fn (): bool => $this->treeSortColumn === 'manual')
             ->allowCrossCategory()
             ->getRecordUsing(fn (int|string $id): ?Category => Category::query()->find($id))
             ->saveOrderUsing(function (array $nodes): void {
@@ -49,8 +63,34 @@ class ManageCategoryTree extends TreePage
                     $nodes,
                 );
             })
-            ->prependToolbarActions([
+            ->toolbarActions([
                 $this->createCategoryAction(),
+                Action::make('collapse_all')
+                    ->label('Згорнути все')
+                    ->icon('heroicon-o-chevron-up')
+                    ->color('gray')
+                    ->alpineClickHandler('collapseAll()'),
+                Action::make('expand_all')
+                    ->label('Розгорнути все')
+                    ->icon('heroicon-o-chevron-down')
+                    ->color('gray')
+                    ->alpineClickHandler('expandAll()'),
+                Action::make('manual_order')
+                    ->label('Ручний порядок')
+                    ->icon('heroicon-o-bars-arrow-down')
+                    ->color('gray')
+                    ->visible(fn (): bool => $this->treeSortColumn !== 'manual')
+                    ->action(fn () => $this->resetTreeSort()),
+                Action::make('save')
+                    ->label('Зберегти порядок')
+                    ->extraAttributes(['x-show' => 'hasUnsavedOrder', 'x-cloak' => true])
+                    ->alpineClickHandler('$wire.saveTreeOrder([], treeKey)'),
+                Action::make('reset_order')
+                    ->label('Скинути порядок')
+                    ->color('gray')
+                    ->icon('heroicon-o-arrow-path')
+                    ->iconButton()
+                    ->alpineClickHandler('$wire.resetTreeOrder(treeKey)'),
             ]);
     }
 
@@ -78,6 +118,49 @@ class ManageCategoryTree extends TreePage
 
         // Refresh original placement tokens after a successful commit so the
         // next reorder compares against the canonical server state.
+        $this->refreshTreeNodes();
+    }
+
+    public function content(Schema $schema): Schema
+    {
+        $tree = $this->getCachedTree();
+
+        return $schema->components([
+            View::make('filament.resources.category-resource.pages.category-tree-table')
+                ->viewData([
+                    'treeConfig' => $tree,
+                    'isSearchable' => $tree->isSearchable(),
+                    'allowDragDrop' => $tree->isDraggable(),
+                    'allowCrossCategory' => $tree->isCrossCategoryAllowed(),
+                    'toolbarActions' => $tree->getToolbarActions(),
+                    'hasNodeActions' => ! empty($tree->getNodeActions()),
+                    'sortColumn' => $this->treeSortColumn,
+                    'sortDirection' => $this->treeSortDirection,
+                ])
+                ->key('category-tree-table-'.$this->treeSortColumn.'-'.$this->treeSortDirection),
+        ]);
+    }
+
+    public function sortTree(string $column): void
+    {
+        if (! in_array($column, self::TREE_SORT_COLUMNS, true)) {
+            return;
+        }
+
+        if ($this->treeSortColumn === $column) {
+            $this->treeSortDirection = $this->treeSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->treeSortColumn = $column;
+            $this->treeSortDirection = 'asc';
+        }
+
+        $this->refreshTreeNodes();
+    }
+
+    public function resetTreeSort(): void
+    {
+        $this->treeSortColumn = 'manual';
+        $this->treeSortDirection = 'asc';
         $this->refreshTreeNodes();
     }
 
@@ -234,10 +317,46 @@ class ManageCategoryTree extends TreePage
             return $totals[$id] = $total;
         };
 
-        $build = function (string $parentKey, array $ancestors = []) use (&$build, $byParent, $totalProducts): array {
+        $sortSiblings = function (array $siblings) use ($byParent, $totalProducts): array {
+            if ($this->treeSortColumn === 'manual') {
+                return $siblings;
+            }
+
+            usort($siblings, function (Category $left, Category $right) use ($byParent, $totalProducts): int {
+                $leftValue = match ($this->treeSortColumn) {
+                    'name' => mb_strtolower((string) $left->name),
+                    'children_count' => count($byParent[(string) $left->id] ?? []),
+                    'products_count' => $totalProducts((int) $left->id),
+                    'stock_display_threshold' => (int) $left->stock_display_threshold,
+                    'is_active' => (int) $left->is_active,
+                    default => (int) $left->sort_order,
+                };
+                $rightValue = match ($this->treeSortColumn) {
+                    'name' => mb_strtolower((string) $right->name),
+                    'children_count' => count($byParent[(string) $right->id] ?? []),
+                    'products_count' => $totalProducts((int) $right->id),
+                    'stock_display_threshold' => (int) $right->stock_display_threshold,
+                    'is_active' => (int) $right->is_active,
+                    default => (int) $right->sort_order,
+                };
+
+                $comparison = $leftValue <=> $rightValue;
+
+                if ($comparison !== 0) {
+                    return $this->treeSortDirection === 'asc' ? $comparison : -$comparison;
+                }
+
+                return [(int) $left->sort_order, (string) $left->name, (int) $left->id]
+                    <=> [(int) $right->sort_order, (string) $right->name, (int) $right->id];
+            });
+
+            return $siblings;
+        };
+
+        $build = function (string $parentKey, array $ancestors = []) use (&$build, $byParent, $sortSiblings, $totalProducts): array {
             $nodes = [];
 
-            foreach ($byParent[$parentKey] ?? [] as $category) {
+            foreach ($sortSiblings($byParent[$parentKey] ?? []) as $category) {
                 $id = (int) $category->id;
                 if (isset($ancestors[$id])) {
                     continue;
@@ -246,17 +365,17 @@ class ManageCategoryTree extends TreePage
                 $nextAncestors = $ancestors;
                 $nextAncestors[$id] = true;
 
-                $label = (string) $category->name.' · товарів: '.$totalProducts($id);
-                if (! $category->is_active) {
-                    $label .= ' · неактивна';
-                }
-
                 $nodes[] = [
                     'id' => $id,
                     'parent_id' => $category->parent_id === null ? null : (int) $category->parent_id,
                     'original_parent_id' => $category->parent_id === null ? null : (int) $category->parent_id,
                     'original_sort_order' => (int) $category->sort_order,
-                    'tree_label' => $label,
+                    'name' => (string) $category->name,
+                    'tree_label' => (string) $category->name,
+                    'children_count' => count($byParent[(string) $id] ?? []),
+                    'products_count' => $totalProducts($id),
+                    'stock_display_threshold' => (int) $category->stock_display_threshold,
+                    'is_active' => (bool) $category->is_active,
                     'children' => $build((string) $id, $nextAncestors),
                 ];
             }
