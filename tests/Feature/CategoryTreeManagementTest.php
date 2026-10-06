@@ -15,6 +15,8 @@ use App\Services\Catalog\CategoryTreeMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -123,6 +125,29 @@ class CategoryTreeManagementTest extends TestCase
         $service->saveTree($this->actor, $this->workspace, [
             $this->treeNode($rootA->fresh()),
         ]);
+    }
+
+    #[Test]
+    public function category_writer_and_resource_reject_user_without_manage_products(): void
+    {
+        $unauthorized = User::factory()->create([
+            'name' => 'Category Read Only',
+            'role' => UserRole::Manager,
+            'is_active' => true,
+        ]);
+        $this->makeWorkspaceMembership($this->workspace, $unauthorized);
+
+        $this->actingAs($unauthorized);
+
+        $this->assertTrue(CategoryResource::getCreateAuthorizationResponse()->denied());
+
+        $this->expectException(AuthorizationException::class);
+
+        app(CategoryTreeMutationService::class)->create(
+            $unauthorized,
+            $this->workspace,
+            ['name' => 'Forbidden category'],
+        );
     }
 
     #[Test]
@@ -255,6 +280,31 @@ class CategoryTreeManagementTest extends TestCase
         );
 
         $service->saveTree($this->actor, $this->workspace, $stalePayload);
+    }
+
+    #[Test]
+    public function stale_ui_reorder_warns_and_does_not_emit_package_success(): void
+    {
+        $service = app(CategoryTreeMutationService::class);
+        $rootA = $service->create($this->actor, $this->workspace, ['name' => 'A']);
+        $rootB = $service->create($this->actor, $this->workspace, ['name' => 'B']);
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(ManageCategoryTree::class);
+        $stalePayload = $component->get('treeNodes');
+
+        $service->saveTree($this->actor, $this->workspace, [
+            $this->treeNode($rootB),
+            $this->treeNode($rootA),
+        ]);
+
+        $component->call('saveTreeOrder', $stalePayload);
+
+        Notification::assertNotified('Дерево не збережено');
+        Notification::assertNotNotified('Збережено');
+
+        $this->assertSame(0, $rootB->fresh()->sort_order);
+        $this->assertSame(1, $rootA->fresh()->sort_order);
     }
 
     #[Test]

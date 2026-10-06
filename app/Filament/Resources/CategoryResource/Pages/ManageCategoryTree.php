@@ -43,34 +43,42 @@ class ManageCategoryTree extends TreePage
                     throw new AuthorizationException('This action is unauthorized.');
                 }
 
-                try {
-                    app(CategoryTreeMutationService::class)->saveTree(
-                        $actor,
-                        app(WorkspaceContext::class)->current(),
-                        $nodes,
-                    );
-                } catch (CategoryTreeMutationException|AuthorizationException $exception) {
-                    Notification::make()
-                        ->warning()
-                        ->title('Дерево не збережено')
-                        ->body($exception->getMessage())
-                        ->send();
-
-                    $this->dispatch('tree-refresh');
-
-                    return;
-                }
-
-                Notification::make()
-                    ->success()
-                    ->title('Порядок категорій збережено')
-                    ->send();
-
-                $this->dispatch('tree-refresh');
+                app(CategoryTreeMutationService::class)->saveTree(
+                    $actor,
+                    app(WorkspaceContext::class)->current(),
+                    $nodes,
+                );
             })
             ->prependToolbarActions([
                 $this->createCategoryAction(),
             ]);
+    }
+
+    /**
+     * Persist drag/drop only through the BabyPark writer while preserving the
+     * package's success notification on committed writes.
+     *
+     * @param  array<int|string, mixed>  $orderedNodes
+     */
+    public function saveTreeOrder(array $orderedNodes = [], ?string $treeKey = null): void
+    {
+        try {
+            parent::saveTreeOrder($orderedNodes, $treeKey);
+        } catch (CategoryTreeMutationException|AuthorizationException $exception) {
+            Notification::make()
+                ->warning()
+                ->title('Дерево не збережено')
+                ->body($exception->getMessage())
+                ->send();
+
+            $this->resetTreeOrder($treeKey);
+
+            return;
+        }
+
+        // Refresh original placement tokens after a successful commit so the
+        // next reorder compares against the canonical server state.
+        $this->refreshTreeNodes();
     }
 
     protected function buildTree(): Tree
