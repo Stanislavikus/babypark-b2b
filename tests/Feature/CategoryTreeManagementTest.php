@@ -357,6 +357,7 @@ class CategoryTreeManagementTest extends TestCase
             ->assertDontSee('Ручний порядок');
 
         $toolbarActions = $component->instance()->getCachedTree()->getToolbarActions();
+        $nodeActionsHtml = implode('', $component->instance()->loadTreeNodeActions($root->id));
 
         $this->assertSame(['save'], array_map(
             fn ($action): string => $action->getName(),
@@ -366,6 +367,8 @@ class CategoryTreeManagementTest extends TestCase
         $this->assertStringNotContainsString('expandAll()', $component->html());
         $this->assertStringContainsString('bp-category-tree-controls', $component->html());
         $this->assertStringContainsString('bp-category-tree-search', $component->html());
+        $this->assertStringContainsString('x-show="node._hasChildren"', $component->html());
+        $this->assertStringContainsString('Приховати категорію', $nodeActionsHtml);
     }
 
     #[Test]
