@@ -39,6 +39,26 @@ Typical checkout path (adjust if your host differs):
 /var/www/babypark-b2b
 ```
 
+### Scheduler cron (pilot)
+
+The bare-host pilot must run Laravel's scheduler through the repository-owned
+non-blocking host lock in `ops/cron/babypark-scheduler.cron`. The lock is intentionally
+outside Laravel/cache/DB so a database stall cannot accumulate scheduler bootstrap
+processes:
+
+```cron
+* * * * * cd /var/www/babypark-b2b && /usr/bin/flock -n /run/lock/babypark-scheduler.lock /usr/bin/php artisan schedule:run --no-interaction >> /dev/null 2>&1
+```
+
+Laravel task-level `withoutOverlapping()` remains required; it solves a different
+problem. The host-level `flock` bounds concurrent `schedule:run` processes before
+Laravel boots. Production activation of this cron entry is a host configuration
+change and requires separate authorization; merging the repository contract does
+not alter the live crontab.
+
+Incident evidence and rollback procedure:
+`docs/reviews/SCHEDULER_FLOCK_HARDENING_2026_10_06.md`.
+
 ### Deploy (pilot)
 
 On the server, from the application directory:

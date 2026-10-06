@@ -1,0 +1,4 @@
+# BabyPark pilot scheduler — canonical host cron entry.
+# Keep the lock outside the repository so code deploys cannot remove an active lock inode.
+# -n skips a tick instead of queueing another schedule:run process when the previous tick is still running.
+* * * * * cd /var/www/babypark-b2b && /usr/bin/flock -n /run/lock/babypark-scheduler.lock /usr/bin/php artisan schedule:run --no-interaction >> /dev/null 2>&1
