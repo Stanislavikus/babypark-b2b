@@ -18,12 +18,16 @@ class Category extends Model
         'onec_guid',
         'name',
         'parent_id',
+        'sort_order',
+        'is_active',
         'stock_display_threshold',
     ];
 
     protected function casts(): array
     {
         return [
+            'sort_order' => 'integer',
+            'is_active' => 'boolean',
             'stock_display_threshold' => 'integer',
         ];
     }
@@ -40,7 +44,10 @@ class Category extends Model
 
     public function children(): HasMany
     {
-        return $this->hasMany(Category::class, 'parent_id');
+        return $this->hasMany(Category::class, 'parent_id')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id');
     }
 
     public function products(): HasMany

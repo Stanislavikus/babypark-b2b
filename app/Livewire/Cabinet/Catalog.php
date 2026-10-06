@@ -6,6 +6,7 @@ use App\Enums\CatalogProductDisplayState;
 use App\Models\Category;
 use App\Models\ProductVariant;
 use App\Services\Availability\ReservationCreator;
+use App\Services\Catalog\CategoryHierarchyService;
 use App\Services\Pricing\CustomerCatalogQuery;
 use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Support\CatalogRowData;
@@ -225,7 +226,12 @@ class Catalog extends Component
             ];
         }
 
-        $categories = Category::orderBy('name')->get();
+        $activeCategoryIds = app(CategoryHierarchyService::class)->effectiveActiveIds((string) $customer->workspace_id);
+        $categories = Category::query()
+            ->whereIn('id', $activeCategoryIds)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
         $brands = $catalogQuery->availableBrands($customer);
 
         return view('livewire.cabinet.catalog', compact(

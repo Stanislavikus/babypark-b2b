@@ -1780,6 +1780,23 @@ The platform should not introduce global taxonomy in MVP. See **Product classifi
 
 Global taxonomy, marketplace taxonomy mapping and channel-specific category mapping should be handled later in connector/channel mapping layers.
 
+**[Resolved addendum — Category Tree management — 2026-10-06]**
+
+Merchant/Catalogue Category management uses the existing workspace-owned adjacency tree. Category,
+Subcategory and deeper levels are not different entities: all are `Category` rows connected by nullable
+`parent_id`. The admin surface is a searchable hierarchy with create-child, edit, activate/deactivate,
+reorder and reparent actions. Ordering is persisted through `sort_order`; merchants do not type ordering
+numbers manually. Effective category visibility/selectability requires the node and every ancestor to be
+active. Deactivation never deactivates Products or rewrites connector category mappings. Physical delete,
+Category media/SEO/landing pages and public slug behavior remain outside this capability.
+
+The tree UI is integration-first: `solution-forest/filament-nestable-tree` is used only as a Filament
+presentation/interaction adapter. Category writes remain governed by platform authorization and
+workspace/cycle/stale-tree invariants. `categories.onec_guid` remains legacy connector identity debt and
+must not be promoted into a new generic source-ownership rule without separate evidence.
+
+See `docs/reviews/CATEGORY_TREE_MANAGEMENT_2026_10_06.md`.
+
 This keeps the platform simple for small businesses that already think in their own Excel or Google Sheets categories.
 
 ### Media

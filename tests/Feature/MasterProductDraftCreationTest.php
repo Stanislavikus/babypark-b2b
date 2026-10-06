@@ -98,6 +98,30 @@ class MasterProductDraftCreationTest extends TestCase
     }
 
     #[Test]
+    public function draft_creator_rejects_category_from_inactive_branch(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $root = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'Inactive root',
+            'is_active' => false,
+        ]);
+        $child = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'Active child under inactive root',
+            'parent_id' => $root->id,
+            'is_active' => true,
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        app(MasterProductDraftCreator::class)->create($workspace, [
+            'name' => 'Wrong inactive category product',
+            'category_id' => $child->id,
+        ]);
+    }
+
+    #[Test]
     public function authorized_workspace_user_sees_create_product_action_on_product_list(): void
     {
         $workspace = Workspace::query()->where('is_default', true)->sole();

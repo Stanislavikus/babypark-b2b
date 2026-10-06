@@ -13,6 +13,7 @@
         "laravel/tinker": "^3.0",
         "livewire/livewire": "^4.0",
         "predis/predis": "^3.4",
+        "solution-forest/filament-nestable-tree": "^1.0",
         "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {

@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Enums\CatalogProductDisplayState;
 use App\Enums\CatalogSort;
 use App\Enums\ProductLifecycleStatus;
+use App\Models\Category;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -257,6 +258,62 @@ class CustomerCatalogVisibilityTest extends TestCase
         $ids = $products->pluck('id')->all();
         $this->assertContains($priced->id, $ids);
         $this->assertContains($unpriced->id, $ids);
+    }
+
+    public function test_parent_category_filter_includes_active_descendants_and_excludes_inactive_branches(): void
+    {
+        $customer = $this->createCustomer();
+
+        $root = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $customer->workspace_id,
+            'name' => 'Коляски',
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $child = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $customer->workspace_id,
+            'name' => 'Прогулянкові',
+            'parent_id' => $root->id,
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $inactiveChild = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $customer->workspace_id,
+            'name' => 'Прихована гілка',
+            'parent_id' => $root->id,
+            'sort_order' => 1,
+            'is_active' => false,
+        ]);
+
+        $direct = $this->createCatalogProduct($customer->workspace, [
+            'sku' => 'CATEGORY-ROOT',
+            'category_id' => $root->id,
+        ]);
+        $nested = $this->createCatalogProduct($customer->workspace, [
+            'sku' => 'CATEGORY-CHILD',
+            'category_id' => $child->id,
+        ]);
+        $hidden = $this->createCatalogProduct($customer->workspace, [
+            'sku' => 'CATEGORY-INACTIVE',
+            'category_id' => $inactiveChild->id,
+        ]);
+
+        $criteria = new CustomerCatalogCriteria(
+            null,
+            [$root->id],
+            [],
+            CatalogSort::SkuAsc,
+            100,
+        );
+
+        $ids = app(CustomerCatalogQuery::class)
+            ->paginateFor($customer, $criteria)
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($direct->id, $ids);
+        $this->assertContains($nested->id, $ids);
+        $this->assertNotContains($hidden->id, $ids);
     }
 
     public function test_available_brands_includes_brand_for_product_without_price(): void
