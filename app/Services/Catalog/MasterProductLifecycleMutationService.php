@@ -26,10 +26,6 @@ final class MasterProductLifecycleMutationService
         ProductLifecycleStatus $expected,
         ProductLifecycleStatus $target,
     ): Product {
-        if (! in_array($target, [ProductLifecycleStatus::Active, ProductLifecycleStatus::Archived], true)) {
-            throw MasterProductLifecycleMutationException::unsupportedTarget();
-        }
-
         return DB::transaction(function () use ($actor, $workspace, $product, $expected, $target): Product {
             $lockedWorkspace = Workspace::query()
                 ->whereKey($workspace->id)

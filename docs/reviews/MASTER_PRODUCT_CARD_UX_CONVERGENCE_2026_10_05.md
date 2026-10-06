@@ -1,8 +1,9 @@
 # Master Product Card UX Convergence
 
-> **STATUS: [Resolved — 2026-10-05] — PRODUCT OWNER APPROVED**
+> **STATUS: [Resolved — 2026-10-05; amended 2026-10-06 after visual merchant acceptance] — PRODUCT OWNER APPROVED**
 >
-> Base at freeze: `origin/develop @ 3e4bd476c139e22ec96d5f4cf3305fa96be5d8ff`.
+> Original base at freeze: `origin/develop @ 3e4bd476c139e22ec96d5f4cf3305fa96be5d8ff`.
+> Interaction amendment base: `origin/develop @ d9608fe84fd39aecc0e7da0079820a191ea2b208`.
 >
 > Reopen only for conflict with a newer authoritative document, a proven implementation blocker,
 > or new material evidence. General OSS/UI research alone is not grounds to reopen this decision.
@@ -21,11 +22,13 @@ not replace or duplicate Master data.
 
 1. **One Master Product Card.** Create and Edit use the same visible card shell. The current
    abbreviated Create form is not a separate product concept.
-2. **No invisible autosave for initial creation.** Before first persistence, sections that require
-   a Product/Variant identity remain visible but disabled with an explanation. The merchant
-   explicitly saves the draft.
+2. **One explicit Save; no artificial first-step card.** Create and Edit use the same section
+   structure. Direct Master fields that are safe before identity exists are editable immediately.
+   Capabilities whose existing governed writers require Product/Variant identity stay in the same
+   section and become interactive after the explicit first Save; do not render duplicate locked
+   replacement sections and do not invent hidden autosave.
 3. **Draft creation requires only Name.** Merchant-facing copy must state:
-   **"Для чернетки достатньо заповнити лише «Назва»."**
+   **"Для чернетки достатньо заповнити лише «Назва». Решту даних можна додати пізніше."**
 4. **Real lifecycle.** Master lifecycle is `draft | active | archived`. Publication/readiness is
    separate per goal/channel. The historical `products.is_active` boolean remains a compatibility
    boundary during migration and must not be treated as the full lifecycle model.
@@ -62,25 +65,26 @@ not replace or duplicate Master data.
 
 The full Master Product Card shell is visible immediately.
 
-Sections that do not require a persisted Product may be edited normally.
+The merchant sees one stable card before and after the first Save. There is no separate
+"draft form" followed by a second full form.
 
-Sections whose writers require `product_id` or `variant_id` remain visible but disabled with
-plain-language helper text such as:
-
-- "Доступно після збереження чернетки."
-
-This applies to at least Media, Price, Inventory, Variants and any other current writer that
-requires persisted identity.
+Direct Master fields (including physical/shipping fields) are editable before first persistence
+and are submitted with the same explicit Save. Existing transactional/domain capabilities whose
+writers require persisted Product/Variant identity remain in their normal section and may show an
+inline identity prerequisite until the first Save. They must not be represented by a second
+duplicate locked section.
 
 Primary actions:
 
-- **Зберегти чернетку**
+- **Зберегти**
 - **Зберегти й додати ще товар**
 
-The historical "Створити та створити наступне" wording is retired.
+Master lifecycle is selected independently in the right-hand **Статус / Стан у Master** control:
+`draft | active | archived`. Saving data and selecting lifecycle are separate concepts; channel
+publication remains separate from Master lifecycle.
 
-After first save the merchant remains in the same conceptual card; persisted-identity sections
-become interactive.
+After first Save the merchant remains in the same conceptual card; identity-bound controls become
+interactive without changing the card structure.
 
 ### Field naming
 

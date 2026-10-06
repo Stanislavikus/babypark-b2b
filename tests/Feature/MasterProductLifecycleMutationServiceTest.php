@@ -13,7 +13,6 @@ use App\Models\Workspace;
 use App\Services\Catalog\MasterProductLifecycleMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -74,6 +73,17 @@ final class MasterProductLifecycleMutationServiceTest extends TestCase
 
         $this->assertSame(ProductLifecycleStatus::Archived, $archived->lifecycle_status);
         $this->assertFalse($archived->is_active);
+
+        $draftAgain = $service->transition(
+            $this->actor,
+            $this->workspace,
+            $archived,
+            ProductLifecycleStatus::Archived,
+            ProductLifecycleStatus::Draft,
+        );
+
+        $this->assertSame(ProductLifecycleStatus::Draft, $draftAgain->lifecycle_status);
+        $this->assertFalse($draftAgain->is_active);
     }
 
     #[Test]
@@ -119,19 +129,15 @@ final class MasterProductLifecycleMutationServiceTest extends TestCase
     }
 
     #[Test]
-    public function master_card_lifecycle_actions_activate_and_archive_manual_product(): void
+    public function master_card_lifecycle_selector_can_activate_archive_and_return_to_draft(): void
     {
         [$product] = $this->manualProduct(ProductLifecycleStatus::Draft);
 
-        $activate = TestAction::make('activate_product');
-        $archive = TestAction::make('archive_product');
-
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible($activate)
-            ->assertActionVisible($archive)
-            ->callAction($activate)
-            ->assertNotified('Товар активовано');
+            ->fillForm(['master_lifecycle_status' => ProductLifecycleStatus::Active->value])
+            ->call('save')
+            ->assertHasNoFormErrors();
 
         $product->refresh();
 
@@ -140,31 +146,36 @@ final class MasterProductLifecycleMutationServiceTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden($activate)
-            ->assertActionVisible($archive)
-            ->callAction($archive)
-            ->assertNotified('Товар архівовано');
+            ->fillForm(['master_lifecycle_status' => ProductLifecycleStatus::Archived->value])
+            ->call('save')
+            ->assertHasNoFormErrors();
 
         $product->refresh();
 
         $this->assertSame(ProductLifecycleStatus::Archived, $product->lifecycle_status);
         $this->assertFalse($product->is_active);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->fillForm(['master_lifecycle_status' => ProductLifecycleStatus::Draft->value])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $product->refresh();
+
+        $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
+        $this->assertFalse($product->is_active);
     }
 
     #[Test]
-    public function source_owned_variant_hides_manual_lifecycle_actions_in_master_card(): void
+    public function source_owned_variant_disables_master_lifecycle_selector(): void
     {
         [$product, $variant] = $this->manualProduct(ProductLifecycleStatus::Draft);
         $variant->update(['onec_guid' => '33333333-3333-4333-8333-333333333333']);
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden(
-                TestAction::make('activate_product'),
-            )
-            ->assertActionHidden(
-                TestAction::make('archive_product'),
-            );
+            ->assertFormFieldDisabled('master_lifecycle_status');
     }
 
     /** @return array{Product,ProductVariant} */

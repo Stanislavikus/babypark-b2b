@@ -108,7 +108,7 @@ class ProductResource extends Resource
                     Section::make('Основна інформація')
                         ->description(fn (?Product $record): string => self::isSourceOwned($record)
                             ? 'Основні ідентифікаційні дані надходять з 1С. Контент і внутрішня організація редагуються окремо.'
-                            : 'Master-дані товару. Для чернетки достатньо заповнити лише «Назва».')
+                            : 'Для чернетки достатньо заповнити лише «Назва». Решту даних можна додати пізніше.')
                         ->schema([
                             TextInput::make('name')
                                 ->label('Назва')
@@ -147,12 +147,6 @@ class ProductResource extends Resource
                         ])
                         ->columns(2),
 
-                    self::draftLockedSection(
-                        'draft_media_locked',
-                        'Медіа',
-                        'Тут зберігаються вихідні зображення товару.'
-                    ),
-
                     Section::make('Медіа')
                         ->description('Тут зберігаються вихідні зображення товару. Версії, підготовлені для окремих каналів, не дублюються в галереї.')
                         ->schema([
@@ -179,10 +173,7 @@ class ProductResource extends Resource
                                     'heroicon-o-paper-airplane',
                                 ),
                             ])->key('media_pending_actions'),
-                        ])
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection('draft_price_locked', 'Ціна'),
+                        ]),
 
                     Section::make('Ціна')
                         ->schema([
@@ -206,10 +197,7 @@ class ProductResource extends Resource
                                 self::offerEditorAction(),
                             ])->key('offer_actions')->columnSpanFull(),
                         ])
-                        ->columns(3)
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection('draft_inventory_locked', 'Залишки'),
+                        ->columns(3),
 
                     Section::make('Залишки')
                         ->schema([
@@ -227,14 +215,7 @@ class ProductResource extends Resource
                                 self::inventoryEditorAction(),
                             ])->key('inventory_actions')->columnSpanFull(),
                         ])
-                        ->columns(2)
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection(
-                        'draft_shipping_locked',
-                        'Доставка та фізичні дані',
-                        'Вага, габарити та упаковка.'
-                    ),
+                        ->columns(2),
 
                     Section::make('Доставка та фізичні дані')
                         ->description('Вага, габарити та упаковка. Варіантні правила доставки й backorder залишаються у Характеристиках.')
@@ -308,24 +289,14 @@ class ProductResource extends Resource
                         ])
                         ->columns(3)
                         ->collapsible()
-                        ->collapsed()
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection('draft_variants_locked', 'Варіанти'),
+                        ->collapsed(),
 
                     Section::make('Варіанти')
                         ->schema([
                             Placeholder::make('workspace_variants')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
-                        ])
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection(
-                        'draft_characteristics_locked',
-                        'Характеристики',
-                        'Групи визначаються сімейством товару.'
-                    ),
+                        ]),
 
                     Section::make('Характеристики')
                         ->description('Групи визначаються типом товару. Обов’язкові поля показуються першими; поля каналу сюди не дублюються.')
@@ -341,10 +312,7 @@ class ProductResource extends Resource
                                     'heroicon-o-document-text',
                                 ),
                             ])->key('characteristics_pending_actions'),
-                        ])
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection('draft_seo_locked', 'SEO та пошук'),
+                        ]),
 
                     Section::make('SEO та пошук')
                         ->description('Розділ показано для візуальної обкатки. Пошук ключових слів, AI-опис і аналіз пошуку підключимо на фінальному етапі.')
@@ -390,18 +358,24 @@ class ProductResource extends Resource
                                 ),
                             ])->key('seo_pending_actions'),
                         ])
-                        ->collapsible()
-                        ->visible(fn (?Product $record): bool => $record !== null),
+                        ->collapsible(),
                 ])->columnSpan(2),
 
                 Group::make([
                     Section::make('Статус')
                         ->schema([
-                            Placeholder::make('workspace_lifecycle')
+                            Select::make('master_lifecycle_status')
                                 ->label('Стан у Master')
-                                ->content(fn (?Product $record): string => $record
-                                    ? (($record->lifecycle_status ?? ($record->is_active ? ProductLifecycleStatus::Active : ProductLifecycleStatus::Archived))->label())
-                                    : 'Нова чернетка'),
+                                ->options(ProductLifecycleStatus::options())
+                                ->default(fn (?Product $record): string => $record instanceof Product
+                                    ? self::productLifecycleStatus($record)->value
+                                    : ProductLifecycleStatus::Draft->value)
+                                ->native(false)
+                                ->dehydrated(false)
+                                ->disabled(fn (?Product $record): bool => self::lifecycleIsReadOnly($record))
+                                ->helperText(fn (?Product $record): string => self::lifecycleIsReadOnly($record)
+                                    ? 'Для товару або варіанта з джерелом 1С стан у Master доступний лише для перегляду.'
+                                    : 'Статус Master не публікує товар у Magento. Публікація керується окремо для кожного каналу.'),
                             Placeholder::make('workspace_publication_boundary')
                                 ->label('Публікація')
                                 ->content('Окремо для кожного каналу'),
@@ -473,17 +447,12 @@ class ProductResource extends Resource
                                 ->visible(fn (?Product $record): bool => $record === null),
                         ]),
 
-                    self::draftLockedSection('draft_quality_locked', 'Якість даних'),
-
                     Section::make('Якість даних')
                         ->schema([
                             Placeholder::make('workspace_quality')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildBasicQualityHtml($record)),
-                        ])
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection('draft_channels_locked', 'Канали публікації'),
+                        ]),
 
                     Section::make('Канали публікації')
                         ->schema([
@@ -505,18 +474,14 @@ class ProductResource extends Resource
                                     'heroicon-o-link',
                                 ),
                             ])->key('channel_capability_actions'),
-                        ])
-                        ->visible(fn (?Product $record): bool => $record !== null),
-
-                    self::draftLockedSection('draft_attention_locked', 'Потребує уваги'),
+                        ]),
 
                     Section::make('Потребує уваги')
                         ->schema([
                             Placeholder::make('workspace_attention')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildAttentionHtml($record)),
-                        ])
-                        ->visible(fn (?Product $record): bool => $record !== null),
+                        ]),
                 ])->columnSpan(1),
             ]);
     }
@@ -1118,10 +1083,12 @@ class ProductResource extends Resource
         return Action::make('edit_offer')
             ->label('Редагувати ціни')
             ->icon('heroicon-o-banknotes')
-            ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
-            ->tooltip(fn (?Product $record): ?string => self::isSourceOwned($record)
-                ? 'Для товару з джерелом 1С ціна в Master поки доступна лише для перегляду.'
-                : null)
+            ->disabled(fn (?Product $record): bool => $record === null || self::isSourceOwned($record))
+            ->tooltip(fn (?Product $record): ?string => $record === null
+                ? 'Ціну можна додати після першого збереження товару.'
+                : (self::isSourceOwned($record)
+                    ? 'Для товару з джерелом 1С ціна в Master поки доступна лише для перегляду.'
+                    : null))
             ->modalHeading('Ціна товару')
             ->modalDescription('Редагуйте поточну ціну та, за потреби, ціну до знижки. У Master ці значення зберігаються без ПДВ; сума з ПДВ розраховується автоматично.')
             ->modalSubmitActionLabel('Зберегти ціну')
@@ -1489,10 +1456,12 @@ class ProductResource extends Resource
         return Action::make('edit_inventory')
             ->label('Редагувати залишки')
             ->icon('heroicon-o-archive-box')
-            ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
-            ->tooltip(fn (?Product $record): ?string => self::isSourceOwned($record)
-                ? 'Для товару з джерелом 1С залишок у Master поки доступний лише для перегляду.'
-                : null)
+            ->disabled(fn (?Product $record): bool => $record === null || self::isSourceOwned($record))
+            ->tooltip(fn (?Product $record): ?string => $record === null
+                ? 'Залишок можна додати після першого збереження товару.'
+                : (self::isSourceOwned($record)
+                    ? 'Для товару з джерелом 1С залишок у Master поки доступний лише для перегляду.'
+                    : null))
             ->modalHeading('Залишки товару')
             ->modalDescription('Змінюється Master-залишок конкретного варіанта. Доступно до продажу враховує тимчасові резерви автоматично.')
             ->modalSubmitActionLabel('Зберегти залишок')
@@ -1954,24 +1923,6 @@ class ProductResource extends Resource
         }
     }
 
-    private static function draftLockedSection(
-        string $key,
-        string $title,
-        ?string $description = null,
-    ): Section {
-        $section = Section::make($title)
-            ->schema([
-                Placeholder::make($key)
-                    ->hiddenLabel()
-                    ->content('Доступно після збереження чернетки.'),
-            ])
-            ->visible(fn (?Product $record): bool => $record === null);
-
-        return $description === null
-            ? $section
-            : $section->description($description);
-    }
-
     private static function pendingCapabilityAction(
         string $name,
         string $label,
@@ -2017,6 +1968,23 @@ class ProductResource extends Resource
     private static function isSourceOwned(?Product $record): bool
     {
         return $record !== null && filled($record->onec_guid);
+    }
+
+    private static function lifecycleIsReadOnly(?Product $record): bool
+    {
+        if (! $record instanceof Product) {
+            return false;
+        }
+
+        if (filled($record->onec_guid)) {
+            return true;
+        }
+
+        return ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $record->workspace_id)
+            ->where('product_id', $record->id)
+            ->whereNotNull('onec_guid')
+            ->exists();
     }
 
     private static function inventoryScopeLabel(Product $record): string
@@ -2085,7 +2053,9 @@ class ProductResource extends Resource
     private static function buildVariantWorkspaceHtml(?Product $record): HtmlString
     {
         if ($record === null) {
-            return new HtmlString('—');
+            return new HtmlString(
+                '<div style="color:#6b7280;">Варіанти можна налаштувати після першого збереження товару.</div>'
+            );
         }
 
         $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
@@ -2225,7 +2195,9 @@ class ProductResource extends Resource
     private static function buildAttributeGroupsHtml(?Product $record): HtmlString
     {
         if ($record === null) {
-            return new HtmlString('—');
+            return new HtmlString(
+                '<div style="color:#6b7280;">Характеристики поточного сімейства стануть доступними після першого збереження товару.</div>'
+            );
         }
 
         $groups = app(ProductWorkspaceSummaryService::class)->attributeGroups($record);
@@ -2282,7 +2254,9 @@ class ProductResource extends Resource
     private static function buildBasicQualityHtml(?Product $record): HtmlString
     {
         if ($record === null) {
-            return new HtmlString('—');
+            return new HtmlString(
+                '<div style="color:#6b7280;">Для чернетки достатньо назви. Перевірка якості оновиться після збереження.</div>'
+            );
         }
 
         $service = app(ProductWorkspaceSummaryService::class);
@@ -2312,7 +2286,9 @@ class ProductResource extends Resource
     private static function buildChannelWorkspaceHtml(?Product $record): HtmlString
     {
         if ($record === null) {
-            return new HtmlString('—');
+            return new HtmlString(
+                '<div style="color:#6b7280;">Канали можна налаштувати після першого збереження товару.</div>'
+            );
         }
 
         $channels = app(ProductChannelReadinessReadService::class)->rows($record);
@@ -2359,7 +2335,9 @@ class ProductResource extends Resource
     private static function buildAttentionHtml(?Product $record): HtmlString
     {
         if ($record === null) {
-            return new HtmlString('—');
+            return new HtmlString(
+                '<div style="color:#6b7280;">Поки що достатньо заповнити назву. Додаткові підказки з’являться після збереження.</div>'
+            );
         }
 
         $service = app(ProductWorkspaceSummaryService::class);
