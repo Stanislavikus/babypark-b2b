@@ -27,6 +27,22 @@
     @apply overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10;
 }
 
+.bp-category-tree-controls {
+    @apply flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-white/5;
+}
+
+.bp-category-tree-search {
+    @apply w-full max-w-md;
+}
+
+.bp-category-tree-search .fi-tree-search {
+    @apply mb-0;
+}
+
+.bp-category-tree-context-actions {
+    @apply shrink-0;
+}
+
 .bp-category-tree-table {
     min-width: 58rem;
 }
@@ -60,7 +76,7 @@ button.bp-category-tree-header-cell {
 }
 
 .bp-category-tree-header-cell--actions {
-    @apply justify-end pe-6;
+    @apply justify-start;
 }
 
 .bp-category-tree-sort-icon {
@@ -119,7 +135,7 @@ button.bp-category-tree-header-cell {
 }
 
 .bp-category-tree-actions-cell {
-    @apply justify-end pe-6;
+    @apply justify-start;
 }
 
 .bp-category-tree-table .fi-tree-node-label {
