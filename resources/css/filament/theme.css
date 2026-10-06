@@ -32,7 +32,7 @@
 }
 
 .bp-category-tree-search {
-    @apply w-full max-w-md;
+    @apply min-w-0 flex-1;
 }
 
 .bp-category-tree-search .fi-tree-search {

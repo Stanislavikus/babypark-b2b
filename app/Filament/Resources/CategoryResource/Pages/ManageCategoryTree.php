@@ -234,13 +234,18 @@ class ManageCategoryTree extends TreePage
     private function toggleActiveAction(): Action
     {
         return Action::make('toggle_category_active')
-            ->label(fn (?Category $record): string => $record?->is_active ? 'Деактивувати' : 'Активувати')
+            ->label(fn (?Category $record): string => $record?->is_active ? 'Приховати категорію' : 'Показати категорію')
             ->icon(fn (?Category $record): string => $record?->is_active ? 'heroicon-o-eye-slash' : 'heroicon-o-eye')
             ->color(fn (?Category $record): string => $record?->is_active ? 'gray' : 'success')
             ->iconButton()
             ->visible(fn (?Category $record): bool => $record instanceof Category
                 && CategoryResource::getEditAuthorizationResponse($record)->allowed())
             ->requiresConfirmation()
+            ->modalHeading(fn (?Category $record): string => $record?->is_active ? 'Приховати категорію?' : 'Показати категорію?')
+            ->modalDescription(fn (?Category $record): string => $record?->is_active
+                ? 'Категорія не видаляється. Товари та Magento-зв’язки зберігаються; ця категорія і її підкатегорії стануть недоступними для вибору та відображення.'
+                : 'Категорія знову стане доступною, якщо всі її батьківські категорії також активні.')
+            ->modalSubmitActionLabel(fn (?Category $record): string => $record?->is_active ? 'Приховати' : 'Показати')
             ->action(function (?Category $record): void {
                 if (! $record instanceof Category) {
                     throw new AuthorizationException('This action is unauthorized.');
@@ -251,7 +256,7 @@ class ManageCategoryTree extends TreePage
                     app(WorkspaceContext::class)->current(),
                     $record,
                     ! $record->is_active,
-                ), $record->is_active ? 'Категорію деактивовано' : 'Категорію активовано');
+                ), $record->is_active ? 'Категорію приховано' : 'Категорію показано');
             });
     }
 

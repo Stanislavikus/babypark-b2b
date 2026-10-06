@@ -101,7 +101,8 @@
                             <button
                                 type="button"
                                 class="fi-tree-node-toggle"
-                                :class="{ 'fi-tree-node-toggle--hidden': !node._hasChildren }"
+                                x-show="node._hasChildren"
+                                x-cloak
                                 @click.stop="toggleNode(node[idField])"
                                 :aria-label="node._isExpanded ? 'Згорнути підкатегорії' : 'Розгорнути підкатегорії'"
                             >
