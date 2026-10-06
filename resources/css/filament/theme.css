@@ -6,6 +6,7 @@
 @source '../../../resources/views/vendor/filament*/**/*';
 @source '../../../resources/views/components/filament/**/*';
 @source '../../../resources/views/livewire/**/*';
+@source '../../../vendor/solution-forest/filament-nestable-tree/resources/**/*.blade.php';
 
 @theme {
     --font-sans:

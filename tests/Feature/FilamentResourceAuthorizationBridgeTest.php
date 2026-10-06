@@ -74,7 +74,7 @@ class FilamentResourceAuthorizationBridgeTest extends TestCase
             'stock' => [StockResource::class, ['create', 'edit', 'delete']],
             'reservation' => [ReservationResource::class, ['create', 'edit', 'delete']],
             'admin product' => [ProductResource::class, ['create', 'delete']],
-            'category' => [CategoryResource::class, ['create', 'delete']],
+            'category' => [CategoryResource::class, ['delete']],
             'order' => [OrderResource::class, ['create']],
             'customer' => [CustomerResource::class, ['create']],
             'cabinet product' => [CabinetProductResource::class, ['create', 'edit', 'delete']],

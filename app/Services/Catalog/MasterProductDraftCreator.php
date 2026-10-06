@@ -52,6 +52,14 @@ final class MasterProductDraftCreator
             if (! $categoryExists) {
                 throw new InvalidArgumentException('Product category must belong to the active workspace.');
             }
+
+            if (! in_array(
+                (int) $categoryId,
+                app(CategoryHierarchyService::class)->effectiveActiveIds((string) $workspace->id),
+                true,
+            )) {
+                throw new InvalidArgumentException('Product category must be active in the full category path.');
+            }
         } else {
             $categoryId = null;
         }

@@ -16,7 +16,6 @@ use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
-use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SyncConfigurationProductSelection;
@@ -391,11 +390,11 @@ class ProductResource extends Resource
                         ->schema([
                             Select::make('category_id')
                                 ->label('Категорія')
-                                ->relationship(name: 'category', titleAttribute: 'name')
-                                ->getOptionLabelFromRecordUsing(
-                                    fn (Category $record): string => app(ProductCategoryTreeOptions::class)->label($record)
-                                )
-                                ->helperText('Показано повний шлях: батьківська категорія › підкатегорія.')
+                                ->options(fn (?Product $record): array => app(ProductCategoryTreeOptions::class)->selectableOptions(
+                                    (string) app(WorkspaceContext::class)->current()->id,
+                                    $record?->category_id === null ? null : (int) $record->category_id,
+                                ))
+                                ->helperText('Показано повний шлях. Неактивні гілки не доступні для нового призначення.')
                                 ->searchable()
                                 ->preload(),
                             TextInput::make('brand')

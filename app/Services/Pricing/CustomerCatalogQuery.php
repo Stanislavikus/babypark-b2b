@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Workspace;
+use App\Services\Catalog\CategoryHierarchyService;
 use App\Support\Pricing\CustomerCatalogCriteria;
 use App\Support\Pricing\CustomerPricingScope;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -31,7 +32,16 @@ class CustomerCatalogQuery
         }
 
         if ($criteria->categoryIds !== []) {
-            $query->whereIn('category_id', $criteria->categoryIds);
+            $categoryIds = app(CategoryHierarchyService::class)->activeDescendantIds(
+                (string) $customer->workspace_id,
+                $criteria->categoryIds,
+            );
+
+            if ($categoryIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('category_id', $categoryIds);
+            }
         }
 
         if ($criteria->brandIds !== []) {
