@@ -19,6 +19,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
@@ -193,6 +194,22 @@ class CategoryTreeManagementTest extends TestCase
             'is_active' => true,
             'stock_display_threshold' => 10,
         ]);
+    }
+
+    #[Test]
+    public function category_tree_migration_is_reversible(): void
+    {
+        $migration = require database_path('migrations/2026_10_06_100000_category_tree_management.php');
+
+        $migration->down();
+
+        $this->assertFalse(Schema::hasColumn('categories', 'sort_order'));
+        $this->assertFalse(Schema::hasColumn('categories', 'is_active'));
+
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('categories', 'sort_order'));
+        $this->assertTrue(Schema::hasColumn('categories', 'is_active'));
     }
 
     #[Test]
