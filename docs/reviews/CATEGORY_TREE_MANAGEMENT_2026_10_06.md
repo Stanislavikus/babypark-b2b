@@ -24,6 +24,17 @@ Verified for the campaign:
 - custom `saveOrderUsing()` is the only persistence path used by BabyPark;
 - exact project stack resolves: PHP `^8.3`, Laravel `13.24.0`, Filament `5.7.6`.
 
+| Area | `filament-nestable-tree` | `solution-forest/filament-tree` | Decision evidence |
+| --- | --- | --- | --- |
+| Functionality | PASS | PASS | Both provide tree UI; selected package provides search, drag/drop, node actions and a custom save hook without requiring its model trait. |
+| License | PASS | PASS | MIT; commercially reusable with no product/user free-tier limit. |
+| Activity | PARTIAL | PASS | Selected package is newer/younger; the older tree package has a longer adoption history. |
+| Upgrade | PARTIAL | PASS | Selected package supports Filament 4/5 but brings `kalnoy/nestedset` transitively even though BabyPark does not use it. |
+| Integration | PASS | PARTIAL | Selected package works with the existing nullable `parent_id` model and BabyPark-owned writer; the older package is more opinionated around its tree model/root conventions. |
+| Workspace/RBAC/write isolation | PASS | PARTIAL | Selected package can be presentation-only and route all writes through BabyPark authorization/invariants. |
+
+**Verdict: ADAPT `solution-forest/filament-nestable-tree`.** Its weaker maturity/extra transitive dependency are acceptable because the integration boundary is deliberately replaceable and the package does not own Category persistence.
+
 The package owns tree presentation and browser interaction only. It is not a domain writer.
 All Category create/edit/activate/reparent/reorder writes remain governed by BabyPark code.
 
