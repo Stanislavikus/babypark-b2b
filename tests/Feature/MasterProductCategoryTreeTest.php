@@ -101,6 +101,41 @@ class MasterProductCategoryTreeTest extends TestCase
         );
     }
 
+    public function test_product_form_rejects_new_assignment_to_inactive_branch_but_preserves_existing_assignment(): void
+    {
+        $root = $this->category('Inactive root');
+        $child = $this->category('Active child', $root);
+        $root->update(['is_active' => false]);
+
+        $unassigned = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Unassigned product',
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $unassigned->getRouteKey()])
+            ->fillForm(['category_id' => $child->id])
+            ->call('save')
+            ->assertHasFormErrors(['category_id']);
+
+        $this->assertNull($unassigned->fresh()->category_id);
+
+        $assigned = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Existing inactive branch product',
+            'category_id' => $child->id,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $assigned->getRouteKey()])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame($child->id, $assigned->fresh()->category_id);
+    }
+
     public function test_product_form_rejects_category_from_another_workspace(): void
     {
         $foreignWorkspace = Workspace::query()->create([
