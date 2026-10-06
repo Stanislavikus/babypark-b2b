@@ -14,7 +14,6 @@ use App\Services\Catalog\CategoryHierarchyService;
 use App\Services\Catalog\CategoryTreeMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
-use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -353,16 +352,20 @@ class CategoryTreeManagementTest extends TestCase
             ->assertSee('Поріг відображення')
             ->assertSee('Стан')
             ->assertSee('Дії')
-            ->assertSee('Згорнути все')
-            ->assertSee('Розгорнути все');
+            ->assertDontSee('Згорнути все')
+            ->assertDontSee('Розгорнути все')
+            ->assertDontSee('Ручний порядок');
 
         $toolbarActions = $component->instance()->getCachedTree()->getToolbarActions();
 
-        $this->assertFalse(collect($toolbarActions)->contains(
-            fn (mixed $action): bool => $action instanceof ActionGroup,
+        $this->assertSame(['save'], array_map(
+            fn ($action): string => $action->getName(),
+            $toolbarActions,
         ));
-        $this->assertStringContainsString('collapseAll()', $component->html());
-        $this->assertStringContainsString('expandAll()', $component->html());
+        $this->assertStringNotContainsString('collapseAll()', $component->html());
+        $this->assertStringNotContainsString('expandAll()', $component->html());
+        $this->assertStringContainsString('bp-category-tree-controls', $component->html());
+        $this->assertStringContainsString('bp-category-tree-search', $component->html());
     }
 
     #[Test]
@@ -395,15 +398,27 @@ class CategoryTreeManagementTest extends TestCase
             ->assertSet('treeSortDirection', 'desc')
             ->assertSet('treeNodes.0.id', $rootB->id)
             ->assertSet('treeNodes.1.id', $rootA->id)
+            ->call('sortTree', 'name')
+            ->assertSet('treeSortColumn', 'manual')
+            ->assertSet('treeSortDirection', 'asc')
+            ->assertSet('treeNodes.0.id', $rootB->id)
+            ->assertSet('treeNodes.1.id', $rootA->id);
+
+        $this->assertTrue($component->instance()->getCachedTree()->isDraggable());
+
+        $component
             ->call('sortTree', 'children_count')
             ->assertSet('treeSortColumn', 'children_count')
             ->assertSet('treeSortDirection', 'asc')
             ->assertSet('treeNodes.0.id', $rootB->id)
-            ->assertSet('treeNodes.1.id', $rootA->id)
-            ->call('resetTreeSort')
-            ->assertSet('treeSortColumn', 'manual')
-            ->assertSet('treeNodes.0.id', $rootB->id)
             ->assertSet('treeNodes.1.id', $rootA->id);
+
+        $this->assertFalse($component->instance()->getCachedTree()->isDraggable());
+
+        $component
+            ->call('sortTree', 'children_count')
+            ->call('sortTree', 'children_count')
+            ->assertSet('treeSortColumn', 'manual');
 
         $this->assertTrue($component->instance()->getCachedTree()->isDraggable());
         $this->assertSame(0, $rootB->fresh()->sort_order);

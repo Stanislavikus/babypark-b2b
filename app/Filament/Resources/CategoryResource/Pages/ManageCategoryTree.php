@@ -37,6 +37,13 @@ class ManageCategoryTree extends TreePage
         'is_active',
     ];
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            $this->createCategoryAction(),
+        ];
+    }
+
     public function tree(Tree $tree): Tree
     {
         return $tree
@@ -64,33 +71,10 @@ class ManageCategoryTree extends TreePage
                 );
             })
             ->toolbarActions([
-                $this->createCategoryAction(),
-                Action::make('collapse_all')
-                    ->label('Згорнути все')
-                    ->icon('heroicon-o-chevron-up')
-                    ->color('gray')
-                    ->alpineClickHandler('collapseAll()'),
-                Action::make('expand_all')
-                    ->label('Розгорнути все')
-                    ->icon('heroicon-o-chevron-down')
-                    ->color('gray')
-                    ->alpineClickHandler('expandAll()'),
-                Action::make('manual_order')
-                    ->label('Ручний порядок')
-                    ->icon('heroicon-o-bars-arrow-down')
-                    ->color('gray')
-                    ->visible(fn (): bool => $this->treeSortColumn !== 'manual')
-                    ->action(fn () => $this->resetTreeSort()),
                 Action::make('save')
                     ->label('Зберегти порядок')
                     ->extraAttributes(['x-show' => 'hasUnsavedOrder', 'x-cloak' => true])
                     ->alpineClickHandler('$wire.saveTreeOrder([], treeKey)'),
-                Action::make('reset_order')
-                    ->label('Скинути порядок')
-                    ->color('gray')
-                    ->icon('heroicon-o-arrow-path')
-                    ->iconButton()
-                    ->alpineClickHandler('$wire.resetTreeOrder(treeKey)'),
             ]);
     }
 
@@ -147,20 +131,16 @@ class ManageCategoryTree extends TreePage
             return;
         }
 
-        if ($this->treeSortColumn === $column) {
-            $this->treeSortDirection = $this->treeSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
+        if ($this->treeSortColumn !== $column) {
             $this->treeSortColumn = $column;
+            $this->treeSortDirection = 'asc';
+        } elseif ($this->treeSortDirection === 'asc') {
+            $this->treeSortDirection = 'desc';
+        } else {
+            $this->treeSortColumn = 'manual';
             $this->treeSortDirection = 'asc';
         }
 
-        $this->refreshTreeNodes();
-    }
-
-    public function resetTreeSort(): void
-    {
-        $this->treeSortColumn = 'manual';
-        $this->treeSortDirection = 'asc';
         $this->refreshTreeNodes();
     }
 

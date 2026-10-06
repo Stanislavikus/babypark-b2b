@@ -31,19 +31,22 @@
     })"
     class="filament-nestable-tree bp-category-tree"
 >
-    @if (count($toolbarActions) > 0)
-        <x-filament::actions
-            class="fi-tree-toolbar"
-            :actions="$toolbarActions"
-            full-width
-        />
-    @endif
-
-    @if ($isSearchable)
-        <x-filament-nestable-tree::tree.search-bar />
-    @endif
-
     <div class="bp-category-tree-frame">
+        <div class="bp-category-tree-controls">
+            @if ($isSearchable)
+                <div class="bp-category-tree-search">
+                    <x-filament-nestable-tree::tree.search-bar />
+                </div>
+            @endif
+
+            @if (count($toolbarActions) > 0)
+                <x-filament::actions
+                    class="bp-category-tree-context-actions"
+                    :actions="$toolbarActions"
+                />
+            @endif
+        </div>
+
         <div class="bp-category-tree-table">
             <div class="bp-category-tree-header" role="row">
                 @foreach ($sortHeaders as $column => $label)
