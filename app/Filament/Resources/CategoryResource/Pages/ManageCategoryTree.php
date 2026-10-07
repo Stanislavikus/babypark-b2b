@@ -353,6 +353,10 @@ class ManageCategoryTree extends TreePage
                 TextInput::make('confirmation')
                     ->label('Підтвердження')
                     ->helperText('Введіть ВИДАЛИТИ, щоб підтвердити незворотне видалення категорії.')
+                    ->rules(['in:ВИДАЛИТИ'])
+                    ->validationMessages([
+                        'in' => 'Введіть слово «ВИДАЛИТИ».',
+                    ])
                     ->required(fn (Get $get): bool => (int) $get('expected_products_count') > 0)
                     ->visible(fn (Get $get): bool => (int) $get('expected_products_count') > 0),
             ])

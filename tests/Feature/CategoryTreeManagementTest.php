@@ -402,11 +402,11 @@ class CategoryTreeManagementTest extends TestCase
                 && (int) ($data['expected_children_count'] ?? -1) === 0
                 && (int) ($data['expected_mappings_count'] ?? -1) === 0
             ))
-            ->unmountAction()
-            ->callAction($action, [
+            ->setActionData([
                 'product_destination' => '__uncategorized__',
                 'confirmation' => 'delete',
             ])
+            ->callMountedAction()
             ->assertHasActionErrors(['confirmation']);
 
         $this->assertDatabaseHas('categories', ['id' => $source->id]);
@@ -433,10 +433,12 @@ class CategoryTreeManagementTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(ManageCategoryTree::class)
-            ->callAction($action, [
+            ->mountAction($action)
+            ->setActionData([
                 'product_destination' => '__uncategorized__',
                 'confirmation' => 'ВИДАЛИТИ',
             ])
+            ->callMountedAction()
             ->assertNotified('Категорію видалено');
 
         $this->assertDatabaseMissing('categories', ['id' => $source->id]);
