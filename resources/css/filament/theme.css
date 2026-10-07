@@ -55,8 +55,8 @@
         minmax(7rem, 0.36fr)
         minmax(6rem, 0.3fr)
         minmax(10rem, 0.46fr)
-        minmax(7rem, 0.34fr)
-        8rem;
+        minmax(6rem, 0.26fr)
+        10.5rem;
 }
 
 .bp-category-tree-header {
@@ -102,8 +102,8 @@ button.bp-category-tree-header-cell {
         minmax(7rem, 0.36fr)
         minmax(6rem, 0.3fr)
         minmax(10rem, 0.46fr)
-        minmax(7rem, 0.34fr)
-        8rem;
+        minmax(6rem, 0.26fr)
+        10.5rem;
 }
 
 .bp-category-tree-table .fi-tree-node-row--selected {
@@ -135,7 +135,15 @@ button.bp-category-tree-header-cell {
 }
 
 .bp-category-tree-actions-cell {
-    @apply justify-start;
+    @apply justify-start whitespace-nowrap;
+}
+
+.bp-category-tree-actions-cell .fi-tree-node-actions-list {
+    @apply flex flex-nowrap items-center gap-2;
+}
+
+.bp-category-tree-actions-cell .fi-tree-node-action-item {
+    @apply shrink-0;
 }
 
 .bp-category-tree-table .fi-tree-node-label {
