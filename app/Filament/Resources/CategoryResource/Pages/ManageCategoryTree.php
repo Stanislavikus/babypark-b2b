@@ -353,10 +353,6 @@ class ManageCategoryTree extends TreePage
                 TextInput::make('confirmation')
                     ->label('Підтвердження')
                     ->helperText('Введіть ВИДАЛИТИ, щоб підтвердити незворотне видалення категорії.')
-                    ->rules(['in:ВИДАЛИТИ'])
-                    ->validationMessages([
-                        'in' => 'Введіть слово «ВИДАЛИТИ».',
-                    ])
                     ->required(fn (Get $get): bool => (int) $get('expected_products_count') > 0)
                     ->visible(fn (Get $get): bool => (int) $get('expected_products_count') > 0),
             ])
@@ -371,6 +367,12 @@ class ManageCategoryTree extends TreePage
                 $destinationCategoryId = null;
 
                 if ($productsCount > 0) {
+                    if (($data['confirmation'] ?? null) !== 'ВИДАЛИТИ') {
+                        throw ValidationException::withMessages([
+                            'confirmation' => 'Введіть слово «ВИДАЛИТИ».',
+                        ]);
+                    }
+
                     $destination = $data['product_destination'] ?? null;
 
                     if ($destination !== '__uncategorized__') {
