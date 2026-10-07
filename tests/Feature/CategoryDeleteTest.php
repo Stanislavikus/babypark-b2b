@@ -268,10 +268,11 @@ final class CategoryDeleteTest extends TestCase
     }
 
     #[Test]
-    public function delete_rejects_inactive_destination_and_rolls_back(): void
+    public function delete_rejects_effectively_inactive_destination_and_rolls_back(): void
     {
         $source = $this->category('Source');
-        $destination = $this->category('Inactive destination', active: false);
+        $inactiveParent = $this->category('Inactive destination parent', active: false);
+        $destination = $this->category('Active flag but hidden destination', $inactiveParent, active: true);
         $product = Product::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
             'name' => 'Must stay put',
