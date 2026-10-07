@@ -65,7 +65,11 @@ and retain the existing `categories.parent_id`, `sort_order`, `is_active` and Ba
 - `is_active` is explicit. A node is effectively selectable/visible only when it and all
   ancestors are active.
 - Deactivating a Category does not deactivate Products and does not rewrite Magento mappings.
-- Physical delete remains disabled in this campaign.
+- Physical delete was intentionally disabled in this original tree campaign. **Superseded scope note
+  [Resolved — 2026-10-07]:** governed deletion of one Master Category is now approved as a separate
+  capability; whole-subtree deletion remains deferred. No Delete UI may ship before the legacy
+  Magento NULL-category destructive path is hardened. See
+  `docs/reviews/CATEGORY_CLASSIFICATION_ARCHITECTURE_2026_10_07.md`.
 - No Category image, description, SEO page or slug is added in this campaign.
 - Existing `stock_display_threshold` remains editable.
 - `categories.onec_guid` remains legacy connector/category identity debt. Its mere presence
@@ -79,7 +83,9 @@ and retain the existing `categories.parent_id`, `sort_order`, `is_active` and Ba
 
 - Standard Category / Google or Shopify taxonomy;
 - category-to-provider heuristic mapping;
-- physical delete;
+- physical delete **inside this original 2026-10-06 campaign** (later approved as a separate
+  governed single-Category capability by the 2026-10-07 Resolved amendment);
 - category landing-page CMS;
 - media/SEO fields;
-- multi-category Product cardinality.
+- multi-category Product cardinality **in this campaign**; current `0..1` remains v1 storage, not
+  a permanent platform invariant.
