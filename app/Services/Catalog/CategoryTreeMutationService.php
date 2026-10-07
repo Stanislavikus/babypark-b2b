@@ -129,7 +129,6 @@ final class CategoryTreeMutationService
                 ->where('workspace_id', $lockedWorkspace->id)
                 ->where('category_id', $lockedCategory->id)
                 ->orderBy('id')
-                ->lockForUpdate()
                 ->get(['id', 'category_id']);
 
             $mappings = ConnectorCategoryMapping::withoutWorkspaceScope()
@@ -171,11 +170,15 @@ final class CategoryTreeMutationService
             }
 
             if ($products->isNotEmpty()) {
-                Product::withoutWorkspaceScope()
+                $updatedProducts = Product::withoutWorkspaceScope()
                     ->where('workspace_id', $lockedWorkspace->id)
                     ->whereIn('id', $products->pluck('id')->all())
                     ->where('category_id', $lockedCategory->id)
                     ->update(['category_id' => $destination?->id]);
+
+                if ($updatedProducts !== $products->count()) {
+                    throw CategoryTreeMutationException::staleDeleteImpact();
+                }
             }
 
             $this->reparentDeletedCategoryChildren($categories, $lockedCategory);
