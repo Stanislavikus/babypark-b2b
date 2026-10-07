@@ -370,7 +370,7 @@ final class MagentoCategoryRelationRuntimeTest extends TestCase
     }
 
     #[Test]
-    public function null_local_category_removes_only_proven_managed_relation(): void
+    public function null_local_category_with_managed_relation_fails_closed_without_provider_write(): void
     {
         [$account, $product, $variant, $link] = $this->trustedSimple('501');
         $remoteCategories = ['6', '8'];
@@ -386,8 +386,37 @@ final class MagentoCategoryRelationRuntimeTest extends TestCase
             externalCategoryId: null,
         );
 
+        $this->assertSame(SyncLiveOutcome::Partial, $result->outcome);
+        $this->assertTrue(collect($result->findings)->contains(
+            fn ($finding): bool => $finding->code === 'category_mapping_missing',
+        ));
+        $this->assertSame([], $this->writeMethods($transport));
+        $this->assertSame([], $transport->recordedRequests);
+        $this->assertSame(['6', '8'], $remoteCategories);
+        $assignment = AdobeProductCategoryAssignment::withoutWorkspaceScope()->sole();
+        $this->assertSame(AdobeProductCategoryAssignmentState::Managed, $assignment->state);
+        $this->assertSame($link->id, $assignment->external_record_link_id);
+    }
+
+    #[Test]
+    public function null_local_category_without_managed_relation_preserves_legacy_noop(): void
+    {
+        [$account, $product, $variant] = $this->trustedSimple('501');
+        $remoteCategories = ['8'];
+        $transport = $this->bindCategoryTransport($variant->sku, 501, $remoteCategories);
+
+        $result = $this->executeSimple(
+            $account->workspace_id,
+            $account->id,
+            $product->id,
+            $variant->id,
+            categoryId: null,
+            externalCategoryId: null,
+        );
+
         $this->assertSame(SyncLiveOutcome::Synchronized, $result->outcome);
-        $this->assertSame(['DELETE'], $this->writeMethods($transport));
+        $this->assertSame([], $this->writeMethods($transport));
+        $this->assertSame([], $transport->recordedRequests);
         $this->assertSame(['8'], $remoteCategories);
         $this->assertSame(0, AdobeProductCategoryAssignment::withoutWorkspaceScope()->count());
     }
