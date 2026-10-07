@@ -1787,8 +1787,12 @@ Subcategory and deeper levels are not different entities: all are `Category` row
 `parent_id`. The admin surface is a searchable hierarchy with create-child, edit, activate/deactivate,
 reorder and reparent actions. Ordering is persisted through `sort_order`; merchants do not type ordering
 numbers manually. Effective category visibility/selectability requires the node and every ancestor to be
-active. Deactivation never deactivates Products or rewrites connector category mappings. Physical delete,
-Category media/SEO/landing pages and public slug behavior remain outside this capability.
+active. Deactivation never deactivates Products or rewrites connector category mappings. The original
+2026-10-06 tree campaign did not implement physical delete; the later
+**[Resolved addendum — Master Classification / Category Delete — 2026-10-07]** now authorizes governed
+single-Category deletion with explicit Product reassignment/unassignment, child reparenting and no direct
+provider WRITE. Whole-subtree deletion remains deferred. See
+`docs/reviews/CATEGORY_CLASSIFICATION_ARCHITECTURE_2026_10_07.md`.
 
 The tree UI is integration-first: `solution-forest/filament-nestable-tree` is used only as a Filament
 presentation/interaction adapter. Category writes remain governed by platform authorization and
@@ -10448,18 +10452,39 @@ replacement of what already exists, but an addition alongside it:
   collections on top of Merchant/Catalogue Category — never a substitute for it. Implemented as
   a workspace-owned `tags` table + `product_tag` pivot with `workspace_id` isolation enforcement.
 
-**When Standard Category is eventually built** (not now), it becomes mandatory for product
-readiness/channel-export/publishing flows specifically — not for draft-product existence, and
-not a replacement for Merchant/Catalogue Category's storefront-navigation role.
+**[Resolved amendment — Master Classification / Assortment / Channel Classification — 2026-10-07]**
+
+Standard Category, when built, is **not** a universal prerequisite for every channel export or
+publication. Provider classification semantics differ: navigation categories, standardized
+taxonomies, merchant product types, marketplace product types/browse nodes and merchandising
+collections are not one interchangeable concept.
+
+The platform therefore keeps four concerns separate:
+
+1. Master Classification — workspace-owned organization/navigation;
+2. Assortment / Publication Selection — which Products go to a target;
+3. Channel Classification Projection — provider-specific classification;
+4. Merchandising grouping — collections/dynamic groups such as Sale/New/Bestseller.
+
+Current `products.category_id` remains the v1 `Product -> 0..1 Merchant/Catalogue Category`
+storage model, but `0..1` is not a permanent platform invariant. No multi-category schema
+migration is authorized now.
+
+Master Category may be an input/default to a provider projection but never becomes provider
+authority by name/path similarity. Observed provider categories do not auto-create or fuzzy-match
+Master Categories. Assortment is independent of Category; Magento already has explicit Product
+selection, while explicit native-B2B assortment remains a future capability.
 
 `Merchant Type` and `Tags` are implemented on `develop` (see **GAP-011** for runtime notes and
 scope boundaries). Standard Category remains a tracked future concept and is not implemented
-today; it connects to GAP-006's connector/channel-mapping layer when built.
+today. Its eventual use must be justified by the target capability rather than treated as a
+universal channel taxonomy.
+
+See `docs/reviews/CATEGORY_CLASSIFICATION_ARCHITECTURE_2026_10_07.md`.
 
 This decision is closed and must not be reopened without a documentation-level decision. It
-does not reopen, override, or contradict the existing "Categories are workspace-owned" / "no
-global taxonomy in MVP" decisions, nor the existing `ProductType` template concept — it adds
-new, separate concepts alongside them.
+does not override the workspace-owned Category tree or the existing `ProductType` template
+concept; it constrains how those concepts may participate in future channel projection.
 
 ### Payment implementation timing
 

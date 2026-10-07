@@ -98,7 +98,7 @@ The system must explicitly split system attributes by their architectural assign
 
 - brand — Commercial brand name. Not automatically equivalent to the manufacturer. `manufacturer` is a separate Platform Library concept, and provider-side labels (e.g. Shopify `vendor`) are not automatically either one.
 
-- category — Category reference. **Crucial Rule**: This is not a flat text field. It is a system relation mapping the product to the Workspace Category Tree entity. During import, if a category path doesn't exist, the platform automatically creates the corresponding nodes in the tree structure. 
+- category — Category reference. **Crucial Rule**: This is not a flat text field. It is a system relation mapping the product to the Workspace Category Tree entity. During an explicit **Master file import**, a merchant-supplied category path may create the corresponding workspace Category nodes according to the import contract. Observed Magento/Shopify/provider categories never auto-create or fuzzy-match Master Categories; provider classification remains remote truth until an explicit merchant action grounded in exact identity. See `docs/reviews/CATEGORY_CLASSIFICATION_ARCHITECTURE_2026_10_07.md`.
 
 - description — Detailed product description. 
 
