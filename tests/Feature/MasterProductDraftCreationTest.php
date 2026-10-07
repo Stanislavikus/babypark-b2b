@@ -124,6 +124,21 @@ class MasterProductDraftCreationTest extends TestCase
     }
 
     #[Test]
+    public function draft_creator_rejects_inactive_brand(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $brand = $this->brandFixture($workspace, 'Inactive brand');
+        $brand->update(['is_active' => false]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        app(MasterProductDraftCreator::class)->create($workspace, [
+            'name' => 'Product with inactive brand',
+            'brand_id' => $brand->id,
+        ]);
+    }
+
+    #[Test]
     public function authorized_workspace_user_sees_create_product_action_on_product_list(): void
     {
         $workspace = Workspace::query()->where('is_default', true)->sole();

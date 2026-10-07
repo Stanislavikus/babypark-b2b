@@ -90,6 +90,19 @@ final class MasterProductDraftCreator
             $lifecycle,
             $physical,
         ): Product {
+            if ($brandId !== null) {
+                $lockedBrand = Brand::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->whereKey($brandId)
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $lockedBrand instanceof Brand) {
+                    throw new InvalidArgumentException('Product brand must be an active Brand in the active workspace.');
+                }
+            }
+
             $product = Product::withoutWorkspaceScope()->create([
                 'workspace_id' => $workspace->id,
                 'onec_guid' => null,
