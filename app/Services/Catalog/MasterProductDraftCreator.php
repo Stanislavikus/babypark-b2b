@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Enums\ProductLifecycleStatus;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -22,7 +23,7 @@ final class MasterProductDraftCreator
 
         $sku = $this->nullableTrimmedString($input['sku'] ?? null);
         $ean = $this->nullableTrimmedString($input['barcode_ean'] ?? null);
-        $brand = $this->nullableTrimmedString($input['brand'] ?? null);
+        $brandId = filled($input['brand_id'] ?? null) ? (string) $input['brand_id'] : null;
         $categoryId = $input['category_id'] ?? null;
         $merchantType = $this->nullableTrimmedString($input['merchant_type'] ?? null);
         $description = $this->nullableTrimmedString($input['description'] ?? null);
@@ -64,12 +65,24 @@ final class MasterProductDraftCreator
             $categoryId = null;
         }
 
+        if ($brandId !== null) {
+            $brandExists = Brand::withoutWorkspaceScope()
+                ->where('workspace_id', $workspace->id)
+                ->whereKey($brandId)
+                ->where('is_active', true)
+                ->exists();
+
+            if (! $brandExists) {
+                throw new InvalidArgumentException('Product brand must be an active Brand in the active workspace.');
+            }
+        }
+
         return DB::transaction(function () use (
             $workspace,
             $name,
             $sku,
             $ean,
-            $brand,
+            $brandId,
             $categoryId,
             $merchantType,
             $description,
@@ -77,14 +90,32 @@ final class MasterProductDraftCreator
             $lifecycle,
             $physical,
         ): Product {
+            $lockedWorkspace = Workspace::query()
+                ->whereKey($workspace->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($brandId !== null) {
+                $lockedBrand = Brand::withoutWorkspaceScope()
+                    ->where('workspace_id', $lockedWorkspace->id)
+                    ->whereKey($brandId)
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $lockedBrand instanceof Brand) {
+                    throw new InvalidArgumentException('Product brand must be an active Brand in the active workspace.');
+                }
+            }
+
             $product = Product::withoutWorkspaceScope()->create([
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $lockedWorkspace->id,
                 'onec_guid' => null,
                 'sku' => $sku,
                 'barcode_ean' => $ean,
                 'name' => $name,
                 'category_id' => $categoryId,
-                'brand' => $brand,
+                'brand_id' => $brandId,
                 'merchant_type' => $merchantType,
                 'description' => $description,
                 'url' => $url,
@@ -94,7 +125,7 @@ final class MasterProductDraftCreator
             ]);
 
             ProductVariant::withoutWorkspaceScope()->create([
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $lockedWorkspace->id,
                 'product_id' => $product->id,
                 'onec_guid' => null,
                 'sku' => $sku,

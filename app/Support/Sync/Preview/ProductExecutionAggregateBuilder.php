@@ -15,6 +15,7 @@ use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Pricing\PriceResolver;
 use App\Services\Pricing\Resolution\PriceResolutionStatus;
 use App\Services\Pricing\ResolvedPrice;
+use App\Support\Workspace\WorkspaceScope;
 use Illuminate\Support\Collection;
 
 class ProductExecutionAggregateBuilder
@@ -52,9 +53,14 @@ class ProductExecutionAggregateBuilder
         $products = Product::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->whereIn('id', $productIds)
-            ->with(['variants' => static fn ($query) => $query
-                ->where('is_active', true)
-                ->orderBy('id')])
+            ->with([
+                'brand' => static fn ($query) => $query
+                    ->withoutGlobalScope(WorkspaceScope::class)
+                    ->where('workspace_id', $workspaceId),
+                'variants' => static fn ($query) => $query
+                    ->where('is_active', true)
+                    ->orderBy('id'),
+            ])
             ->orderBy('id')
             ->get();
 
@@ -308,6 +314,20 @@ class ProductExecutionAggregateBuilder
         Product $product,
         ?ProductVariant $variant,
     ): mixed {
+        if ($binding->fieldDefinition?->code === 'brand'
+            && $binding->storage_path === 'products.brand_id'
+        ) {
+            if ($product->brand_id === null || $product->brand === null) {
+                return null;
+            }
+
+            if ((string) $product->brand->workspace_id !== (string) $product->workspace_id) {
+                return null;
+            }
+
+            return $product->brand->name;
+        }
+
         return $this->resolveColumnValue($binding, $product, $variant);
     }
 

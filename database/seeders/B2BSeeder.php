@@ -9,6 +9,7 @@ use App\Enums\ReservationStatus;
 use App\Enums\SyncLogStatus;
 use App\Enums\SyncLogType;
 use App\Enums\UserRole;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\InventoryLocation;
@@ -138,7 +139,13 @@ class B2BSeeder extends Seeder
      */
     private function seedProductsAndVariants($categories)
     {
-        $brands = ['Chicco', 'Philips Avent', 'Pampers', 'LEGO DUPLO', 'Fisher-Price'];
+        $brandNames = ['Chicco', 'Philips Avent', 'Pampers', 'LEGO DUPLO', 'Fisher-Price'];
+        $brands = collect($brandNames)->mapWithKeys(fn (string $name): array => [
+            $name => Brand::query()->create([
+                'name' => $name,
+                'is_active' => true,
+            ]),
+        ]);
         $variants = collect();
 
         for ($i = 1; $i <= 50; $i++) {
@@ -150,7 +157,7 @@ class B2BSeeder extends Seeder
                 'barcode_ean' => sprintf('482%010d', $i),
                 'name' => 'Товар BabyPark #'.$i,
                 'category_id' => $category->id,
-                'brand' => $brands[($i - 1) % count($brands)],
+                'brand_id' => $brands[$brandNames[($i - 1) % count($brandNames)]]->id,
                 'unit' => 'шт',
                 'min_order_quantity' => $i % 5 === 0 ? 2 : 1,
                 'order_step' => 1,

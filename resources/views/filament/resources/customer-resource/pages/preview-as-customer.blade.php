@@ -49,8 +49,8 @@
         <div class="min-w-48">
             <label class="text-sm font-medium">Бренди</label>
             <select wire:model.live="selectedBrands" multiple class="mt-1 block w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900" size="4">
-                @foreach($brands as $brand)
-                    <option value="{{ $brand }}">{{ $brand }}</option>
+                @foreach($brands as $brandId => $brandName)
+                    <option value="{{ $brandId }}">{{ $brandName }}</option>
                 @endforeach
             </select>
         </div>

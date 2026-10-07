@@ -25,10 +25,12 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\TestCase;
 
 class MasterProductDraftCreationTest extends TestCase
 {
+    use CreatesBrandFixtures;
     use RefreshDatabase;
 
     #[Test]
@@ -118,6 +120,21 @@ class MasterProductDraftCreationTest extends TestCase
         app(MasterProductDraftCreator::class)->create($workspace, [
             'name' => 'Wrong inactive category product',
             'category_id' => $child->id,
+        ]);
+    }
+
+    #[Test]
+    public function draft_creator_rejects_inactive_brand(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+        $brand = $this->brandFixture($workspace, 'Inactive brand');
+        $brand->update(['is_active' => false]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        app(MasterProductDraftCreator::class)->create($workspace, [
+            'name' => 'Product with inactive brand',
+            'brand_id' => $brand->id,
         ]);
     }
 
@@ -279,13 +296,14 @@ class MasterProductDraftCreationTest extends TestCase
 
         $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $brand = $this->brandFixture($workspace, 'BabyPark Test');
 
         Livewire::actingAs($user)
             ->test(CreateProduct::class)
             ->fillForm([
                 'name' => 'Manual master product',
                 'sku' => null,
-                'brand' => 'BabyPark Test',
+                'brand_id' => $brand->id,
                 'barcode_ean' => null,
                 'merchant_type' => 'test-product',
                 'description' => '<p>Draft description</p>',
@@ -300,7 +318,8 @@ class MasterProductDraftCreationTest extends TestCase
 
         $this->assertNull($product->onec_guid);
         $this->assertNull($product->sku);
-        $this->assertSame('BabyPark Test', $product->brand);
+        $this->assertSame($brand->id, $product->brand_id);
+        $this->assertSame('BabyPark Test', $product->brand?->name);
         $this->assertSame('test-product', $product->merchant_type);
         $this->assertSame(ProductLifecycleStatus::Draft, $product->lifecycle_status);
         $this->assertFalse($product->is_active);
@@ -375,6 +394,8 @@ class MasterProductDraftCreationTest extends TestCase
         ]);
 
         $this->grantWorkspacePermission($workspace, $user, WorkspacePermissions::MANAGE_PRODUCTS);
+        $erpBrand = $this->brandFixture($workspace, 'ERP brand');
+        $overrideBrand = $this->brandFixture($workspace, 'Override brand');
 
         $product = Product::withoutWorkspaceScope()->create([
             'workspace_id' => $workspace->id,
@@ -382,7 +403,7 @@ class MasterProductDraftCreationTest extends TestCase
             'sku' => 'ERP-001',
             'barcode_ean' => '1111111111111',
             'name' => 'ERP product',
-            'brand' => 'ERP brand',
+            'brand_id' => $erpBrand->id,
             'is_active' => true,
         ]);
 
@@ -393,7 +414,7 @@ class MasterProductDraftCreationTest extends TestCase
             ->fillForm([
                 'sku' => 'OVERRIDE-SKU',
                 'name' => 'Override name',
-                'brand' => 'Override brand',
+                'brand_id' => $overrideBrand->id,
                 'barcode_ean' => '2222222222222',
             ])
             ->call('save')
@@ -403,7 +424,8 @@ class MasterProductDraftCreationTest extends TestCase
 
         $this->assertSame('ERP-001', $product->sku);
         $this->assertSame('ERP product', $product->name);
-        $this->assertSame('ERP brand', $product->brand);
+        $this->assertSame($erpBrand->id, $product->brand_id);
+        $this->assertSame('ERP brand', $product->brand?->name);
         $this->assertSame('1111111111111', $product->barcode_ean);
     }
 

@@ -9960,7 +9960,10 @@ Product-level Phase 1 seed:
   primary key, not a UUID. This mismatch is documented here and does not block Phase 1; it may
   be revisited separately.
 - `name` — storage_path: `products.name` (shared FieldDefinition with Customer binding)
-- `brand` — storage_path: `products.brand`
+- `brand` — **[Resolved amendment — 2026-10-07]** storage_type: relation,
+  storage_path: `products.brand_id`; Product stores the workspace-owned Brand UUID while
+  canonical/channel text projection resolves `Brand.name`. See
+  `docs/reviews/MASTER_BRAND_ENTITY_2026_10_07.md`.
 - `category` — storage_type: relation, storage_path: `products.category_id`
 - `description` — storage_path: `products.description`
 - `status` — storage_path: `products.is_active`; interim convention:

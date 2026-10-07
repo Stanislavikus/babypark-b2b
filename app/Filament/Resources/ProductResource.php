@@ -16,6 +16,7 @@ use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
+use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SyncConfigurationProductSelection;
@@ -25,6 +26,7 @@ use App\Models\VariantMedia;
 use App\Models\Workspace;
 use App\Services\Availability\MasterInventoryMutationService;
 use App\Services\Availability\MasterInventoryReadService;
+use App\Services\Catalog\BrandManager;
 use App\Services\Catalog\ProductCategoryTreeOptions;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
@@ -397,10 +399,34 @@ class ProductResource extends Resource
                                 ->helperText('Показано повний шлях. Неактивні гілки не доступні для нового призначення.')
                                 ->searchable()
                                 ->preload(),
-                            TextInput::make('brand')
+                            Select::make('brand_id')
                                 ->label('Бренд')
-                                ->maxLength(255)
-                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                                ->options(fn (?Product $record): array => app(BrandManager::class)->selectableOptions(
+                                    (string) app(WorkspaceContext::class)->id(),
+                                    filled($record?->brand_id) ? (string) $record->brand_id : null,
+                                ))
+                                ->searchable()
+                                ->preload()
+                                ->createOptionForm([
+                                    TextInput::make('name')
+                                        ->label('Назва')
+                                        ->required()
+                                        ->maxLength(255),
+                                ])
+                                ->createOptionUsing(function (array $data): string {
+                                    $actor = auth()->user();
+
+                                    if (! $actor instanceof User) {
+                                        throw new AuthorizationException('This action is unauthorized.');
+                                    }
+
+                                    return app(BrandManager::class)->create(
+                                        $actor,
+                                        app(WorkspaceContext::class)->current(),
+                                        (string) $data['name'],
+                                    )->getKey();
+                                })
+                                ->disabled(fn (?Product $record): bool => self::brandAssignmentIsReadOnly($record)),
                             Placeholder::make('workspace_product_type')
                                 ->label('Сімейство товару')
                                 ->content(fn (?Product $record): string => $record
@@ -499,7 +525,7 @@ class ProductResource extends Resource
                         ->label('EAN')
                         ->getStateUsing(fn (Product $record): ?string => $record->variants->first()?->barcode_ean)
                         ->placeholder('—'),
-                    TextEntry::make('brand')->label('Бренд')->placeholder('—'),
+                    TextEntry::make('brand.name')->label('Бренд')->placeholder('—'),
                     TextEntry::make('name')->label('Назва'),
                     TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
                     TextEntry::make('admin_stock_status')
@@ -610,10 +636,20 @@ class ProductResource extends Resource
                     ->sortable(),
 
                 // 4. Бренд — default visible; user may toggle it off
-                TextColumn::make('brand')
+                TextColumn::make('brand.name')
                     ->label('Бренд')
-                    ->searchable()
-                    ->sortable()
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas(
+                        'brand',
+                        fn (Builder $brandQuery): Builder => $brandQuery->where('name', 'like', '%'.addcslashes($search, '%_\\\\').'%'),
+                    ))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        Brand::withoutWorkspaceScope()
+                            ->select('name')
+                            ->whereColumn('brands.id', 'products.brand_id')
+                            ->whereColumn('brands.workspace_id', 'products.workspace_id')
+                            ->limit(1),
+                        $direction,
+                    ))
                     ->toggleable(in_array('brand', $toggleable)),
 
                 // 5. Ціна — placeholder until admin/base sale price model is resolved (Follow-up 3)
@@ -754,15 +790,11 @@ class ProductResource extends Resource
                     ->multiple()
                     ->preload(),
 
-                SelectFilter::make('brand')
+                SelectFilter::make('brand_id')
                     ->label('Бренди')
-                    ->options(fn (): array => Product::query()
-                        ->distinct()
-                        ->orderBy('brand')
-                        ->whereNotNull('brand')
-                        ->pluck('brand', 'brand')
-                        ->toArray())
-                    ->multiple(),
+                    ->relationship('brand', 'name')
+                    ->multiple()
+                    ->preload(),
 
                 SelectFilter::make('status')
                     ->label('Статус')
@@ -1967,6 +1999,20 @@ class ProductResource extends Resource
     private static function isSourceOwned(?Product $record): bool
     {
         return $record !== null && filled($record->onec_guid);
+    }
+
+    private static function brandAssignmentIsReadOnly(?Product $record): bool
+    {
+        if (! $record instanceof Product) {
+            return false;
+        }
+
+        return filled($record->onec_guid)
+            || ProductVariant::withoutWorkspaceScope()
+                ->where('workspace_id', $record->workspace_id)
+                ->where('product_id', $record->id)
+                ->whereNotNull('onec_guid')
+                ->exists();
     }
 
     private static function lifecycleIsReadOnly(?Product $record): bool

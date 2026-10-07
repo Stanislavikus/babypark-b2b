@@ -44,6 +44,9 @@ not replace or duplicate Master data.
    tree. Magento Category is separate account-scoped channel classification/mapping.
 9. **Brand is Master data.** Current string storage remains in this campaign. Converting Brand to
    a reference entity is separate normalization work and must not block this UX convergence.
+   **[Resolved amendment — 2026-10-07]:** that separate normalization is now the Master Brand
+   campaign in `docs/reviews/MASTER_BRAND_ENTITY_2026_10_07.md`; after its migration,
+   `products.brand_id` is the sole Product→Brand authority and the legacy string column is removed.
 10. **Tags are Master organizational data.** They are not provider taxonomy.
 11. **Actual site URL is channel/destination-owned.** The generic factual "URL товару на сайті"
     must not be presented as one universal Master URL. Master SEO may later hold defaults/slug

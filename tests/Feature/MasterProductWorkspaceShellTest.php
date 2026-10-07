@@ -35,10 +35,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\TestCase;
 
 class MasterProductWorkspaceShellTest extends TestCase
 {
+    use CreatesBrandFixtures;
     use RefreshDatabase;
 
     private Workspace $workspace;
@@ -103,7 +105,7 @@ class MasterProductWorkspaceShellTest extends TestCase
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'WORKSPACE-001',
             'name' => 'Workspace stroller',
-            'brand' => 'BabyPark',
+            'brand_id' => $this->brandFixture($this->workspace, 'BabyPark')->id,
             'description' => '<p>Workspace description</p>',
             'images' => [
                 'https://example.test/media/main.jpg',
@@ -321,7 +323,7 @@ class MasterProductWorkspaceShellTest extends TestCase
             'onec_guid' => null,
             'sku' => null,
             'name' => 'Draft product',
-            'brand' => null,
+            'brand_id' => null,
             'description' => '<p>Draft description</p>',
             'images' => [],
             'is_active' => true,

@@ -30,7 +30,7 @@ final class ProductWorkspaceSummaryService
         $checks = [
             'Назва' => filled($product->name),
             'Категорія' => $product->category_id !== null,
-            'Бренд' => filled($product->brand),
+            'Бренд' => $product->brand_id !== null,
             'Опис' => filled(strip_tags((string) $product->description)),
             'Медіа' => $this->mediaUrls($product) !== [],
         ];

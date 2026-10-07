@@ -27,7 +27,7 @@ class Product extends Model
         'barcode_box',
         'name',
         'category_id',
-        'brand',
+        'brand_id',
         'merchant_type',
         'unit',
         'min_order_quantity',
@@ -127,6 +127,11 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
     }
 
     public function workspace(): BelongsTo

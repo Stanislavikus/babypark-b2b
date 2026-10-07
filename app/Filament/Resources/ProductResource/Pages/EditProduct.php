@@ -8,6 +8,7 @@ use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditor;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditStaleException;
 use App\Models\MediaAsset;
+use App\Models\Product;
 use App\Models\ProductMedia;
 use App\Models\ProductType;
 use App\Models\ProductTypeGroupPlacement;
@@ -16,6 +17,7 @@ use App\Models\User;
 use App\Models\VariantFieldValue;
 use App\Models\VariantMedia;
 use App\Models\Workspace;
+use App\Services\Catalog\BrandManager;
 use App\Services\Catalog\MasterProductLifecycleMutationService;
 use App\Services\Catalog\ProductMediaMutationService;
 use App\Services\Catalog\ProductMediaReadService;
@@ -56,6 +58,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
@@ -90,6 +93,35 @@ class EditProduct extends EditRecord
             $this->optionalGroupsAction(),
             ViewAction::make()->label('Перегляд'),
         ];
+    }
+
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        if (! $record instanceof Product) {
+            return parent::handleRecordUpdate($record, $data);
+        }
+
+        $brandWasSubmitted = array_key_exists('brand_id', $data);
+        $brandId = $brandWasSubmitted && filled($data['brand_id'])
+            ? (string) $data['brand_id']
+            : null;
+        unset($data['brand_id']);
+
+        parent::handleRecordUpdate($record, $data);
+
+        if ($brandWasSubmitted) {
+            $actor = auth()->user();
+
+            if (! $actor instanceof User) {
+                throw new AuthorizationException('This action is unauthorized.');
+            }
+
+            $workspace = Workspace::withoutGlobalScopes()->findOrFail($record->workspace_id);
+            app(BrandManager::class)->assign($actor, $workspace, $record, $brandId);
+            $record->refresh();
+        }
+
+        return $record;
     }
 
     protected function afterSave(): void

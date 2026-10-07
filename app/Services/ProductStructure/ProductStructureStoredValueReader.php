@@ -7,6 +7,7 @@ use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
@@ -18,7 +19,7 @@ final class ProductStructureStoredValueReader
     private const RULES = [
         'internal_product_id' => [FieldObjectType::Product, AttributeStorageType::Column, 'products.id', AttributeDataType::Number, 'id'],
         'name' => [FieldObjectType::Product, AttributeStorageType::Column, 'products.name', AttributeDataType::Text, 'name'],
-        'brand' => [FieldObjectType::Product, AttributeStorageType::Column, 'products.brand', AttributeDataType::Text, 'brand'],
+        'brand' => [FieldObjectType::Product, AttributeStorageType::Relation, 'products.brand_id', AttributeDataType::Text, 'brand_id'],
         'category' => [FieldObjectType::Product, AttributeStorageType::Relation, 'products.category_id', AttributeDataType::Text, 'category_id'],
         'description' => [FieldObjectType::Product, AttributeStorageType::Column, 'products.description', AttributeDataType::LongText, 'description'],
         'status' => [FieldObjectType::Product, AttributeStorageType::Column, 'products.is_active', AttributeDataType::Boolean, 'is_active'],
@@ -56,12 +57,21 @@ final class ProductStructureStoredValueReader
 
         $value = $target->getAttribute($attribute);
         if ($storageType === AttributeStorageType::Relation) {
-            return $definition->code === 'category'
-                && $value !== null
-                && Category::withoutWorkspaceScope()
+            if ($value === null) {
+                return false;
+            }
+
+            return match ($definition->code) {
+                'category' => Category::withoutWorkspaceScope()
                     ->whereKey($value)
                     ->where('workspace_id', $target->workspace_id)
-                    ->exists();
+                    ->exists(),
+                'brand' => Brand::withoutWorkspaceScope()
+                    ->whereKey($value)
+                    ->where('workspace_id', $target->workspace_id)
+                    ->exists(),
+                default => false,
+            };
         }
 
         return match ($dataType) {

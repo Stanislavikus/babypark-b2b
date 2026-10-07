@@ -56,7 +56,7 @@ final class SyncLiveWorklistQuery
             $productQuery
                 ->where(function (Builder $inner) use ($like): void {
                     $inner->where('name', 'like', $like)
-                        ->orWhere('brand', 'like', $like)
+                        ->orWhereHas('brand', fn (Builder $brandQuery): Builder => $brandQuery->where('name', 'like', $like))
                         ->orWhereHas('variants', function (Builder $variantQuery) use ($like): void {
                             $variantQuery
                                 ->where('is_active', true)

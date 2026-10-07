@@ -47,6 +47,7 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\ConfiguresSyncSupportProfiles;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
@@ -54,6 +55,7 @@ use Tests\TestCase;
 class ProductChannelWorkspaceUiTest extends TestCase
 {
     use ConfiguresSyncSupportProfiles;
+    use CreatesBrandFixtures;
     use CreatesConnectorAccountFixtures;
     use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
@@ -694,7 +696,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
         $this->assertSame('start', $table->getRecordActionsAlignment());
 
         $component
-            ->filterTable('brand', 'Brand A')
+            ->filterTable('brand_id', $active->brand_id)
             ->assertSee($active->name)
             ->assertDontSee($inactive->name)
             ->resetTableFilters()
@@ -941,6 +943,12 @@ class ProductChannelWorkspaceUiTest extends TestCase
     /** @param array<string, mixed> $attributes */
     private function createProduct(string $sku, array $attributes = []): Product
     {
+        if (array_key_exists('brand', $attributes)) {
+            $brand = (string) $attributes['brand'];
+            unset($attributes['brand']);
+            $attributes['brand_id'] = $this->brandFixture($this->workspace, $brand)->id;
+        }
+
         return Product::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
             'onec_guid' => (string) Str::uuid(),

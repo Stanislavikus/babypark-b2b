@@ -19,11 +19,13 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
 
 class CustomerCatalogVisibilityTest extends TestCase
 {
+    use CreatesBrandFixtures;
     use CreatesPricingFixtures;
     use RefreshDatabase;
 
@@ -329,7 +331,7 @@ class CustomerCatalogVisibilityTest extends TestCase
 
         $brands = app(CustomerCatalogQuery::class)->availableBrands($customer);
 
-        $this->assertContains('NoPriceBrand', $brands);
+        $this->assertContains('NoPriceBrand', array_values($brands));
     }
 
     public function test_apply_product_scope_sql_does_not_filter_by_price(): void
@@ -403,6 +405,12 @@ class CustomerCatalogVisibilityTest extends TestCase
         array $productAttrs = [],
         ?float $basePriceCache = null,
     ): Product {
+        if (array_key_exists('brand', $productAttrs)) {
+            $brand = (string) $productAttrs['brand'];
+            unset($productAttrs['brand']);
+            $productAttrs['brand_id'] = $this->brandFixture($workspace, $brand)->id;
+        }
+
         $product = Product::create(array_merge([
             'workspace_id' => $workspace->id,
             'onec_guid' => (string) Str::uuid(),
@@ -422,7 +430,7 @@ class CustomerCatalogVisibilityTest extends TestCase
             'base_price_cache' => $basePriceCache,
         ]);
 
-        return $product->load(['variants.stocks', 'category']);
+        return $product->load(['variants.stocks', 'category', 'brand']);
     }
 
     private function catalogRowFor(Product $product, $customer)

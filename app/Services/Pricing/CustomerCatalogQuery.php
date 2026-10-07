@@ -3,6 +3,7 @@
 namespace App\Services\Pricing;
 
 use App\Enums\CatalogSort;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Product;
@@ -27,7 +28,7 @@ class CustomerCatalogQuery
             $query->where(fn ($q) => $q
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('sku', 'like', "%{$search}%")
-                ->orWhere('brand', 'like', "%{$search}%")
+                ->orWhereHas('brand', fn (Builder $brandQuery): Builder => $brandQuery->where('name', 'like', "%{$search}%"))
             );
         }
 
@@ -45,7 +46,7 @@ class CustomerCatalogQuery
         }
 
         if ($criteria->brandIds !== []) {
-            $query->whereIn('brand', $criteria->brandIds);
+            $query->whereIn('brand_id', $criteria->brandIds);
         }
 
         $query = $this->applySorting($query, $customer, $criteria->sort);
@@ -53,15 +54,21 @@ class CustomerCatalogQuery
         return $query->paginate($criteria->perPage);
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return array<string, string> */
     public function availableBrands(Customer $customer): array
     {
-        return CustomerPricingScope::applyProductScope(
-            Product::query()->where('is_active', true)->whereNotNull('brand'),
+        $brandIds = CustomerPricingScope::applyProductScope(
+            Product::query()->where('is_active', true)->whereNotNull('brand_id'),
             $customer,
-        )->distinct()->orderBy('brand')->pluck('brand')->all();
+        )->distinct()->pluck('brand_id')->filter()->values()->all();
+
+        return Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $customer->workspace_id)
+            ->whereIn('id', $brandIds)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->pluck('name', 'id')
+            ->all();
     }
 
     private function applySorting(Builder $query, Customer $customer, CatalogSort $sort): Builder
@@ -82,7 +89,14 @@ class CustomerCatalogQuery
                     ->limit(1),
                 $dir
             ),
-            'brand' => $query->orderBy('brand', $dir),
+            'brand' => $query->orderBy(
+                Brand::withoutWorkspaceScope()
+                    ->select('name')
+                    ->whereColumn('brands.id', 'products.brand_id')
+                    ->whereColumn('brands.workspace_id', 'products.workspace_id')
+                    ->limit(1),
+                $dir
+            ),
             'stock' => $this->applyStockSorting($query, $dir),
             'price' => $priceListId
                 ? (function () use ($query, $priceListId, $dir, $workspaceRate) {

@@ -4,6 +4,7 @@ namespace App\Support\Sync\Preview\Presentation;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Support\Workspace\WorkspaceScope;
 use Illuminate\Support\Collection;
 
 final class SyncPreviewProductIdentityPresenter
@@ -14,7 +15,14 @@ final class SyncPreviewProductIdentityPresenter
     public function present(Product $product, Collection $sellableVariants): string
     {
         $lines = [$product->name];
-        $brand = is_string($product->brand) ? trim($product->brand) : '';
+        $product->loadMissing([
+            'brand' => fn ($query) => $query
+                ->withoutGlobalScope(WorkspaceScope::class)
+                ->where('workspace_id', $product->workspace_id),
+        ]);
+        $brand = (string) $product->brand?->workspace_id === (string) $product->workspace_id
+            ? trim((string) $product->brand?->name)
+            : '';
         $count = $sellableVariants->count();
 
         if ($count === 1) {

@@ -26,10 +26,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\TestCase;
 
 class ProductCompletenessServiceTest extends TestCase
 {
+    use CreatesBrandFixtures;
     use RefreshDatabase;
 
     #[Test]
@@ -233,8 +235,9 @@ class ProductCompletenessServiceTest extends TestCase
             'name' => 'Completeness Category',
             'stock_display_threshold' => 10,
         ]);
+        $brand = $this->brandFixture($workspace, 'BabyPark');
         Product::withoutWorkspaceScope()->whereKey($product->id)->update([
-            'brand' => 'BabyPark',
+            'brand_id' => $brand->id,
             'category_id' => $category->id,
             'min_order_quantity' => 2,
         ]);
@@ -289,8 +292,6 @@ class ProductCompletenessServiceTest extends TestCase
             'status' => AttributeStatus::Active,
         ]);
         $this->place($workspace, $type, $group, $binding, required: true);
-        Product::withoutWorkspaceScope()->whereKey($product->id)->update(['brand' => 'Present but unsupported']);
-
         $projection = app(ProductCompletenessService::class)->project($product, 'uk');
 
         $this->assertSame(1, $projection->requiredCount);

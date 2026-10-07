@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Sync;
 
 use App\Filament\Resources\ProductResource;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
@@ -176,7 +177,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                         '1' => __('product_channels.product_status.active'),
                         '0' => __('product_channels.product_status.inactive'),
                     ]),
-                SelectFilter::make('brand')
+                SelectFilter::make('brand_id')
                     ->label(__('product_channels.workbench.columns.provider_brand'))
                     ->options(fn (): array => $this->publicationBrandFilterOptions()),
                 SelectFilter::make('category_id')
@@ -313,12 +314,21 @@ class ManageAdobeProductsChannel extends Page implements HasTable
     /** @return array<string, string> */
     private function publicationBrandFilterOptions(): array
     {
-        return $this->publicationFilterProductsQuery()
-            ->whereNotNull('brand')
-            ->where('brand', '!=', '')
+        $workspaceId = $this->resolveSyncDataSetupLandingWorkspace()->id;
+        $brandIds = $this->publicationFilterProductsQuery()
+            ->whereNotNull('brand_id')
             ->distinct()
-            ->orderBy('brand')
-            ->pluck('brand', 'brand')
+            ->pluck('brand_id')
+            ->filter()
+            ->values()
+            ->all();
+
+        return Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('id', $brandIds)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->pluck('name', 'id')
             ->all();
     }
 
