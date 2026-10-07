@@ -123,6 +123,9 @@ This v1 does not guess it.
 ## Active / inactive semantics
 
 `is_active` controls availability for new Master assignments and inline creation/search.
+New Product assignment rechecks the Brand as active under transaction lock order
+`Workspace -> Brand` before Product insert; concurrent deactivation therefore wins or the
+assignment wins, but no Product can be newly attached after the Brand has become inactive.
 
 Deactivation:
 
@@ -187,3 +190,5 @@ No provider Brand mapping/identity table is created in this campaign.
 > **SourceOwnedBrandAssignmentIsReadOnly** — Brand entity normalization does not weaken 1C Product authority.
 
 > **BrandRelationIsWorkspaceIsolated** — cross-workspace Product→Brand links are impossible at database and service boundaries.
+>
+> **NewBrandAssignmentRequiresActiveBrand** — new Product→Brand assignment is authorized only while the exact same-workspace Brand is active, rechecked under the governed transaction lock.

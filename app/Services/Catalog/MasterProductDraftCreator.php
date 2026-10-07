@@ -90,9 +90,14 @@ final class MasterProductDraftCreator
             $lifecycle,
             $physical,
         ): Product {
+            $lockedWorkspace = Workspace::query()
+                ->whereKey($workspace->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if ($brandId !== null) {
                 $lockedBrand = Brand::withoutWorkspaceScope()
-                    ->where('workspace_id', $workspace->id)
+                    ->where('workspace_id', $lockedWorkspace->id)
                     ->whereKey($brandId)
                     ->where('is_active', true)
                     ->lockForUpdate()
@@ -104,7 +109,7 @@ final class MasterProductDraftCreator
             }
 
             $product = Product::withoutWorkspaceScope()->create([
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $lockedWorkspace->id,
                 'onec_guid' => null,
                 'sku' => $sku,
                 'barcode_ean' => $ean,
@@ -120,7 +125,7 @@ final class MasterProductDraftCreator
             ]);
 
             ProductVariant::withoutWorkspaceScope()->create([
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $lockedWorkspace->id,
                 'product_id' => $product->id,
                 'onec_guid' => null,
                 'sku' => $sku,
