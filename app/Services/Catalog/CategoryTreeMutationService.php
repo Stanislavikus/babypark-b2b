@@ -340,13 +340,13 @@ final class CategoryTreeMutationService
 
         $siblings = $categories
             ->filter(fn (Category $candidate): bool => $this->sameParent($candidate->parent_id, $parentId))
-            ->sort($this->categoryOrder(...))
+            ->sort(fn (Category $left, Category $right): int => $this->categoryOrder($left, $right))
             ->values();
 
         $children = $categories
             ->filter(fn (Category $candidate): bool => $candidate->parent_id !== null
                 && (int) $candidate->parent_id === (int) $deleted->id)
-            ->sort($this->categoryOrder(...))
+            ->sort(fn (Category $left, Category $right): int => $this->categoryOrder($left, $right))
             ->values();
 
         $wouldRevealChildren = ! $deleted->is_active
