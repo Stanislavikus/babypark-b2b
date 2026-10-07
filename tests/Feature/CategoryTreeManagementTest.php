@@ -139,9 +139,12 @@ class CategoryTreeManagementTest extends TestCase
         ]);
         $this->makeWorkspaceMembership($this->workspace, $unauthorized);
 
+        $category = $this->category('Protected category');
+
         $this->actingAs($unauthorized);
 
         $this->assertTrue(CategoryResource::getCreateAuthorizationResponse()->denied());
+        $this->assertTrue(CategoryResource::getDeleteAuthorizationResponse($category)->denied());
 
         $this->expectException(AuthorizationException::class);
 
@@ -399,6 +402,7 @@ class CategoryTreeManagementTest extends TestCase
                 && (int) ($data['expected_children_count'] ?? -1) === 0
                 && (int) ($data['expected_mappings_count'] ?? -1) === 0
             ))
+            ->unmountAction()
             ->callAction($action, [
                 'product_destination' => '__uncategorized__',
                 'confirmation' => 'delete',
@@ -407,6 +411,36 @@ class CategoryTreeManagementTest extends TestCase
 
         $this->assertDatabaseHas('categories', ['id' => $source->id]);
         $this->assertDatabaseHas('products', ['category_id' => $source->id]);
+    }
+
+    #[Test]
+    public function confirmed_category_delete_action_uses_governed_writer(): void
+    {
+        $source = $this->category('Delete confirmed');
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Product survives category delete',
+            'category_id' => $source->id,
+            'is_active' => true,
+        ]);
+
+        $action = TestAction::make('delete_category')->arguments([
+            'tree' => true,
+            'recordKey' => $source->id,
+            'nodeId' => $source->id,
+            'treeKey' => null,
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ManageCategoryTree::class)
+            ->callAction($action, [
+                'product_destination' => '__uncategorized__',
+                'confirmation' => 'ВИДАЛИТИ',
+            ])
+            ->assertNotified('Категорію видалено');
+
+        $this->assertDatabaseMissing('categories', ['id' => $source->id]);
+        $this->assertNull($product->fresh()->category_id);
     }
 
     #[Test]
