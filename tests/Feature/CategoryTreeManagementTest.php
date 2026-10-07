@@ -14,6 +14,7 @@ use App\Services\Catalog\CategoryHierarchyService;
 use App\Services\Catalog\CategoryTreeMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -60,13 +61,13 @@ class CategoryTreeManagementTest extends TestCase
     }
 
     #[Test]
-    public function category_resource_allows_authorized_create_but_keeps_delete_denied(): void
+    public function category_resource_allows_authorized_create_edit_and_delete(): void
     {
         $category = $this->category('Коляски');
 
         $this->assertTrue(CategoryResource::getCreateAuthorizationResponse()->allowed());
         $this->assertTrue(CategoryResource::getEditAuthorizationResponse($category)->allowed());
-        $this->assertTrue(CategoryResource::getDeleteAuthorizationResponse($category)->denied());
+        $this->assertTrue(CategoryResource::getDeleteAuthorizationResponse($category)->allowed());
     }
 
     #[Test]
@@ -138,9 +139,12 @@ class CategoryTreeManagementTest extends TestCase
         ]);
         $this->makeWorkspaceMembership($this->workspace, $unauthorized);
 
+        $category = $this->category('Protected category');
+
         $this->actingAs($unauthorized);
 
         $this->assertTrue(CategoryResource::getCreateAuthorizationResponse()->denied());
+        $this->assertTrue(CategoryResource::getDeleteAuthorizationResponse($category)->denied());
 
         $this->expectException(AuthorizationException::class);
 
@@ -369,6 +373,76 @@ class CategoryTreeManagementTest extends TestCase
         $this->assertStringContainsString('bp-category-tree-search', $component->html());
         $this->assertStringContainsString('x-show="node._hasChildren"', $component->html());
         $this->assertStringContainsString('Приховати категорію', $nodeActionsHtml);
+        $this->assertStringContainsString('Видалити категорію', $nodeActionsHtml);
+    }
+
+    #[Test]
+    public function nonempty_category_delete_requires_exact_typed_confirmation(): void
+    {
+        $source = $this->category('Delete guarded');
+        Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Guarded product',
+            'category_id' => $source->id,
+            'is_active' => true,
+        ]);
+
+        $action = TestAction::make('delete_category')->arguments([
+            'tree' => true,
+            'recordKey' => $source->id,
+            'nodeId' => $source->id,
+            'treeKey' => null,
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ManageCategoryTree::class)
+            ->mountAction($action)
+            ->assertActionDataSet(fn (array $data): bool => (
+                (int) ($data['expected_products_count'] ?? -1) === 1
+                && (int) ($data['expected_children_count'] ?? -1) === 0
+                && (int) ($data['expected_mappings_count'] ?? -1) === 0
+            ))
+            ->setActionData([
+                'product_destination' => '__uncategorized__',
+                'confirmation' => 'delete',
+            ])
+            ->callMountedAction()
+            ->assertHasActionErrors(['confirmation']);
+
+        $this->assertDatabaseHas('categories', ['id' => $source->id]);
+        $this->assertDatabaseHas('products', ['category_id' => $source->id]);
+    }
+
+    #[Test]
+    public function confirmed_category_delete_action_uses_governed_writer(): void
+    {
+        $source = $this->category('Delete confirmed');
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Product survives category delete',
+            'category_id' => $source->id,
+            'is_active' => true,
+        ]);
+
+        $action = TestAction::make('delete_category')->arguments([
+            'tree' => true,
+            'recordKey' => $source->id,
+            'nodeId' => $source->id,
+            'treeKey' => null,
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ManageCategoryTree::class)
+            ->mountAction($action)
+            ->setActionData([
+                'product_destination' => '__uncategorized__',
+                'confirmation' => 'ВИДАЛИТИ',
+            ])
+            ->callMountedAction()
+            ->assertNotified('Категорію видалено');
+
+        $this->assertDatabaseMissing('categories', ['id' => $source->id]);
+        $this->assertNull($product->fresh()->category_id);
     }
 
     #[Test]

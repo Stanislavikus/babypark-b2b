@@ -4,6 +4,8 @@ namespace App\Services\Catalog;
 
 use App\Exceptions\Catalog\CategoryTreeMutationException;
 use App\Models\Category;
+use App\Models\ConnectorCategoryMapping;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
@@ -16,6 +18,7 @@ final class CategoryTreeMutationService
 {
     public function __construct(
         private readonly WorkspaceAuthorization $authorization,
+        private readonly CategoryDeleteImpactService $deleteImpact,
     ) {}
 
     /** @param array{name?: mixed, parent_id?: mixed, is_active?: mixed, stock_display_threshold?: mixed} $input */
@@ -95,6 +98,106 @@ final class CategoryTreeMutationService
             $lockedCategory->update(['is_active' => $active]);
 
             return $lockedCategory->refresh();
+        });
+    }
+
+    /**
+     * @param  array{products_count:int,children_count:int,mappings_count:int,fingerprint:string}  $expectedImpact
+     */
+    public function deleteSingle(
+        User $actor,
+        Workspace $workspace,
+        Category $category,
+        ?int $destinationCategoryId,
+        array $expectedImpact,
+    ): void {
+        DB::transaction(function () use (
+            $actor,
+            $workspace,
+            $category,
+            $destinationCategoryId,
+            $expectedImpact,
+        ): void {
+            $lockedWorkspace = $this->lockWorkspaceAndAuthorize($actor, $workspace);
+            $categories = $this->lockCategories($lockedWorkspace);
+            $lockedCategory = $categories->firstWhere('id', (int) $category->id);
+
+            if (! $lockedCategory instanceof Category) {
+                throw new AuthorizationException('This action is unauthorized.');
+            }
+
+            $products = Product::withoutWorkspaceScope()
+                ->where('workspace_id', $lockedWorkspace->id)
+                ->where('category_id', $lockedCategory->id)
+                ->orderBy('id')
+                ->get(['id', 'category_id']);
+
+            $mappings = ConnectorCategoryMapping::withoutWorkspaceScope()
+                ->where('workspace_id', $lockedWorkspace->id)
+                ->where('category_id', $lockedCategory->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $children = $categories
+                ->filter(fn (Category $candidate): bool => $candidate->parent_id !== null
+                    && (int) $candidate->parent_id === (int) $lockedCategory->id)
+                ->values();
+
+            $actualImpact = [
+                'products_count' => $products->count(),
+                'children_count' => $children->count(),
+                'mappings_count' => $mappings->count(),
+            ];
+            $expectedFingerprint = $expectedImpact['fingerprint'] ?? null;
+            $actualFingerprint = $this->deleteImpact->fingerprint(
+                $lockedCategory,
+                $products,
+                $children,
+                $mappings,
+            );
+
+            if ($actualImpact !== [
+                'products_count' => (int) ($expectedImpact['products_count'] ?? -1),
+                'children_count' => (int) ($expectedImpact['children_count'] ?? -1),
+                'mappings_count' => (int) ($expectedImpact['mappings_count'] ?? -1),
+            ] || ! is_string($expectedFingerprint)
+                || ! hash_equals($actualFingerprint, $expectedFingerprint)
+            ) {
+                throw CategoryTreeMutationException::staleDeleteImpact();
+            }
+
+            $destination = null;
+            if ($destinationCategoryId !== null) {
+                $destination = $categories->firstWhere('id', $destinationCategoryId);
+
+                if (! $destination instanceof Category
+                    || (int) $destination->id === (int) $lockedCategory->id
+                    || ! $this->isEffectivelyActive($categories, (int) $destination->id)
+                ) {
+                    throw CategoryTreeMutationException::invalidDeleteDestination();
+                }
+            }
+
+            if ($products->isNotEmpty()) {
+                $updatedProducts = Product::withoutWorkspaceScope()
+                    ->where('workspace_id', $lockedWorkspace->id)
+                    ->whereIn('id', $products->pluck('id')->all())
+                    ->where('category_id', $lockedCategory->id)
+                    ->update(['category_id' => $destination?->id]);
+
+                if ($updatedProducts !== $products->count()) {
+                    throw CategoryTreeMutationException::staleDeleteImpact();
+                }
+            }
+
+            $this->reparentDeletedCategoryChildren($categories, $lockedCategory);
+
+            foreach ($mappings as $mapping) {
+                $mapping->delete();
+            }
+
+            $lockedCategory->delete();
         });
     }
 
@@ -241,6 +344,94 @@ final class CategoryTreeMutationService
 
             $this->flattenTree($children, $id, $placements, $seen);
         }
+    }
+
+    /** @param  Collection<int, Category>  $categories */
+    private function reparentDeletedCategoryChildren(Collection $categories, Category $deleted): void
+    {
+        $parentId = $deleted->parent_id === null ? null : (int) $deleted->parent_id;
+
+        $siblings = $categories
+            ->filter(fn (Category $candidate): bool => $this->sameParent($candidate->parent_id, $parentId))
+            ->sort(fn (Category $left, Category $right): int => $this->categoryOrder($left, $right))
+            ->values();
+
+        $children = $categories
+            ->filter(fn (Category $candidate): bool => $candidate->parent_id !== null
+                && (int) $candidate->parent_id === (int) $deleted->id)
+            ->sort(fn (Category $left, Category $right): int => $this->categoryOrder($left, $right))
+            ->values();
+
+        $wouldRevealChildren = ! $deleted->is_active
+            && $this->parentChainIsEffectivelyActive($categories, $parentId);
+
+        $nextOrder = 0;
+        foreach ($siblings as $sibling) {
+            if ((int) $sibling->id !== (int) $deleted->id) {
+                if ((int) $sibling->sort_order !== $nextOrder) {
+                    $sibling->update(['sort_order' => $nextOrder]);
+                }
+
+                $nextOrder++;
+
+                continue;
+            }
+
+            foreach ($children as $child) {
+                $attributes = [
+                    'parent_id' => $parentId,
+                    'sort_order' => $nextOrder++,
+                ];
+
+                if ($wouldRevealChildren && $child->is_active) {
+                    $attributes['is_active'] = false;
+                }
+
+                $child->update($attributes);
+            }
+        }
+    }
+
+    private function categoryOrder(Category $left, Category $right): int
+    {
+        return [(int) $left->sort_order, mb_strtolower((string) $left->name), (int) $left->id]
+            <=> [(int) $right->sort_order, mb_strtolower((string) $right->name), (int) $right->id];
+    }
+
+    /** @param  Collection<int, Category>  $categories */
+    private function isEffectivelyActive(Collection $categories, int $categoryId): bool
+    {
+        /** @var array<int, Category> $byId */
+        $byId = $categories->keyBy(fn (Category $category): int => (int) $category->id)->all();
+        $seen = [];
+        $currentId = $categoryId;
+
+        while (isset($byId[$currentId])) {
+            if (isset($seen[$currentId])) {
+                return false;
+            }
+
+            $seen[$currentId] = true;
+            $current = $byId[$currentId];
+
+            if (! $current->is_active) {
+                return false;
+            }
+
+            if ($current->parent_id === null) {
+                return true;
+            }
+
+            $currentId = (int) $current->parent_id;
+        }
+
+        return false;
+    }
+
+    /** @param  Collection<int, Category>  $categories */
+    private function parentChainIsEffectivelyActive(Collection $categories, ?int $parentId): bool
+    {
+        return $parentId === null || $this->isEffectivelyActive($categories, $parentId);
     }
 
     private function name(mixed $value): string

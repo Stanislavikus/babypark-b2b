@@ -6,16 +6,22 @@ use App\Exceptions\Catalog\CategoryTreeMutationException;
 use App\Filament\Resources\CategoryResource;
 use App\Models\Category;
 use App\Models\User;
+use App\Services\Catalog\CategoryDeleteImpactService;
 use App\Services\Catalog\CategoryTreeMutationService;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Validation\ValidationException;
 use SolutionForest\FilamentNestableTree\Filament\Resources\Pages\TreePage;
 use SolutionForest\FilamentNestableTree\Tree;
 
@@ -151,6 +157,7 @@ class ManageCategoryTree extends TreePage
                 $this->editCategoryAction(),
                 $this->addChildAction(),
                 $this->toggleActiveAction(),
+                $this->deleteCategoryAction(),
             ]);
     }
 
@@ -258,6 +265,179 @@ class ManageCategoryTree extends TreePage
                     ! $record->is_active,
                 ), $record->is_active ? 'Категорію приховано' : 'Категорію показано');
             });
+    }
+
+    private function deleteCategoryAction(): Action
+    {
+        return Action::make('delete_category')
+            ->label('Видалити категорію')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->iconButton()
+            ->visible(fn (?Category $record): bool => $record instanceof Category
+                && CategoryResource::getDeleteAuthorizationResponse($record)->allowed())
+            ->fillForm(function (?Category $record): array {
+                if (! $record instanceof Category) {
+                    return [];
+                }
+
+                $impact = app(CategoryDeleteImpactService::class)->impact(
+                    app(WorkspaceContext::class)->current(),
+                    $record,
+                );
+
+                return [
+                    'expected_products_count' => $impact['products_count'],
+                    'expected_children_count' => $impact['children_count'],
+                    'expected_mappings_count' => $impact['mappings_count'],
+                    'expected_fingerprint' => $impact['fingerprint'],
+                    'source_adobe_mappings_count' => $impact['adobe_mappings_count'],
+                    'source_stock_display_threshold' => $impact['stock_display_threshold'],
+                    'product_destination' => null,
+                    'confirmation' => null,
+                ];
+            })
+            ->modalHeading(fn (?Category $record): string => $record instanceof Category
+                ? 'Видалити категорію «'.$record->name.'»?'
+                : 'Видалити категорію?')
+            ->modalDescription('Категорія буде фізично видалена з Master. Товари та категорії в Magento не видаляються цією дією.')
+            ->schema([
+                Hidden::make('expected_products_count'),
+                Hidden::make('expected_children_count'),
+                Hidden::make('expected_mappings_count'),
+                Hidden::make('expected_fingerprint'),
+                Hidden::make('source_adobe_mappings_count'),
+                Hidden::make('source_stock_display_threshold'),
+                Placeholder::make('delete_impact')
+                    ->label('Наслідки')
+                    ->content(fn (Get $get): string => sprintf(
+                        'Товарів: %d · Підкатегорій: %d · Зіставлень з каналами: %d.',
+                        (int) $get('expected_products_count'),
+                        (int) $get('expected_children_count'),
+                        (int) $get('expected_mappings_count'),
+                    )),
+                Placeholder::make('children_delete_note')
+                    ->hiddenLabel()
+                    ->content('Підкатегорії будуть підняті на рівень вище. Видалення всієї гілки не виконується.')
+                    ->visible(fn (Get $get): bool => (int) $get('expected_children_count') > 0),
+                Select::make('product_destination')
+                    ->label('Куди перенести товари')
+                    ->placeholder('Оберіть дію')
+                    ->options(fn (?Category $record): array => $record instanceof Category
+                        ? app(CategoryDeleteImpactService::class)->destinationOptions(
+                            app(WorkspaceContext::class)->current(),
+                            $record,
+                        )
+                        : ['__uncategorized__' => 'Без категорії'])
+                    ->searchable()
+                    ->preload()
+                    ->live()
+                    ->required(fn (Get $get): bool => (int) $get('expected_products_count') > 0)
+                    ->visible(fn (Get $get): bool => (int) $get('expected_products_count') > 0),
+                Placeholder::make('channel_delete_warning')
+                    ->label('Канали')
+                    ->content(fn (Get $get, ?Category $record): string => $this->deleteChannelWarning(
+                        $record,
+                        $get('product_destination'),
+                        (int) $get('source_adobe_mappings_count'),
+                    ) ?? '')
+                    ->visible(fn (Get $get, ?Category $record): bool => $this->deleteChannelWarning(
+                        $record,
+                        $get('product_destination'),
+                        (int) $get('source_adobe_mappings_count'),
+                    ) !== null),
+                Placeholder::make('stock_threshold_delete_warning')
+                    ->label('B2B')
+                    ->content('Для товарів без категорії поріг відображення залишку стане стандартним: 10.')
+                    ->visible(fn (Get $get): bool => $get('product_destination') === '__uncategorized__'
+                        && (int) $get('expected_products_count') > 0
+                        && (int) $get('source_stock_display_threshold') !== 10),
+                TextInput::make('confirmation')
+                    ->label('Підтвердження')
+                    ->helperText('Введіть ВИДАЛИТИ, щоб підтвердити незворотне видалення категорії.')
+                    ->rules(['in:ВИДАЛИТИ'])
+                    ->validationMessages([
+                        'in' => 'Введіть слово «ВИДАЛИТИ».',
+                    ])
+                    ->required(fn (Get $get): bool => (int) $get('expected_products_count') > 0)
+                    ->visible(fn (Get $get): bool => (int) $get('expected_products_count') > 0),
+            ])
+            ->requiresConfirmation()
+            ->modalSubmitActionLabel('Видалити')
+            ->action(function (array $data, ?Category $record): void {
+                if (! $record instanceof Category) {
+                    throw new AuthorizationException('This action is unauthorized.');
+                }
+
+                $productsCount = (int) ($data['expected_products_count'] ?? -1);
+                $destinationCategoryId = null;
+
+                if ($productsCount > 0) {
+                    if (($data['confirmation'] ?? null) !== 'ВИДАЛИТИ') {
+                        throw ValidationException::withMessages([
+                            'confirmation' => 'Введіть слово «ВИДАЛИТИ».',
+                        ]);
+                    }
+
+                    $destination = $data['product_destination'] ?? null;
+
+                    if ($destination !== '__uncategorized__') {
+                        $parsed = filter_var($destination, FILTER_VALIDATE_INT);
+                        if ($parsed === false || $parsed < 1) {
+                            throw ValidationException::withMessages([
+                                'product_destination' => 'Оберіть, куди перенести товари.',
+                            ]);
+                        }
+
+                        $destinationCategoryId = (int) $parsed;
+                    }
+                }
+
+                $this->mutate(fn (User $actor) => app(CategoryTreeMutationService::class)->deleteSingle(
+                    $actor,
+                    app(WorkspaceContext::class)->current(),
+                    $record,
+                    $destinationCategoryId,
+                    [
+                        'products_count' => $productsCount,
+                        'children_count' => (int) ($data['expected_children_count'] ?? -1),
+                        'mappings_count' => (int) ($data['expected_mappings_count'] ?? -1),
+                        'fingerprint' => (string) ($data['expected_fingerprint'] ?? ''),
+                    ],
+                ), 'Категорію видалено');
+            });
+    }
+
+    private function deleteChannelWarning(
+        ?Category $record,
+        mixed $destination,
+        int $sourceAdobeMappingsCount,
+    ): ?string {
+        if (! $record instanceof Category || $sourceAdobeMappingsCount < 1 || $destination === null || $destination === '') {
+            return null;
+        }
+
+        if ($destination === '__uncategorized__') {
+            return 'Товари залишаться без Master Category і можуть мати статус Partial до повторної класифікації. Існуючі категорії та зв’язки в Magento цим видаленням не змінюються.';
+        }
+
+        $destinationId = filter_var($destination, FILTER_VALIDATE_INT);
+        if ($destinationId === false || $destinationId < 1) {
+            return null;
+        }
+
+        $missing = app(CategoryDeleteImpactService::class)->missingAdobeMappingCount(
+            app(WorkspaceContext::class)->current(),
+            $record,
+            (int) $destinationId,
+        );
+
+        return $missing > 0
+            ? sprintf(
+                'У цільової категорії немає Magento-зіставлення для %d підключень. Товари без індивідуального override можуть залишитися Partial.',
+                $missing,
+            )
+            : null;
     }
 
     /** @return list<array<string, mixed>> */

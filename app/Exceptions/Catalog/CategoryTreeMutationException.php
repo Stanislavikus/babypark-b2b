@@ -30,4 +30,14 @@ final class CategoryTreeMutationException extends RuntimeException
     {
         return new self('Структура дерева категорій некоректна. Зміни не збережено.');
     }
+
+    public static function invalidDeleteDestination(): self
+    {
+        return new self('Цільова категорія має бути активною категорією цього робочого простору.');
+    }
+
+    public static function staleDeleteImpact(): self
+    {
+        return new self('Категорія змінилася після відкриття підтвердження. Оновіть сторінку і повторіть видалення.');
+    }
 }
