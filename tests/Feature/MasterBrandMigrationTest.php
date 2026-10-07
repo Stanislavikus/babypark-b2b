@@ -11,6 +11,7 @@ use Database\Seeders\FieldDefinitionSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
@@ -116,7 +117,8 @@ final class MasterBrandMigrationTest extends TestCase
     }
 
     #[Test]
-    public function migration_fails_closed_on_whitespace_legacy_label_before_schema_change(): void
+    #[DataProvider('ambiguousLegacyBrandProvider')]
+    public function migration_fails_closed_on_whitespace_legacy_label_before_schema_change(string $legacyBrand): void
     {
         $workspace = Workspace::query()->where('is_default', true)->sole();
         $productTypeId = (string) DB::table('product_types')
@@ -128,7 +130,7 @@ final class MasterBrandMigrationTest extends TestCase
             'workspace_id' => $workspace->id,
             'product_type_id' => $productTypeId,
             'name' => 'Ambiguous legacy Brand',
-            'brand' => ' Joolz',
+            'brand' => $legacyBrand,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -148,6 +150,16 @@ final class MasterBrandMigrationTest extends TestCase
         $binding = $this->canonicalBrandBinding();
         $this->assertSame(AttributeStorageType::Column, $binding->storage_type);
         $this->assertSame('products.brand', $binding->storage_path);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function ambiguousLegacyBrandProvider(): array
+    {
+        return [
+            'leading whitespace' => [' Joolz'],
+            'trailing whitespace' => ['Joolz '],
+            'whitespace only' => ['   '],
+        ];
     }
 
     private function canonicalBrandBinding(): FieldBinding
