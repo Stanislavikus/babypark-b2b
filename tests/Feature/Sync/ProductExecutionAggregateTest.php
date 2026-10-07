@@ -18,12 +18,14 @@ use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 class ProductExecutionAggregateTest extends TestCase
 {
+    use CreatesBrandFixtures;
     use InteractsWithFieldMappingFixtures;
     use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
@@ -97,6 +99,43 @@ class ProductExecutionAggregateTest extends TestCase
         $this->assertFalse($aggregate->hasMultipleSellableVariants());
         $this->assertSame('VAR-SKU', $aggregate->variants[0]->values[$skuBindingId]->value);
         $this->assertSame('blue', $aggregate->variants[0]->values[$colorBindingId]->value);
+    }
+
+    #[Test]
+    public function builder_projects_relation_backed_brand_as_name_not_uuid(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $brand = $this->brandFixture($workspace, 'CYBEX');
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'BRAND-PARENT',
+            'name' => 'Brand projection product',
+            'brand_id' => $brand->id,
+            'is_active' => true,
+        ]);
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'BRAND-VAR',
+            'is_active' => true,
+        ]);
+        $brandBinding = $this->productBinding('brand');
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            [
+                'field_mappings' => [[
+                    'field_binding_id' => $brandBinding->id,
+                    'external_field_key' => 'manufacturer',
+                ]],
+            ],
+        )[0];
+
+        $this->assertSame('CYBEX', $aggregate->productValues[$brandBinding->id]->value);
+        $this->assertNotSame((string) $brand->id, $aggregate->productValues[$brandBinding->id]->value);
     }
 
     #[Test]

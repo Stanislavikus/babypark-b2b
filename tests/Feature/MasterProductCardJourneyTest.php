@@ -35,11 +35,13 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
 
 final class MasterProductCardJourneyTest extends TestCase
 {
+    use CreatesBrandFixtures;
     use InteractsWithWorkspaceRbac;
     use RefreshDatabase;
 
@@ -106,13 +108,15 @@ final class MasterProductCardJourneyTest extends TestCase
             'workspace_id' => $this->workspace->id,
             'name' => 'journey',
         ]);
+        $initialBrand = $this->brandFixture($this->workspace, 'BabyPark');
+        $journeyBrand = $this->brandFixture($this->workspace, 'BabyPark Journey');
 
         Livewire::actingAs($this->actor)
             ->test(CreateProduct::class)
             ->fillForm([
                 'name' => 'Journey simple stroller',
                 'sku' => 'JOURNEY-SIMPLE',
-                'brand' => 'BabyPark',
+                'brand_id' => $initialBrand->id,
                 'description' => '<p>Initial merchant draft</p>',
             ])
             ->call('create')
@@ -130,7 +134,7 @@ final class MasterProductCardJourneyTest extends TestCase
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
             ->fillForm([
                 'category_id' => $category->id,
-                'brand' => 'BabyPark Journey',
+                'brand_id' => $journeyBrand->id,
                 'merchant_type' => 'Прогулянкова коляска',
                 'tags' => [$tag->id],
                 'net_weight' => '5.250',
@@ -194,7 +198,8 @@ final class MasterProductCardJourneyTest extends TestCase
         $fresh = $product->fresh();
 
         $this->assertSame($category->id, $fresh->category_id);
-        $this->assertSame('BabyPark Journey', $fresh->brand);
+        $this->assertSame($journeyBrand->id, $fresh->brand_id);
+        $this->assertSame('BabyPark Journey', $fresh->brand?->name);
         $this->assertSame('Прогулянкова коляска', $fresh->merchant_type);
         $this->assertTrue($fresh->tags->contains($tag));
         $this->assertSame('5.250', (string) $fresh->net_weight);
@@ -227,13 +232,14 @@ final class MasterProductCardJourneyTest extends TestCase
     public function merchant_can_promote_to_variants_and_target_offer_inventory_and_media_to_one_variant(): void
     {
         Storage::fake('public');
+        $brand = $this->brandFixture($this->workspace, 'BabyPark');
 
         Livewire::actingAs($this->actor)
             ->test(CreateProduct::class)
             ->fillForm([
                 'name' => 'Journey configurable stroller',
                 'sku' => 'JOURNEY-CONF',
-                'brand' => 'BabyPark',
+                'brand_id' => $brand->id,
             ])
             ->call('create')
             ->assertHasNoFormErrors();

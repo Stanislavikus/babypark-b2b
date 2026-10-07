@@ -693,6 +693,25 @@ class GovernedProductVariantColumnMutationServiceTest extends TestCase
         );
     }
 
+    public function test_relation_backed_brand_binding_is_rejected_by_generic_column_writer(): void
+    {
+        $binding = $this->bindingByCodeAndObjectType(
+            'brand',
+            FieldObjectType::Product,
+            AttributeStorageType::Relation,
+        );
+
+        $this->expectException(FieldBindingStorageTypeMismatchException::class);
+
+        $this->service->set(
+            $this->workspace->id,
+            FieldObjectType::Product,
+            $this->product->id,
+            $binding->id,
+            'forged-brand-id',
+        );
+    }
+
     public function test_public_api_exposes_field_binding_not_raw_column_parameters_and_avoids_mass_assignment_calls(): void
     {
         $set = new \ReflectionMethod(GovernedProductVariantColumnMutationService::class, 'set');
@@ -731,7 +750,6 @@ class GovernedProductVariantColumnMutationServiceTest extends TestCase
     public static function rejectedSeededColumnBindingProvider(): array
     {
         return [
-            'brand' => ['brand', FieldObjectType::Product],
             'url' => ['url', FieldObjectType::Product],
             'merchant_type' => ['merchant_type', FieldObjectType::Product],
             'net_weight' => ['net_weight', FieldObjectType::Product],

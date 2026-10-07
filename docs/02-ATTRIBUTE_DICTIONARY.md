@@ -290,7 +290,7 @@ Code values must be web-safe, API-friendly, and completely decoupled from any ch
 
 - **Future Extension**: file, JSON, measurement, rich text.
 
-Note: `relation`-backed fields (e.g. `category`) are represented through
+Note: `relation`-backed fields (e.g. `category`, `brand`) are represented through
 `storage_type = relation` on a `FieldBinding` (`field_bindings` table — see
 `03-DOMAIN_MODEL.md`, "Field Foundation"; previously `attribute_definitions`),
 not through a `data_type` value. `relation` is not a `data_type`.

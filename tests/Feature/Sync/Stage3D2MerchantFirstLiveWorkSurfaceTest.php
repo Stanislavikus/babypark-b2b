@@ -41,6 +41,7 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\ConfiguresSyncSupportProfiles;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
@@ -50,6 +51,7 @@ use Tests\TestCase;
 class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
 {
     use ConfiguresSyncSupportProfiles;
+    use CreatesBrandFixtures;
     use CreatesConnectorAccountFixtures;
     use InteractsWithFieldMappingFixtures;
     use InteractsWithWorkspaceRbac;
@@ -1227,7 +1229,7 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'LEGACY-'.$sku,
             'name' => $name,
-            'brand' => $brand,
+            'brand_id' => $this->brandFixture($workspace, $brand)->id,
             'is_active' => true,
         ]);
 

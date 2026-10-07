@@ -6,9 +6,11 @@ use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Cabinet\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource as AdminProductResource;
+use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\CustomerCatalogQuery;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Services\Pricing\WorkspaceTaxDefaults;
@@ -81,7 +83,7 @@ class ProductResource extends Resource
 
                             TextEntry::make('brand')
                                 ->label('Бренд')
-                                ->getStateUsing(fn (ProductVariant $record): ?string => $record->product->brand)
+                                ->getStateUsing(fn (ProductVariant $record): ?string => $record->product->brand?->name)
                                 ->placeholder('—'),
 
                             TextEntry::make('name')
@@ -247,10 +249,20 @@ class ProductResource extends Resource
         }
 
         if (in_array('brand', $visible, true)) {
-            $columns[] = TextColumn::make('brand')
+            $columns[] = TextColumn::make('brand.name')
                 ->label('Бренд')
-                ->searchable()
-                ->sortable()
+                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas(
+                    'brand',
+                    fn (Builder $brandQuery): Builder => $brandQuery->where('name', 'like', '%'.addcslashes($search, '%_\\\\').'%'),
+                ))
+                ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                    Brand::withoutWorkspaceScope()
+                        ->select('name')
+                        ->whereColumn('brands.id', 'products.brand_id')
+                        ->whereColumn('brands.workspace_id', 'products.workspace_id')
+                        ->limit(1),
+                    $direction,
+                ))
                 ->toggleable(in_array('brand', $toggleable));
         }
 
@@ -395,17 +407,9 @@ class ProductResource extends Resource
                     ->relationship('category', 'name')
                     ->multiple()
                     ->preload(),
-                SelectFilter::make('brand')
+                SelectFilter::make('brand_id')
                     ->label('Бренди')
-                    ->options(fn (): array => CustomerPricingScope::applyProductScope(
-                        Product::query()->where('is_active', true),
-                        auth('customer')->user(),
-                    )
-                        ->distinct()
-                        ->orderBy('brand')
-                        ->whereNotNull('brand')
-                        ->pluck('brand', 'brand')
-                        ->toArray())
+                    ->options(fn (): array => app(CustomerCatalogQuery::class)->availableBrands(auth('customer')->user()))
                     ->multiple(),
             ])
             ->toolbarActions([]);

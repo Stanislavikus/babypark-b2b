@@ -38,6 +38,7 @@ class CustomerPricingScope
     {
         return [
             'category',
+            'brand',
             'variants' => fn ($q) => $q->where('is_active', true),
             'variants.stocks',
         ];

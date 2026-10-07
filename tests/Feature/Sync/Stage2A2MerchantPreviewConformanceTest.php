@@ -39,6 +39,7 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\ConfiguresSyncSupportProfiles;
+use Tests\Concerns\CreatesBrandFixtures;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
@@ -47,6 +48,7 @@ use Tests\TestCase;
 class Stage2A2MerchantPreviewConformanceTest extends TestCase
 {
     use ConfiguresSyncSupportProfiles;
+    use CreatesBrandFixtures;
     use CreatesConnectorAccountFixtures;
     use InteractsWithFieldMappingFixtures;
     use InteractsWithWorkspaceRbac;
@@ -818,7 +820,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'LEGACY-IGNORED',
             'name' => 'Cybex Balios S Lux',
-            'brand' => 'CYBEX',
+            'brand_id' => $this->brandFixture($workspace, 'CYBEX')->id,
             'is_active' => true,
         ]);
 
@@ -896,7 +898,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'LEGACY-FALLBACK',
             'name' => 'No SKU Product',
-            'brand' => 'Brand',
+            'brand_id' => $this->brandFixture($workspace, 'Brand')->id,
             'is_active' => true,
         ]);
 
@@ -1224,7 +1226,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'LEGACY-'.$sku,
             'name' => $name,
-            'brand' => $brand,
+            'brand_id' => $this->brandFixture($workspace, $brand)->id,
             'is_active' => true,
         ]);
 
