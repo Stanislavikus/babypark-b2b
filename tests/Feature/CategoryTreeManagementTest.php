@@ -60,13 +60,13 @@ class CategoryTreeManagementTest extends TestCase
     }
 
     #[Test]
-    public function category_resource_allows_authorized_create_but_keeps_delete_denied(): void
+    public function category_resource_allows_authorized_create_edit_and_delete(): void
     {
         $category = $this->category('Коляски');
 
         $this->assertTrue(CategoryResource::getCreateAuthorizationResponse()->allowed());
         $this->assertTrue(CategoryResource::getEditAuthorizationResponse($category)->allowed());
-        $this->assertTrue(CategoryResource::getDeleteAuthorizationResponse($category)->denied());
+        $this->assertTrue(CategoryResource::getDeleteAuthorizationResponse($category)->allowed());
     }
 
     #[Test]
@@ -369,6 +369,7 @@ class CategoryTreeManagementTest extends TestCase
         $this->assertStringContainsString('bp-category-tree-search', $component->html());
         $this->assertStringContainsString('x-show="node._hasChildren"', $component->html());
         $this->assertStringContainsString('Приховати категорію', $nodeActionsHtml);
+        $this->assertStringContainsString('Видалити категорію', $nodeActionsHtml);
     }
 
     #[Test]
