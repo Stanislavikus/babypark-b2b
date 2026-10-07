@@ -290,6 +290,7 @@ class ManageCategoryTree extends TreePage
                     'expected_products_count' => $impact['products_count'],
                     'expected_children_count' => $impact['children_count'],
                     'expected_mappings_count' => $impact['mappings_count'],
+                    'expected_fingerprint' => $impact['fingerprint'],
                     'source_adobe_mappings_count' => $impact['adobe_mappings_count'],
                     'source_stock_display_threshold' => $impact['stock_display_threshold'],
                     'product_destination' => null,
@@ -304,6 +305,7 @@ class ManageCategoryTree extends TreePage
                 Hidden::make('expected_products_count'),
                 Hidden::make('expected_children_count'),
                 Hidden::make('expected_mappings_count'),
+                Hidden::make('expected_fingerprint'),
                 Hidden::make('source_adobe_mappings_count'),
                 Hidden::make('source_stock_display_threshold'),
                 Placeholder::make('delete_impact')
@@ -400,6 +402,7 @@ class ManageCategoryTree extends TreePage
                         'products_count' => $productsCount,
                         'children_count' => (int) ($data['expected_children_count'] ?? -1),
                         'mappings_count' => (int) ($data['expected_mappings_count'] ?? -1),
+                        'fingerprint' => (string) ($data['expected_fingerprint'] ?? ''),
                     ],
                 ), 'Категорію видалено');
             });

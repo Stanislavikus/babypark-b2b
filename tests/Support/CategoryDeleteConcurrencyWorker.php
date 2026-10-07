@@ -4,6 +4,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Catalog\CategoryDeleteImpactService;
 use App\Services\Catalog\CategoryTreeMutationService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
@@ -45,6 +46,7 @@ function runDelete(string $workspaceId, string $actorUserId, string $categoryId,
         $category = Category::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->findOrFail((int) $categoryId);
+        $impact = app(CategoryDeleteImpactService::class)->impact($workspace, $category);
 
         DB::beginTransaction();
 
@@ -69,9 +71,10 @@ function runDelete(string $workspaceId, string $actorUserId, string $categoryId,
             $category,
             null,
             [
-                'products_count' => 0,
-                'children_count' => 0,
-                'mappings_count' => 0,
+                'products_count' => $impact['products_count'],
+                'children_count' => $impact['children_count'],
+                'mappings_count' => $impact['mappings_count'],
+                'fingerprint' => $impact['fingerprint'],
             ],
         );
 

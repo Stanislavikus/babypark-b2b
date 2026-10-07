@@ -18,6 +18,7 @@ final class CategoryTreeMutationService
 {
     public function __construct(
         private readonly WorkspaceAuthorization $authorization,
+        private readonly CategoryDeleteImpactService $deleteImpact,
     ) {}
 
     /** @param array{name?: mixed, parent_id?: mixed, is_active?: mixed, stock_display_threshold?: mixed} $input */
@@ -101,7 +102,7 @@ final class CategoryTreeMutationService
     }
 
     /**
-     * @param  array{products_count:int,children_count:int,mappings_count:int}  $expectedImpact
+     * @param  array{products_count:int,children_count:int,mappings_count:int,fingerprint:string}  $expectedImpact
      */
     public function deleteSingle(
         User $actor,
@@ -148,12 +149,21 @@ final class CategoryTreeMutationService
                 'children_count' => $children->count(),
                 'mappings_count' => $mappings->count(),
             ];
+            $expectedFingerprint = $expectedImpact['fingerprint'] ?? null;
+            $actualFingerprint = $this->deleteImpact->fingerprint(
+                $lockedCategory,
+                $products,
+                $children,
+                $mappings,
+            );
 
             if ($actualImpact !== [
                 'products_count' => (int) ($expectedImpact['products_count'] ?? -1),
                 'children_count' => (int) ($expectedImpact['children_count'] ?? -1),
                 'mappings_count' => (int) ($expectedImpact['mappings_count'] ?? -1),
-            ]) {
+            ] || ! is_string($expectedFingerprint)
+                || ! hash_equals($actualFingerprint, $expectedFingerprint)
+            ) {
                 throw CategoryTreeMutationException::staleDeleteImpact();
             }
 

@@ -75,7 +75,7 @@ final class CategoryDeleteTest extends TestCase
             $this->workspace,
             $deleted,
             null,
-            $this->expectedImpact(products: 0, children: 0, mappings: 0),
+            $this->expectedImpact($deleted),
         );
 
         $this->assertDatabaseMissing('categories', ['id' => $deleted->id]);
@@ -150,7 +150,7 @@ final class CategoryDeleteTest extends TestCase
             $this->workspace,
             $source,
             (int) $destination->id,
-            $this->expectedImpact(products: 1, children: 2, mappings: 1),
+            $this->expectedImpact($source),
         );
 
         $this->assertDatabaseMissing('categories', ['id' => $source->id]);
@@ -202,7 +202,7 @@ final class CategoryDeleteTest extends TestCase
             $this->workspace,
             $source,
             null,
-            $this->expectedImpact(products: 1, children: 1, mappings: 0),
+            $this->expectedImpact($source),
         );
 
         $this->assertNull($product->fresh()->category_id);
@@ -222,7 +222,7 @@ final class CategoryDeleteTest extends TestCase
             $this->workspace,
             $source,
             null,
-            $this->expectedImpact(products: 0, children: 1, mappings: 0),
+            $this->expectedImpact($source),
         );
 
         $child->refresh();
@@ -253,6 +253,7 @@ final class CategoryDeleteTest extends TestCase
                     'products_count' => $impact['products_count'],
                     'children_count' => $impact['children_count'],
                     'mappings_count' => $impact['mappings_count'],
+                    'fingerprint' => $impact['fingerprint'],
                 ],
             );
             $this->fail('Stale delete impact must fail closed.');
@@ -265,6 +266,52 @@ final class CategoryDeleteTest extends TestCase
 
         $this->assertDatabaseHas('categories', ['id' => $source->id]);
         $this->assertSame($source->id, $product->fresh()->category_id);
+    }
+
+    #[Test]
+    public function delete_rejects_same_count_product_swap_after_confirmation(): void
+    {
+        $source = $this->category('Source');
+        $first = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'First product',
+            'category_id' => $source->id,
+            'is_active' => true,
+        ]);
+        $impact = app(CategoryDeleteImpactService::class)->impact($this->workspace, $source);
+
+        $first->update(['category_id' => null]);
+        $replacement = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Replacement product',
+            'category_id' => $source->id,
+            'is_active' => true,
+        ]);
+
+        try {
+            app(CategoryTreeMutationService::class)->deleteSingle(
+                $this->actor,
+                $this->workspace,
+                $source,
+                null,
+                [
+                    'products_count' => $impact['products_count'],
+                    'children_count' => $impact['children_count'],
+                    'mappings_count' => $impact['mappings_count'],
+                    'fingerprint' => $impact['fingerprint'],
+                ],
+            );
+            $this->fail('Same-count Product replacement must invalidate delete confirmation.');
+        } catch (CategoryTreeMutationException $exception) {
+            $this->assertSame(
+                'Категорія змінилася після відкриття підтвердження. Оновіть сторінку і повторіть видалення.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseHas('categories', ['id' => $source->id]);
+        $this->assertNull($first->fresh()->category_id);
+        $this->assertSame($source->id, $replacement->fresh()->category_id);
     }
 
     #[Test]
@@ -286,7 +333,7 @@ final class CategoryDeleteTest extends TestCase
                 $this->workspace,
                 $source,
                 (int) $destination->id,
-                $this->expectedImpact(products: 1, children: 0, mappings: 0),
+                $this->expectedImpact($source),
             );
             $this->fail('Inactive destination must be rejected.');
         } catch (CategoryTreeMutationException $exception) {
@@ -316,7 +363,12 @@ final class CategoryDeleteTest extends TestCase
             $this->workspace,
             $foreign,
             null,
-            $this->expectedImpact(products: 0, children: 0, mappings: 0),
+            [
+                'products_count' => 0,
+                'children_count' => 0,
+                'mappings_count' => 0,
+                'fingerprint' => 'foreign',
+            ],
         );
     }
 
@@ -385,13 +437,16 @@ final class CategoryDeleteTest extends TestCase
         ]);
     }
 
-    /** @return array{products_count:int,children_count:int,mappings_count:int} */
-    private function expectedImpact(int $products, int $children, int $mappings): array
+    /** @return array{products_count:int,children_count:int,mappings_count:int,fingerprint:string} */
+    private function expectedImpact(Category $category): array
     {
+        $impact = app(CategoryDeleteImpactService::class)->impact($this->workspace, $category);
+
         return [
-            'products_count' => $products,
-            'children_count' => $children,
-            'mappings_count' => $mappings,
+            'products_count' => $impact['products_count'],
+            'children_count' => $impact['children_count'],
+            'mappings_count' => $impact['mappings_count'],
+            'fingerprint' => $impact['fingerprint'],
         ];
     }
 }
