@@ -48,7 +48,7 @@ final class CategoryDeleteImpactService
         ];
     }
 
-    /** @return array<string, string> */
+    /** @return array<int|string, string> */
     public function destinationOptions(Workspace $workspace, Category $category): array
     {
         $fresh = $this->categoryInWorkspace($workspace, $category);
@@ -56,10 +56,13 @@ final class CategoryDeleteImpactService
 
         unset($options[(int) $fresh->id]);
 
-        return ['__uncategorized__' => 'Без категорії'] + array_combine(
-            array_map('strval', array_keys($options)),
-            array_values($options),
-        );
+        $destinations = ['__uncategorized__' => 'Без категорії'];
+
+        foreach ($options as $id => $label) {
+            $destinations[(int) $id] = $label;
+        }
+
+        return $destinations;
     }
 
     public function missingAdobeMappingCount(
