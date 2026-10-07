@@ -89,7 +89,7 @@ class CategoryResource extends Resource
 
     public static function getDeleteAuthorizationResponse(Model $record): Response
     {
-        return Response::deny();
+        return self::getEditAuthorizationResponse($record);
     }
 
     /** @return array<int, string> */
