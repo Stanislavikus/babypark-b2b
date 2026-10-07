@@ -14,6 +14,7 @@ use App\Services\Catalog\CategoryHierarchyService;
 use App\Services\Catalog\CategoryTreeMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -370,6 +371,42 @@ class CategoryTreeManagementTest extends TestCase
         $this->assertStringContainsString('x-show="node._hasChildren"', $component->html());
         $this->assertStringContainsString('Приховати категорію', $nodeActionsHtml);
         $this->assertStringContainsString('Видалити категорію', $nodeActionsHtml);
+    }
+
+    #[Test]
+    public function nonempty_category_delete_requires_exact_typed_confirmation(): void
+    {
+        $source = $this->category('Delete guarded');
+        Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Guarded product',
+            'category_id' => $source->id,
+            'is_active' => true,
+        ]);
+
+        $action = TestAction::make('delete_category')->arguments([
+            'tree' => true,
+            'recordKey' => $source->id,
+            'nodeId' => $source->id,
+            'treeKey' => null,
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ManageCategoryTree::class)
+            ->mountAction($action)
+            ->assertActionDataSet(fn (array $data): bool => (
+                (int) ($data['expected_products_count'] ?? -1) === 1
+                && (int) ($data['expected_children_count'] ?? -1) === 0
+                && (int) ($data['expected_mappings_count'] ?? -1) === 0
+            ))
+            ->callAction($action, [
+                'product_destination' => '__uncategorized__',
+                'confirmation' => 'delete',
+            ])
+            ->assertHasActionErrors(['confirmation']);
+
+        $this->assertDatabaseHas('categories', ['id' => $source->id]);
+        $this->assertDatabaseHas('products', ['category_id' => $source->id]);
     }
 
     #[Test]
