@@ -127,6 +127,28 @@ final class AdobeProductCategoryRelationExecutor
             );
         }
 
+        if (! array_key_exists('adobe_product_classifications', $snapshot)
+            && $aggregate->categoryId === null
+            && $desiredExternalCategoryIds === []
+            && AdobeProductCategoryAssignment::withoutWorkspaceScope()
+                ->where('workspace_id', $runContext->workspaceId)
+                ->where('connector_account_id', $runContext->connectorAccountId)
+                ->where('external_record_link_id', $link->id)
+                ->whereIn('state', [
+                    AdobeProductCategoryAssignmentState::Managed->value,
+                    AdobeProductCategoryAssignmentState::PendingRemove->value,
+                    AdobeProductCategoryAssignmentState::RemoveAmbiguous->value,
+                ])
+                ->exists()
+        ) {
+            return $this->compose(
+                $currentResult,
+                SyncLiveOutcome::Partial,
+                'category_mapping_missing',
+                $aggregate->productId,
+            );
+        }
+
         if ($desiredExternalCategoryIds === []
             && ! AdobeProductCategoryAssignment::withoutWorkspaceScope()
                 ->where('workspace_id', $runContext->workspaceId)
