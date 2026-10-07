@@ -7,6 +7,7 @@ use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\UserRole;
 use App\Exceptions\Catalog\CategoryTreeMutationException;
 use App\Models\AdobeProductCategoryAssignment;
+use App\Models\AdobeProductCategoryOverride;
 use App\Models\Category;
 use App\Models\ConnectorCategoryMapping;
 use App\Models\ExternalRecordLink;
@@ -134,6 +135,12 @@ final class CategoryDeleteTest extends TestCase
             'state' => AdobeProductCategoryAssignmentState::Managed,
             'anchor_entity_id' => '501',
         ]);
+        AdobeProductCategoryOverride::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_category_id' => '9',
+        ]);
 
         $revisionService = app(ConnectorCategoryMappingSnapshotService::class);
         $beforeRevision = $revisionService->revision((string) $this->workspace->id, (string) $account->id);
@@ -170,6 +177,12 @@ final class CategoryDeleteTest extends TestCase
         $this->assertSame($link->id, $assignment->external_record_link_id);
         $this->assertSame('6', $assignment->external_category_id);
         $this->assertSame(AdobeProductCategoryAssignmentState::Managed, $assignment->state);
+        $this->assertDatabaseHas('adobe_product_category_overrides', [
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_category_id' => '9',
+        ]);
     }
 
     #[Test]
