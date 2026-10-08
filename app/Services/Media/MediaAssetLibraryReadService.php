@@ -1,0 +1,173 @@
+<?php
+
+namespace App\Services\Media;
+
+use App\Enums\MediaDiagnosisStatus;
+use App\Models\Brand;
+use App\Models\MediaAsset;
+use App\Models\ProductMedia;
+use App\Models\VariantMedia;
+use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
+
+final class MediaAssetLibraryReadService
+{
+    public function originalsQuery(Workspace $workspace): Builder
+    {
+        return MediaAsset::withoutWorkspaceScope()
+            ->select('media_assets.*')
+            ->where('media_assets.workspace_id', $workspace->id)
+            ->whereNull('media_assets.parent_media_asset_id')
+            ->selectSub(
+                ProductMedia::withoutWorkspaceScope()
+                    ->selectRaw('COUNT(DISTINCT product_id)')
+                    ->whereColumn('product_media.workspace_id', 'media_assets.workspace_id')
+                    ->whereColumn('product_media.media_asset_id', 'media_assets.id'),
+                'products_usage_count',
+            )
+            ->selectSub(
+                VariantMedia::withoutWorkspaceScope()
+                    ->selectRaw('COUNT(DISTINCT variant_id)')
+                    ->whereColumn('variant_media.workspace_id', 'media_assets.workspace_id')
+                    ->whereColumn('variant_media.media_asset_id', 'media_assets.id'),
+                'variants_usage_count',
+            )
+            ->selectSub(
+                Brand::withoutWorkspaceScope()
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('brands.workspace_id', 'media_assets.workspace_id')
+                    ->whereColumn('brands.logo_media_asset_id', 'media_assets.id'),
+                'brands_usage_count',
+            )
+            ->selectSub(
+                MediaAsset::withoutWorkspaceScope()
+                    ->from('media_assets as derivatives')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('derivatives.workspace_id', 'media_assets.workspace_id')
+                    ->whereColumn('derivatives.parent_media_asset_id', 'media_assets.id'),
+                'derivatives_usage_count',
+            );
+    }
+
+    public function applyUsageFilter(Builder $query, ?string $usage): Builder
+    {
+        return match ($usage) {
+            'used' => $query->where(fn (Builder $nested): Builder => $this->whereUsed($nested)),
+            'unused' => $query->where(fn (Builder $nested): Builder => $this->whereUnused($nested)),
+            'products' => $query->whereHas('productMedia', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('product_media.workspace_id', 'media_assets.workspace_id')),
+            'variants' => $query->whereHas('variantMedia', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('variant_media.workspace_id', 'media_assets.workspace_id')),
+            'brand_logos' => $query->whereHas('brandsAsLogo', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('brands.workspace_id', 'media_assets.workspace_id')),
+            default => $query,
+        };
+    }
+
+    public function applySourceFilter(Builder $query, ?string $source): Builder
+    {
+        return match ($source) {
+            'managed' => $query
+                ->whereNull('source_url')
+                ->whereNotNull('storage_disk')
+                ->whereNotNull('storage_path'),
+            'external' => $query->whereNotNull('source_url'),
+            default => $query,
+        };
+    }
+
+    public function applyAttentionFilter(Builder $query, bool $enabled): Builder
+    {
+        if (! $enabled) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $nested): void {
+            $nested
+                ->whereIn('diagnosis_status', [
+                    MediaDiagnosisStatus::Attention->value,
+                    MediaDiagnosisStatus::Failed->value,
+                ])
+                ->orWhere(function (Builder $missing): void {
+                    $missing
+                        ->whereNull('source_url')
+                        ->where(function (Builder $storage): void {
+                            $storage
+                                ->whereNull('storage_disk')
+                                ->orWhereNull('storage_path');
+                        });
+                });
+        });
+    }
+
+    public function usageSummary(MediaAsset $asset): string
+    {
+        $parts = [];
+
+        $products = (int) ($asset->getAttribute('products_usage_count') ?? 0);
+        $variants = (int) ($asset->getAttribute('variants_usage_count') ?? 0);
+        $brands = (int) ($asset->getAttribute('brands_usage_count') ?? 0);
+        $derivatives = (int) ($asset->getAttribute('derivatives_usage_count') ?? 0);
+
+        if ($products > 0) {
+            $parts[] = 'Товари: '.$products;
+        }
+
+        if ($variants > 0) {
+            $parts[] = 'Варіанти: '.$variants;
+        }
+
+        if ($brands > 0) {
+            $parts[] = 'Бренди: '.$brands;
+        }
+
+        if ($derivatives > 0) {
+            $parts[] = 'Версії: '.$derivatives;
+        }
+
+        return $parts === [] ? 'Не використовується' : implode(' · ', $parts);
+    }
+
+    public function isUsed(MediaAsset $asset): bool
+    {
+        return ((int) ($asset->getAttribute('products_usage_count') ?? 0)
+            + (int) ($asset->getAttribute('variants_usage_count') ?? 0)
+            + (int) ($asset->getAttribute('brands_usage_count') ?? 0)
+            + (int) ($asset->getAttribute('derivatives_usage_count') ?? 0)) > 0;
+    }
+
+    private function whereUsed(Builder $query): Builder
+    {
+        return $query
+            ->whereHas('productMedia', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('product_media.workspace_id', 'media_assets.workspace_id'))
+            ->orWhereHas('variantMedia', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('variant_media.workspace_id', 'media_assets.workspace_id'))
+            ->orWhereHas('brandsAsLogo', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('brands.workspace_id', 'media_assets.workspace_id'))
+            ->orWhereHas('derivatives', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes());
+    }
+
+    private function whereUnused(Builder $query): Builder
+    {
+        return $query
+            ->whereDoesntHave('productMedia', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('product_media.workspace_id', 'media_assets.workspace_id'))
+            ->whereDoesntHave('variantMedia', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('variant_media.workspace_id', 'media_assets.workspace_id'))
+            ->whereDoesntHave('brandsAsLogo', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes()
+                ->whereColumn('brands.workspace_id', 'media_assets.workspace_id'))
+            ->whereDoesntHave('derivatives', fn (Builder $relation): Builder => $relation
+                ->withoutGlobalScopes());
+    }
+}

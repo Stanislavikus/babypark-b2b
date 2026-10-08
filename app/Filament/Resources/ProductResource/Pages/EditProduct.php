@@ -33,6 +33,7 @@ use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\Catalog\Exceptions\VariantMediaException;
+use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\ProductStructure\ProductTypeChangeImpact;
 use App\Support\Workspace\WorkspaceContext;
@@ -209,12 +210,23 @@ class EditProduct extends EditRecord
             ->schema([
                 FileUpload::make('files')
                     ->label('Зображення')
-                    ->image()
                     ->multiple()
                     ->storeFiles(false)
                     ->appendFiles()
+                    ->maxSize(20 * 1024)
+                    ->acceptedFileTypes([
+                        'image/jpeg',
+                        'image/png',
+                        'image/gif',
+                        'image/webp',
+                        'image/avif',
+                    ])
+                    ->validationMessages([
+                        'max' => 'Файл завеликий. Максимальний розмір Original — 20 МіБ.',
+                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                    ])
                     ->required()
-                    ->helperText('Можна вибрати кілька файлів. Технічні версії для каналів тут не створюються.'),
+                    ->helperText('JPEG, PNG, WebP, GIF або AVIF · до 20 МіБ і 25 МП. SVG поки не підтримується.'),
             ])
             ->action(function (array $data): void {
                 $files = array_values(array_filter(
@@ -485,7 +497,7 @@ class EditProduct extends EditRecord
                 ->success()
                 ->title($successTitle)
                 ->send();
-        } catch (ProductMediaException $e) {
+        } catch (ProductMediaException|MediaIngestException $e) {
             Notification::make()
                 ->danger()
                 ->title('Не вдалося змінити медіа')

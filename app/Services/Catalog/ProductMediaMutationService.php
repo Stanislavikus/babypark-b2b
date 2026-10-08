@@ -2,14 +2,12 @@
 
 namespace App\Services\Catalog;
 
-use App\Enums\MediaAssetType;
-use App\Enums\MediaDiagnosisStatus;
 use App\Enums\MediaRole;
-use App\Models\MediaAsset;
 use App\Models\Product;
 use App\Models\ProductMedia;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Media\OriginalImageIngestService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Workspace\WorkspacePermissions;
@@ -18,7 +16,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Throwable;
 
 final class ProductMediaMutationService
@@ -26,6 +23,7 @@ final class ProductMediaMutationService
     public function __construct(
         private readonly WorkspaceAuthorization $authorization,
         private readonly ProductMediaReadService $readService,
+        private readonly OriginalImageIngestService $imageIngest,
     ) {}
 
     /**
@@ -38,7 +36,9 @@ final class ProductMediaMutationService
         Product $product,
         array $files,
     ): Collection {
-        $prepared = collect($files)->map(fn (UploadedFile $file): array => $this->diagnoseUpload($file))->all();
+        $prepared = collect($files)
+            ->map(fn (UploadedFile $file) => $this->imageIngest->prepare($file))
+            ->all();
         $storedPaths = [];
 
         try {
@@ -53,58 +53,11 @@ final class ProductMediaMutationService
                 $nextOrder = $existing->isEmpty() ? 0 : ((int) $existing->max('sort_order')) + 1;
 
                 foreach ($prepared as $item) {
-                    /** @var UploadedFile $file */
-                    $file = $item['file'];
-                    $asset = MediaAsset::withoutWorkspaceScope()
-                        ->where('workspace_id', $lockedWorkspace->id)
-                        ->where('content_sha256', $item['sha256'])
-                        ->lockForUpdate()
-                        ->first();
+                    $ingested = $this->imageIngest->ingestPrepared($actor, $lockedWorkspace, $item);
+                    $asset = $ingested->asset;
 
-                    if ($asset instanceof MediaAsset && ! $asset->isOriginal()) {
-                        throw ProductMediaException::invalidOriginal();
-                    }
-
-                    if (! $asset instanceof MediaAsset) {
-                        $assetId = (string) Str::uuid();
-                        $storagePath = $file->storeAs(
-                            'media/originals/'.$lockedWorkspace->id,
-                            $assetId.'.'.$item['extension'],
-                            ['disk' => 'public'],
-                        );
-
-                        if (! is_string($storagePath) || $storagePath === '') {
-                            throw new ProductMediaException('Не вдалося зберегти Original медіафайлу.');
-                        }
-
-                        $storedPaths[] = ['disk' => 'public', 'path' => $storagePath];
-
-                        $asset = MediaAsset::withoutWorkspaceScope()->create([
-                            'id' => $assetId,
-                            'workspace_id' => $lockedWorkspace->id,
-                            'parent_media_asset_id' => null,
-                            'asset_type' => MediaAssetType::Image,
-                            'storage_disk' => 'public',
-                            'storage_path' => $storagePath,
-                            'source_url' => null,
-                            'original_filename' => $file->getClientOriginalName(),
-                            'mime_type' => $item['mime_type'],
-                            'byte_size' => $item['byte_size'],
-                            'content_sha256' => $item['sha256'],
-                            'width_px' => $item['width_px'],
-                            'height_px' => $item['height_px'],
-                            'diagnosis_status' => MediaDiagnosisStatus::Ready,
-                            'diagnosis_json' => [
-                                'native_width_px' => $item['width_px'],
-                                'native_height_px' => $item['height_px'],
-                                'mime_type' => $item['mime_type'],
-                                'byte_size' => $item['byte_size'],
-                            ],
-                            'provenance_json' => [
-                                'kind' => 'merchant_upload',
-                                'actor_user_id' => (string) $actor->id,
-                            ],
-                        ]);
+                    if ($ingested->newStoredPath !== null) {
+                        $storedPaths[] = $ingested->newStoredPath;
                     }
 
                     if (ProductMedia::withoutWorkspaceScope()
@@ -256,50 +209,6 @@ final class ProductMediaMutationService
 
             return $this->readService->productMedia($lockedProduct);
         });
-    }
-
-    /**
-     * @return array{file:UploadedFile,mime_type:string,extension:string,byte_size:int,sha256:string,width_px:int,height_px:int}
-     */
-    private function diagnoseUpload(UploadedFile $file): array
-    {
-        $path = $file->getRealPath();
-
-        if (! is_string($path) || $path === '' || ! is_file($path)) {
-            throw ProductMediaException::invalidImage();
-        }
-
-        $info = @getimagesize($path);
-        if ($info === false || ! isset($info[0], $info[1], $info['mime'])) {
-            throw ProductMediaException::invalidImage();
-        }
-
-        $mimeType = strtolower((string) $info['mime']);
-        $extension = match ($mimeType) {
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'image/avif' => 'avif',
-            default => throw ProductMediaException::invalidImage(),
-        };
-
-        $byteSize = filesize($path);
-        $sha256 = hash_file('sha256', $path);
-
-        if (! is_int($byteSize) || ! is_string($sha256) || $sha256 === '') {
-            throw ProductMediaException::invalidImage();
-        }
-
-        return [
-            'file' => $file,
-            'mime_type' => $mimeType,
-            'extension' => $extension,
-            'byte_size' => $byteSize,
-            'sha256' => $sha256,
-            'width_px' => (int) $info[0],
-            'height_px' => (int) $info[1],
-        ];
     }
 
     /** @return array{0:Workspace,1:Product} */
