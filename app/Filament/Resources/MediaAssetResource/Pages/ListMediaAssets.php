@@ -50,8 +50,8 @@ class ListMediaAssets extends ListRecords
                 ->label('Завантажити')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->visible(fn (): bool => $this->canManageProducts())
-                ->modalHeading('Завантажити Original')
-                ->modalDescription('Original зберігається без resize та повторного кодування. Максимум 20 МіБ і 25 МП на файл.')
+                ->modalHeading('Завантажити зображення')
+                ->modalDescription('Оригінальний файл зберігається без зміни розміру та повторного кодування. Максимум 20 МіБ і 25 МП на файл.')
                 ->modalSubmitActionLabel('Завантажити')
                 ->schema([
                     FileUpload::make('files')
@@ -68,7 +68,7 @@ class ListMediaAssets extends ListRecords
                             'image/avif',
                         ])
                         ->validationMessages([
-                            'max' => 'Файл завеликий. Максимальний розмір Original — 20 МіБ.',
+                            'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
                             'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                         ])
                         ->required()

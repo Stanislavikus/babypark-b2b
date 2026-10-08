@@ -15,6 +15,7 @@ use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
@@ -61,60 +62,81 @@ class MediaAssetResource extends Resource
     public static function detailSchema(): array
     {
         return [
-            Section::make('Original')->schema([
-                MediaPreviewFrame::entry(
-                    ImageEntry::make('preview_url')
-                        ->label('Зображення')
-                        ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
-                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
-                    MediaPreviewFrame::DETAIL,
-                ),
-                TextEntry::make('display_name')
-                    ->label('Файл')
-                    ->state(fn (MediaAsset $record): string => self::displayName($record)),
-                TextEntry::make('source_kind')
-                    ->label('Зберігання')
-                    ->state(fn (MediaAsset $record): string => self::sourceLabel($record))
-                    ->badge()
-                    ->color(fn (MediaAsset $record): string => self::sourceColor($record)),
-                TextEntry::make('dimensions')
-                    ->label('Розмір')
-                    ->state(fn (MediaAsset $record): string => self::dimensions($record)),
-                TextEntry::make('megapixels')
-                    ->label('Мегапікселі')
-                    ->state(fn (MediaAsset $record): string => self::megapixels($record)),
-                TextEntry::make('byte_size')
-                    ->label('Вага')
-                    ->formatStateUsing(fn (mixed $state): string => self::formatBytes(is_numeric($state) ? (int) $state : null)),
-                TextEntry::make('mime_type')
-                    ->label('Формат')
-                    ->placeholder('—'),
-                TextEntry::make('created_at')
-                    ->label('Додано')
-                    ->dateTime('d.m.Y H:i'),
-                TextEntry::make('diagnosis_status')
-                    ->label('Технічний стан')
-                    ->formatStateUsing(fn (mixed $state): string => self::diagnosisLabel($state))
-                    ->badge()
-                    ->color(fn (MediaAsset $record): string => self::diagnosisColor($record)),
+            Section::make('Зображення')->schema([
+                Group::make([
+                    MediaPreviewFrame::entry(
+                        ImageEntry::make('preview_url')
+                            ->label('Зображення')
+                            ->hiddenLabel()
+                            ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
+                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
+                        MediaPreviewFrame::DETAIL,
+                    ),
+                    Group::make([
+                        TextEntry::make('display_name')
+                            ->label('Файл')
+                            ->state(fn (MediaAsset $record): string => self::displayName($record))
+                            ->columnSpanFull(),
+                        TextEntry::make('dimensions')
+                            ->label('Розмір')
+                            ->state(fn (MediaAsset $record): string => self::dimensions($record)),
+                        TextEntry::make('megapixels')
+                            ->label('Мегапікселі')
+                            ->state(fn (MediaAsset $record): string => self::megapixels($record)),
+                        TextEntry::make('byte_size')
+                            ->label('Вага')
+                            ->formatStateUsing(fn (mixed $state): string => self::formatBytes(is_numeric($state) ? (int) $state : null)),
+                        TextEntry::make('mime_type')
+                            ->label('Формат')
+                            ->placeholder('—'),
+                    ])->columns(2),
+                ])->columns([
+                    'default' => 1,
+                    'md' => 2,
+                ])->columnSpanFull(),
+                Group::make([
+                    TextEntry::make('source_kind')
+                        ->label('Зберігання')
+                        ->state(fn (MediaAsset $record): string => self::sourceLabel($record))
+                        ->badge()
+                        ->color(fn (MediaAsset $record): string => self::sourceColor($record)),
+                    TextEntry::make('diagnosis_status')
+                        ->label('Технічний стан')
+                        ->formatStateUsing(fn (mixed $state): string => self::diagnosisLabel($state))
+                        ->badge()
+                        ->color(fn (MediaAsset $record): string => self::diagnosisColor($record)),
+                    TextEntry::make('created_at')
+                        ->label('Додано')
+                        ->dateTime('d.m.Y H:i'),
+                ])->columns([
+                    'default' => 1,
+                    'md' => 3,
+                ])->columnSpanFull(),
                 TextEntry::make('diagnosis_help')
                     ->label('Що це означає')
                     ->state(fn (MediaAsset $record): ?string => self::diagnosisHelp($record))
-                    ->visible(fn (MediaAsset $record): bool => $record->diagnosis_status !== MediaDiagnosisStatus::Ready),
+                    ->visible(fn (MediaAsset $record): bool => $record->diagnosis_status !== MediaDiagnosisStatus::Ready)
+                    ->columnSpanFull(),
                 TextEntry::make('source_url')
                     ->label('Зовнішнє посилання')
-                    ->visible(fn (MediaAsset $record): bool => filled($record->source_url)),
+                    ->visible(fn (MediaAsset $record): bool => filled($record->source_url))
+                    ->columnSpanFull(),
                 TextEntry::make('external_source_note')
                     ->label('Перевірка джерела')
                     ->state('Зовнішній URL може змінитися або стати недоступним. Відсутність попередження не означає, що посилання було нещодавно перевірено.')
                     ->color('warning')
-                    ->visible(fn (MediaAsset $record): bool => app(MediaAssetSourceResolver::class)->sourceKind($record) === 'external'),
-            ])->columns(2),
+                    ->visible(fn (MediaAsset $record): bool => app(MediaAssetSourceResolver::class)->sourceKind($record) === 'external')
+                    ->columnSpanFull(),
+            ]),
             Section::make('Використовується в')->schema([
                 TextEntry::make('usage_items')
                     ->label('Використання')
                     ->hiddenLabel()
-                    ->state(fn (MediaAsset $record): array => app(MediaAssetLibraryReadService::class)->usageItems($record))
+                    ->state(function (MediaAsset $record): ?array {
+                        $items = app(MediaAssetLibraryReadService::class)->usageItems($record);
+
+                        return $items === [] ? null : $items;
+                    })
                     ->formatStateUsing(fn (array $state): string => self::usageItemLabel($state))
                     ->url(fn (array $state): ?string => self::usageItemUrl($state))
                     ->listWithLineBreaks()
@@ -202,15 +224,31 @@ class MediaAssetResource extends Resource
             ], layout: FiltersLayout::Modal)
             ->deferFilters()
             ->filtersFormWidth('md')
+            ->filtersApplyAction(
+                fn (Action $action): Action => $action
+                    ->label('Застосувати')
+                    ->color('gray')
+            )
             ->filtersTriggerAction(
                 fn (Action $action): Action => $action
                     ->button()
+                    ->outlined()
+                    ->color('gray')
                     ->label('Фільтри')
                     ->tooltip('Фільтри')
                     ->extraAttributes(['class' => 'bp-toolbar-count-trigger'])
                     ->slideOver()
+                    ->extraModalFooterActions([
+                        $table->getFiltersApplyAction()->close(),
+                        Action::make('resetFilters')
+                            ->label('Скинути')
+                            ->color('gray')
+                            ->outlined()
+                            ->action('resetTableFiltersForm')
+                            ->button()
+                            ->close(),
+                    ])
             )
-            ->filtersApplyAction(fn (Action $action): Action => $action->label('Застосувати'))
             ->recordUrl(null)
             ->recordAction('view')
             ->recordActions([
@@ -225,7 +263,8 @@ class MediaAssetResource extends Resource
                             ->label('Відкрити повну картку')
                             ->icon('heroicon-m-arrow-top-right-on-square')
                             ->color('gray')
-                            ->url(self::getUrl('view', ['record' => $record])),
+                            ->url(self::getUrl('view', ['record' => $record]))
+                            ->openUrlInNewTab(),
                     ]),
             ])
             ->toolbarActions([]);
@@ -305,7 +344,7 @@ class MediaAssetResource extends Resource
         }
 
         $megapixels = ($asset->width_px * $asset->height_px) / 1_000_000;
-        $precision = $megapixels < 1 ? 2 : ($megapixels < 10 ? 1 : 0);
+        $precision = $megapixels < 0.01 ? 3 : ($megapixels < 1 ? 2 : ($megapixels < 10 ? 1 : 0));
 
         return number_format($megapixels, $precision, ',', ' ').' МП';
     }

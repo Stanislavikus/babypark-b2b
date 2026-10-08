@@ -95,6 +95,7 @@ class ListProductsViewActionTest extends TestCase
         $mountedAction = $component->instance()->getMountedAction();
         $this->assertNotNull($mountedAction);
         $this->assertSame('view', $mountedAction->getName());
+        $this->assertTrue($mountedAction->getExtraModalFooterActions()['open_full_page_footer']->shouldOpenUrlInNewTab());
         $this->assertStringContainsString('fi-'.$component->id().'-action-0', $component->getMountedActionModalHtml());
     }
 }

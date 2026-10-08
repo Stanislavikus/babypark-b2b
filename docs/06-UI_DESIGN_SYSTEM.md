@@ -574,6 +574,38 @@ overflow panel, actions and sections use visible text labels.
 Do not rely on hover-only tooltips to communicate the meaning of an
 ambiguous primary toolbar action.
 
+### Action Emphasis and Color
+
+Action color communicates consequence and priority, not decoration.
+
+For dense admin screens, drawers and filter panels:
+
+- default utility/navigation actions are neutral/gray;
+- use at most one emphasized/accent action when the user is committing the
+  primary business task, such as Save, Create, Upload or Publish;
+- reversible view-state actions such as Apply filters, Reset filters, Close and
+  Open full card do not use warning/danger colors merely to distinguish buttons;
+- destructive red/danger styling is reserved for genuinely destructive,
+  irreversible or difficult-to-reverse operations;
+- do not mix accent, danger and neutral buttons in one footer when the actions are
+  routine utilities.
+
+This keeps content visually dominant and prevents "button rainbow" noise. Existing
+screens migrate when materially touched.
+
+### Modal Submit Action Labels
+
+A modal submit button must name the business action being completed.
+
+Prefer action-specific labels such as `Завантажити`, `Зберегти`, `Додати`,
+`Замінити`, `Видалити` or `Застосувати`. Do not expose a generic framework
+label such as `Відправити` / `Submit` when the user is not meaningfully sending
+a message or form to another party.
+
+Existing unrelated modal actions are not mass-renamed in an arbitrary feature PR.
+When a screen is materially touched, review its submit wording and align it with
+this rule.
+
 ### Choosing a Selection Control
 
 - Single choice from a compact list: Select or Radio, according to
@@ -1050,6 +1082,12 @@ When a deeper page exists, the drawer should expose an explicit
 `Відкрити повну картку` / localized equivalent rather than forcing navigation
 for ordinary inspection.
 
+The full-card action opens in a **new browser tab**. The list/drawer stays available
+in the original tab so the merchant can compare or work in the full card and then
+close it without losing list context. This applies to Product, Asset and future
+entity drawers unless a documented workflow explicitly requires same-tab
+navigation.
+
 ### Shared Media Preview Frame
 
 Image-bearing admin surfaces use a stable preview frame instead of sizing only
@@ -1057,12 +1095,18 @@ the raw `<img>`.
 
 The frame owns:
 
-- bounded width and height appropriate to the context;
+- a **1:1 square** default geometry for ordinary single-image previews;
+- bounded size appropriate to the context;
 - neutral background/border;
 - centered content;
 - `object-fit: contain`;
 - identical geometry for placeholder and real media;
 - no crop solely to make an image fill the frame.
+
+Non-square frames require an explicit approved context such as a gallery hero,
+lightbox or channel-specific composition preview. Brand logos do not get a special
+rectangular exception merely because the source logo is wide; the wide logo is
+contained inside the same square preview frame.
 
 This applies to reusable Assets, Brand logos, Product/Variant media previews and
 future media pickers when those surfaces are materially touched.

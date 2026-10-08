@@ -32,6 +32,21 @@ The merchant smoke after PR #267 found interaction defects:
 - the upload action uses Filament's generic `Відправити` submit label;
 - quick details lack useful merchant metadata such as added date and megapixels.
 
+Post-deploy visual acceptance after PR #268 found additional concrete presentation
+facts, which are valid grounds to amend this [Resolved] document:
+
+- the detail frame rendered non-square and Brand variants still used rectangular
+  geometry;
+- Asset detail metadata was visually scattered instead of grouped around the
+  preview/file block;
+- very small images rounded megapixels to `0,00 МП`, which is technically
+  misleading as merchant information;
+- Filament's default filter reset button used danger/red styling for a reversible
+  view-state action;
+- the full-card footer action did not preserve the explicitly desired parallel
+  browser context;
+- an unused Asset could render an empty `Використовується в` card.
+
 ## Research First result
 
 No new dependency is needed.
@@ -48,6 +63,17 @@ The global `Table::deferFilters(false)` migration compatibility override is not
 changed in this campaign. Assets opts into deferred filters locally. Other pages
 migrate when materially touched, per `06-UI_DESIGN_SYSTEM.md`.
 
+Post-deploy action-emphasis research also stays integration-first:
+
+| Source | Relevant guidance | Result |
+|---|---|---|
+| Adobe Spectrum ActionButton | panel/task actions are un-emphasized by default so content keeps attention | PASS / reference |
+| Microsoft Fluent 2 Button | avoid high-emphasis buttons in information-rich modal surfaces; keep one primary action prominent | PASS / reference |
+| Shopify admin action hierarchy | at most one primary action; supporting actions remain secondary | PASS / reference |
+| Filament native Actions | `color('gray')`, `outlined()`, `openUrlInNewTab()` already provide the needed behavior | PASS / implement |
+
+Therefore no custom button system or third-party UI package is introduced.
+
 ## [Resolved] Platform UI decisions introduced/clarified
 
 ### Stable Media Preview Frame
@@ -56,12 +82,18 @@ Media preview is a shared presentation primitive.
 
 A preview frame owns:
 
-- fixed or bounded width/height appropriate to its context;
+- a 1:1 square default geometry for ordinary single-image previews;
+- bounded size appropriate to its context;
 - neutral background and border;
 - centered content;
 - `object-fit: contain`;
 - identical geometry for placeholder and real media;
 - no crop solely to fill the frame.
+
+Post-deploy visual acceptance on 2026-10-08 proved that merely bounding width and
+height was still ambiguous: Asset detail and Brand variants diverged into
+rectangular frames. The square default is therefore an acceptance-driven
+clarification of this [Resolved] interaction contract.
 
 Approved first variants:
 
@@ -82,6 +114,8 @@ list-backed entity quick review:
 - list context stays in place;
 - the drawer contains compact, decision-useful data;
 - a visible `Відкрити повну картку` action is provided when a deep page exists;
+- `Відкрити повну картку` opens in a new browser tab so the original list/drawer
+  context remains available;
 - the modal close action remains explicit.
 
 Assets adopts this pattern now. This does not require every existing resource to
@@ -102,24 +136,37 @@ The global legacy live-filter default remains unchanged.
 
 ### Asset detail content
 
-Quick/full Asset details show merchant-relevant data only:
+Quick/full Asset details show merchant-relevant data only and group related
+information instead of scattering fields across the available space.
 
-- preview;
-- file name;
+Top content block:
+
+- square preview on the left;
+- on the right: file name, dimensions, megapixels, byte size and MIME/format.
+
+Technical metadata row below:
+
 - storage source;
-- dimensions;
-- megapixels;
-- byte size;
-- MIME/format;
-- added timestamp;
 - technical state;
-- concrete `Використовується в` links.
+- added timestamp.
+
+The concrete `Використовується в` section remains separate below. When there are
+no usages, it explicitly says `Не використовується` instead of rendering an empty
+card.
 
 Internal UUID, SHA, filesystem path and other implementation details are not
 ordinary merchant fields.
 
 For External assets the UI must state that lack of an attention warning is not
 proof that the remote URL was recently checked.
+
+### Drawer action emphasis
+
+Assets filter/inspection drawers use neutral utility actions by default. Applying or
+resetting filters is reversible view-state work, so neither action uses danger
+styling. Danger/red is reserved for the future genuinely destructive Asset delete
+operation. This follows the platform-wide action-emphasis rule in
+`06-UI_DESIGN_SYSTEM.md`.
 
 ### Upload wording
 
@@ -148,12 +195,13 @@ These belong to Assets Lifecycle or later resource-alignment campaigns.
 
 ## Acceptance evidence
 
-- wide, tall, square and placeholder previews stay inside the same stable frame;
-- Brand form placeholder and real logo align identically;
-- Brands list placeholder and real logo align identically;
+- wide, tall, square and placeholder previews stay inside the same square stable frame;
+- Brand form placeholder and real logo use the same square geometry;
+- Brands list placeholder and real logo use the same square geometry;
 - Assets list/card preview does not crop the subject;
 - neutral Asset click opens the slide-over quick view;
 - drawer has explicit close semantics and `Відкрити повну картку`;
+- `Відкрити повну картку` opens in a new browser tab;
 - full Asset page remains directly addressable;
 - `Usage items` is not visible;
 - date and megapixels are visible in detail;

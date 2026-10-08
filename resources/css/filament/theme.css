@@ -54,16 +54,16 @@
 
 .bp-media-preview-frame--brand-list {
     --bp-media-preview-width: 4rem;
-    --bp-media-preview-height: 3rem;
+    --bp-media-preview-height: 4rem;
 }
 
 .bp-media-preview-frame--brand-form {
-    --bp-media-preview-width: 12rem;
-    --bp-media-preview-height: 6rem;
+    --bp-media-preview-width: 9rem;
+    --bp-media-preview-height: 9rem;
 }
 
 .bp-media-preview-frame--detail {
-    --bp-media-preview-width: min(100%, 30rem);
+    --bp-media-preview-width: min(100%, 18rem);
     --bp-media-preview-height: 18rem;
 }
 

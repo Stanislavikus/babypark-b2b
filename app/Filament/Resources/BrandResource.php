@@ -87,7 +87,7 @@ class BrandResource extends Resource
                             $set('logo_upload', null);
                         }
                     })
-                    ->helperText('Оберіть існуючий Original. Один Asset можна повторно використовувати без дублювання файлу.'),
+                    ->helperText('Оберіть існуюче зображення з Assets. Один файл можна повторно використовувати без дублювання.'),
                 FileUpload::make('logo_upload')
                     ->label('Завантажити новий логотип')
                     ->storeFiles(false)
@@ -100,7 +100,7 @@ class BrandResource extends Resource
                         'image/avif',
                     ])
                     ->validationMessages([
-                        'max' => 'Файл завеликий. Максимальний розмір Original — 20 МіБ.',
+                        'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
                         'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                     ])
                     ->live()
