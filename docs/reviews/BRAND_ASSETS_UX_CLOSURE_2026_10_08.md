@@ -78,6 +78,12 @@ A newly uploaded logo is ingested through the shared
 `OriginalImageIngestService`, becomes/reuses an ordinary Original MediaAsset, and
 is then assigned through `BrandManager`.
 
+Brand upload + Brand mutation are one caller-owned DB transaction. The image is
+prepared before the workspace lock; `ingestPrepared()` runs inside the Brand
+transaction. If Brand creation/update fails after a newly managed Original was
+written, the DB row rolls back and the caller deletes only the newly written path.
+A deduplicated/reused existing MediaAsset is never deleted on Brand failure.
+
 No Brand-specific storage, media table, hash logic, or upload service is introduced.
 
 ### 6. Deployment bootstrap
@@ -99,6 +105,8 @@ second-media-authority conflict already rejected by Assets v1 research.
 - the same images remain bounded in Assets Details;
 - Brand list logo preview uses contain behavior and the shared placeholder;
 - Brand can upload a new logo and the resulting/reused MediaAsset is canonical;
+- failed Brand create/update rolls back a newly created MediaAsset and removes only
+  the newly stored file; a reused existing MediaAsset survives unchanged;
 - Brand can select an existing Original from Assets;
 - clearing logo association does not delete the MediaAsset;
 - source labels render as `У платформі / Зовнішнє`;
