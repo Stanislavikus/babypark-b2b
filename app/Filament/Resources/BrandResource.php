@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BrandResource\Pages\CreateBrand;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Filament\Resources\BrandResource\Pages\ListBrands;
+use App\Filament\Support\MediaPreviewFrame;
 use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\MediaAsset;
@@ -56,29 +57,27 @@ class BrandResource extends Resource
                     ->label('Назва')
                     ->required()
                     ->maxLength(255),
-                ImageEntry::make('logo_preview')
-                    ->label('Поточний логотип')
-                    ->state(function (Get $get): ?string {
-                        $assetId = $get('logo_media_asset_id');
+                MediaPreviewFrame::entry(
+                    ImageEntry::make('logo_preview')
+                        ->label('Поточний логотип')
+                        ->state(function (Get $get): ?string {
+                            $assetId = $get('logo_media_asset_id');
 
-                        if (! is_string($assetId) || $assetId === '') {
-                            return null;
-                        }
+                            if (! is_string($assetId) || $assetId === '') {
+                                return null;
+                            }
 
-                        $asset = MediaAsset::withoutWorkspaceScope()
-                            ->where('workspace_id', app(WorkspaceContext::class)->id())
-                            ->whereNull('parent_media_asset_id')
-                            ->whereKey($assetId)
-                            ->first();
+                            $asset = MediaAsset::withoutWorkspaceScope()
+                                ->where('workspace_id', app(WorkspaceContext::class)->id())
+                                ->whereNull('parent_media_asset_id')
+                                ->whereKey($assetId)
+                                ->first();
 
-                        return app(MediaAssetSourceResolver::class)->sourceReference($asset);
-                    })
-                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160)))
-                    ->imageWidth('12rem')
-                    ->imageHeight('6rem')
-                    ->extraImgAttributes([
-                        'style' => 'object-fit: contain; width: 12rem; height: 6rem; max-width: 100%; background-color: white;',
-                    ]),
+                            return app(MediaAssetSourceResolver::class)->sourceReference($asset);
+                        })
+                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
+                    MediaPreviewFrame::BRAND_FORM,
+                ),
                 OriginalImageAssetPicker::make('logo_media_asset_id')
                     ->label('Обрати з Assets')
                     ->placeholder('Без логотипу')
@@ -137,16 +136,14 @@ class BrandResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('logo_preview')
-                    ->label('Лого')
-                    ->state(fn (Brand $record): ?string => app(MediaAssetSourceResolver::class)
-                        ->sourceReference($record->logo))
-                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(48)))
-                    ->imageWidth(64)
-                    ->imageHeight(44)
-                    ->extraImgAttributes([
-                        'style' => 'object-fit: contain; width: 64px; height: 44px; max-width: 64px; max-height: 44px; background-color: white;',
-                    ]),
+                MediaPreviewFrame::column(
+                    ImageColumn::make('logo_preview')
+                        ->label('Лого')
+                        ->state(fn (Brand $record): ?string => app(MediaAssetSourceResolver::class)
+                            ->sourceReference($record->logo))
+                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(64))),
+                    MediaPreviewFrame::BRAND_LIST,
+                ),
                 TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()

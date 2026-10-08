@@ -5,10 +5,12 @@ namespace App\Filament\Resources;
 use App\Enums\MediaDiagnosisStatus;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
+use App\Filament\Support\MediaPreviewFrame;
 use App\Models\MediaAsset;
 use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Support\Workspace\WorkspaceContext;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -16,10 +18,12 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -48,17 +52,23 @@ class MediaAssetResource extends Resource
 
     public static function infolist(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->components(self::detailSchema());
+    }
+
+    /**
+     * @return array<int, Section>
+     */
+    public static function detailSchema(): array
+    {
+        return [
             Section::make('Original')->schema([
-                ImageEntry::make('preview_url')
-                    ->label('Зображення')
-                    ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
-                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180)))
-                    ->imageWidth('100%')
-                    ->imageHeight('20rem')
-                    ->extraImgAttributes([
-                        'style' => 'object-fit: contain; max-width: 100%; max-height: 20rem; background-color: white;',
-                    ]),
+                MediaPreviewFrame::entry(
+                    ImageEntry::make('preview_url')
+                        ->label('Зображення')
+                        ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
+                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
+                    MediaPreviewFrame::DETAIL,
+                ),
                 TextEntry::make('display_name')
                     ->label('Файл')
                     ->state(fn (MediaAsset $record): string => self::displayName($record)),
@@ -70,12 +80,18 @@ class MediaAssetResource extends Resource
                 TextEntry::make('dimensions')
                     ->label('Розмір')
                     ->state(fn (MediaAsset $record): string => self::dimensions($record)),
+                TextEntry::make('megapixels')
+                    ->label('Мегапікселі')
+                    ->state(fn (MediaAsset $record): string => self::megapixels($record)),
                 TextEntry::make('byte_size')
                     ->label('Вага')
                     ->formatStateUsing(fn (mixed $state): string => self::formatBytes(is_numeric($state) ? (int) $state : null)),
                 TextEntry::make('mime_type')
                     ->label('Формат')
                     ->placeholder('—'),
+                TextEntry::make('created_at')
+                    ->label('Додано')
+                    ->dateTime('d.m.Y H:i'),
                 TextEntry::make('diagnosis_status')
                     ->label('Технічний стан')
                     ->formatStateUsing(fn (mixed $state): string => self::diagnosisLabel($state))
@@ -88,10 +104,16 @@ class MediaAssetResource extends Resource
                 TextEntry::make('source_url')
                     ->label('Зовнішнє посилання')
                     ->visible(fn (MediaAsset $record): bool => filled($record->source_url)),
+                TextEntry::make('external_source_note')
+                    ->label('Перевірка джерела')
+                    ->state('Зовнішній URL може змінитися або стати недоступним. Відсутність попередження не означає, що посилання було нещодавно перевірено.')
+                    ->color('warning')
+                    ->visible(fn (MediaAsset $record): bool => app(MediaAssetSourceResolver::class)->sourceKind($record) === 'external'),
             ])->columns(2),
             Section::make('Використовується в')->schema([
                 TextEntry::make('usage_items')
-                    ->label('')
+                    ->label('Використання')
+                    ->hiddenLabel()
                     ->state(fn (MediaAsset $record): array => app(MediaAssetLibraryReadService::class)->usageItems($record))
                     ->formatStateUsing(fn (array $state): string => self::usageItemLabel($state))
                     ->url(fn (array $state): ?string => self::usageItemUrl($state))
@@ -101,7 +123,7 @@ class MediaAssetResource extends Resource
                     ->expandableLimitedList()
                     ->placeholder('Не використовується'),
             ]),
-        ]);
+        ];
     }
 
     public static function table(Table $table): Table
@@ -109,16 +131,14 @@ class MediaAssetResource extends Resource
         return $table
             ->columns([
                 Split::make([
-                    ImageColumn::make('asset_preview')
-                        ->label('')
-                        ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
-                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(88)))
-                        ->imageWidth(88)
-                        ->imageHeight(88)
-                        ->extraImgAttributes([
-                            'style' => 'object-fit: contain; width: 88px; height: 88px; max-width: 88px; max-height: 88px; background-color: white;',
-                        ])
-                        ->grow(false),
+                    MediaPreviewFrame::column(
+                        ImageColumn::make('asset_preview')
+                            ->label('')
+                            ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
+                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(88)))
+                            ->grow(false),
+                        MediaPreviewFrame::ASSET_CARD,
+                    ),
                     Stack::make([
                         TextColumn::make('asset_name')
                             ->label('Файл')
@@ -179,11 +199,34 @@ class MediaAssetResource extends Resource
                     ->label('Потребує уваги')
                     ->query(fn (Builder $query): Builder => app(MediaAssetLibraryReadService::class)
                         ->applyAttentionFilter($query, true)),
-            ])
-            ->recordUrl(fn (MediaAsset $record): string => self::getUrl('view', ['record' => $record]))
+            ], layout: FiltersLayout::Modal)
+            ->deferFilters()
+            ->filtersFormWidth('md')
+            ->filtersTriggerAction(
+                fn (Action $action): Action => $action
+                    ->button()
+                    ->label('Фільтри')
+                    ->tooltip('Фільтри')
+                    ->extraAttributes(['class' => 'bp-toolbar-count-trigger'])
+                    ->slideOver()
+            )
+            ->filtersApplyAction(fn (Action $action): Action => $action->label('Застосувати'))
+            ->recordUrl(null)
+            ->recordAction('view')
             ->recordActions([
                 ViewAction::make()
-                    ->label('Деталі'),
+                    ->label('Деталі')
+                    ->slideOver()
+                    ->modalWidth(Width::Large)
+                    ->modalHeading(fn (MediaAsset $record): string => self::displayName($record))
+                    ->schema(fn (): array => self::detailSchema())
+                    ->extraModalFooterActions(fn (MediaAsset $record): array => [
+                        Action::make('open_full_page_footer')
+                            ->label('Відкрити повну картку')
+                            ->icon('heroicon-m-arrow-top-right-on-square')
+                            ->color('gray')
+                            ->url(self::getUrl('view', ['record' => $record])),
+                    ]),
             ])
             ->toolbarActions([]);
     }
@@ -253,6 +296,18 @@ class MediaAssetResource extends Resource
         return $asset->width_px !== null && $asset->height_px !== null
             ? $asset->width_px.' × '.$asset->height_px.' px'
             : 'Розмір невідомий';
+    }
+
+    public static function megapixels(MediaAsset $asset): string
+    {
+        if ($asset->width_px === null || $asset->height_px === null) {
+            return '—';
+        }
+
+        $megapixels = ($asset->width_px * $asset->height_px) / 1_000_000;
+        $precision = $megapixels < 1 ? 2 : ($megapixels < 10 ? 1 : 0);
+
+        return number_format($megapixels, $precision, ',', ' ').' МП';
     }
 
     public static function formatBytes(?int $bytes): string

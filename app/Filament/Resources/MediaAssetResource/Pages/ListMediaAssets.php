@@ -52,6 +52,7 @@ class ListMediaAssets extends ListRecords
                 ->visible(fn (): bool => $this->canManageProducts())
                 ->modalHeading('Завантажити Original')
                 ->modalDescription('Original зберігається без resize та повторного кодування. Максимум 20 МіБ і 25 МП на файл.')
+                ->modalSubmitActionLabel('Завантажити')
                 ->schema([
                     FileUpload::make('files')
                         ->label('Зображення')
