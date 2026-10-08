@@ -27,14 +27,14 @@
    images aligned and contain every aspect ratio without cropping. */
 .bp-media-preview-frame {
     --bp-media-preview-width: 5.5rem;
-    --bp-media-preview-height: 5.5rem;
 }
 
 .bp-media-preview-frame.fi-in-image,
 .bp-media-preview-frame.fi-ta-image {
     width: var(--bp-media-preview-width);
-    height: var(--bp-media-preview-height);
+    height: auto;
     max-width: 100%;
+    aspect-ratio: 1 / 1;
     @apply flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5 dark:border-white/10 dark:bg-gray-900;
 }
 
@@ -49,22 +49,18 @@
 
 .bp-media-preview-frame--asset-card {
     --bp-media-preview-width: 5.5rem;
-    --bp-media-preview-height: 5.5rem;
 }
 
 .bp-media-preview-frame--brand-list {
     --bp-media-preview-width: 4rem;
-    --bp-media-preview-height: 4rem;
 }
 
 .bp-media-preview-frame--brand-form {
     --bp-media-preview-width: 9rem;
-    --bp-media-preview-height: 9rem;
 }
 
 .bp-media-preview-frame--detail {
     --bp-media-preview-width: min(100%, 18rem);
-    --bp-media-preview-height: 18rem;
 }
 
 /* Category Tree: keep the package as the interaction engine, but present it
