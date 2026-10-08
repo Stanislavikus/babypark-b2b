@@ -62,7 +62,7 @@ Detailed architecture remains in the owning documents.
 
 ## A1 — Assets v1 Core
 
-**Status:** `PARTIAL` — merged; production transport closure pending.
+**Status:** `PARTIAL` — merged/deployed; merchant-browser visual/action smoke pending.
 
 **Goal:** one reusable workspace-owned MediaAsset library and shared Original image
 ingest for Product, Variant, and the next Brand-logo campaign.
@@ -77,6 +77,15 @@ ingest for Product, Variant, and the next Brand-logo campaign.
   `da54452e49e0e98206c20bf9a843f4c580102516`.
 - Exact-head MySQL CI **#590**: **3840 passed / 15 skipped / 85,382 assertions**;
   Pint **1636 files PASS**; `git diff --check` PASS.
+- Production deployed at exact `develop` SHA
+  `da54452e49e0e98206c20bf9a843f4c580102516`.
+- Production transport envelope aligned to the frozen contract:
+  nginx **26m**, PHP-FPM upload **25M**, PHP-FPM post **26M**, Livewire **25 MiB**.
+- Live external HTTPS/Livewire smoke:
+  exact **20 MiB** valid PNG traversed transport and passed application admission;
+  **20 MiB + 1 byte** traversed transport and was rejected by application with the
+  controlled merchant message rather than nginx/PHP/Livewire rejection.
+- Smoke temporary uploads were deleted and created no permanent MediaAsset.
 - Physical MediaAsset delete is intentionally not part of this campaign.
 
 **Acceptance evidence required:**
@@ -91,11 +100,11 @@ ingest for Product, Variant, and the next Brand-logo campaign.
 - exact-head MySQL CI;
 - production upload transport smoke after approved deployment/configuration.
 
-**Known blocker:** merge readiness waits for exact-head CI/review. Production closure
-also waits for explicit deployment approval and real upload-chain evidence.
+**Known blocker:** no engineering blocker remains. Final closure evidence still
+needs merchant-browser visual/action smoke of the deployed Assets surface.
 
-**Shortest safe path:** finish #266 → merge only after Product Owner OK → deploy only
-after separate Product Owner OK → live 20 MiB transport verification.
+**Shortest safe path:** Product Owner visually checks deployed Assets and performs a
+normal merchant upload; record any UX findings into A2 Brand UX / BrandLogo campaign.
 
 ## A2 — Brand UX completion / BrandLogo usage
 
