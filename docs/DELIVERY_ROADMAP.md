@@ -62,7 +62,7 @@ Detailed architecture remains in the owning documents.
 
 ## A1 — Assets v1 Core
 
-**Status:** `ACTIVE`
+**Status:** `PARTIAL` — merged; production transport closure pending.
 
 **Goal:** one reusable workspace-owned MediaAsset library and shared Original image
 ingest for Product, Variant, and the next Brand-logo campaign.
@@ -70,10 +70,13 @@ ingest for Product, Variant, and the next Brand-logo campaign.
 **Current state:**
 
 - Frozen contract: `docs/reviews/MASTER_ASSETS_V1_CORE_2026_10_08.md`.
-- Draft PR: **#266 — feat: add Assets v1 Core**.
-- Active branch: `feat/assets-v1-core`.
-- Exact HEAD / CI evidence is tracked on the active PR and must be copied here only
-  when it becomes durable merge/closure evidence.
+- PR **#266 — feat: add Assets v1 Core** merged 2026-10-08.
+- Verified pre-merge HEAD:
+  `26009b35e51914c194e6817243cae4df454eef45`.
+- Squash merge on `develop`:
+  `da54452e49e0e98206c20bf9a843f4c580102516`.
+- Exact-head MySQL CI **#590**: **3840 passed / 15 skipped / 85,382 assertions**;
+  Pint **1636 files PASS**; `git diff --check` PASS.
 - Physical MediaAsset delete is intentionally not part of this campaign.
 
 **Acceptance evidence required:**
