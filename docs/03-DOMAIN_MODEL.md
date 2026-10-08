@@ -1663,11 +1663,11 @@ The Product Data Platform conceptually supports rich Product assets including at
 
 The architecture must allow both Product-level assets and Variant-specific assets where business semantics require them.
 
-Current implementation truth: Product currently carries an `images` JSON field. No first-class MediaAsset / ProductMedia / VariantMedia runtime model with asset-type or variant-level semantics is implemented.
+Current implementation truth: first-class `MediaAsset`, `ProductMedia` and `VariantMedia` runtime persistence is implemented under the resolved Master Media contracts, while `products.images` remains only a legacy compatibility projection/fallback where first-class associations have not taken authority. Merchant-facing reusable Assets authoring is governed by `docs/reviews/MASTER_ASSETS_V1_CORE_2026_10_08.md`.
 
-The Domain Model names MediaAsset / ProductMedia / VariantMedia as the conceptual target. Do not create a competing second media model. Do not collapse every asset forever into `products.images` JSON if richer media entities are later implemented along that existing conceptual path.
+Do not create a competing second media model. Do not re-promote `products.images` JSON, a third-party media table, filesystem paths, or connector-specific records into independent media authority.
 
-This section defines required conceptual extensibility, not a new persistence schema. Do not freeze storage implementation beyond the already-resolved hybrid Field Dictionary and the current minimal `products.images` JSON.
+This section defines the durable media-domain semantics. Physical persistence is already frozen by the resolved Master Media contracts; further media capabilities must extend that model rather than replace it.
 
 Required semantic concerns to preserve or explicitly leave extensible:
 
@@ -1680,7 +1680,7 @@ Required semantic concerns to preserve or explicitly leave extensible:
 - importability;
 - exportability.
 
-The target architecture must remain capable of evolving from the current minimal representation toward first-class Product/Variant assets without forcing connector-specific media fields into Product core.
+The architecture must continue evolving through the existing first-class Product/Variant asset model without forcing connector-specific media fields into Product core.
 
 If Magento Product Export V1 does not consume video or documents, mark:
 
