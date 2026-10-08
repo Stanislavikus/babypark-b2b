@@ -15,7 +15,9 @@ final class OriginalImageAssetPicker
     public static function make(string $name): Select
     {
         return Select::make($name)
+            ->options(fn (): array => self::search(''))
             ->searchable()
+            ->preload()
             ->getSearchResultsUsing(fn (?string $search): array => self::search($search ?? ''))
             ->getOptionLabelUsing(fn (?string $value): ?string => self::labelForId($value));
     }
@@ -72,15 +74,16 @@ final class OriginalImageAssetPicker
             : self::urlName($asset) ?? 'Image '.substr((string) $asset->id, 0, 8);
 
         $source = match (app(MediaAssetSourceResolver::class)->sourceKind($asset)) {
-            'managed' => 'Managed',
-            'external' => 'External',
+            'managed' => 'У платформі',
+            'external' => 'Зовнішнє',
             default => 'Немає джерела',
         };
 
-        $attention = in_array($asset->diagnosis_status, [
-            MediaDiagnosisStatus::Attention,
-            MediaDiagnosisStatus::Failed,
-        ], true) ? ' · Потребує уваги' : '';
+        $attention = match ($asset->diagnosis_status) {
+            MediaDiagnosisStatus::Pending => ' · Ще не перевірено',
+            MediaDiagnosisStatus::Attention, MediaDiagnosisStatus::Failed => ' · Потребує уваги',
+            default => '',
+        };
 
         return $name.' · '.$source.$attention;
     }

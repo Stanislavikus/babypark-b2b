@@ -15,11 +15,14 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\BrandManager;
+use App\Services\Media\OriginalImageIngestService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -334,6 +337,171 @@ final class BrandManagementTest extends TestCase
     }
 
     #[Test]
+    public function brand_can_upload_new_logo_into_assets_and_reuse_the_same_original(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $file = UploadedFile::fake()->image('brand-wide.png', 1200, 180)->size(128);
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Uploaded Logo Brand',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $brand = Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('name', 'Uploaded Logo Brand')
+            ->sole();
+
+        $asset = MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereKey($brand->logo_media_asset_id)
+            ->sole();
+
+        $this->assertTrue($asset->isOriginal());
+        $this->assertSame('brand-wide.png', $asset->original_filename);
+        $this->assertSame(1200, $asset->width_px);
+        $this->assertSame(180, $asset->height_px);
+        Storage::disk('public')->assertExists((string) $asset->storage_path);
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Uploaded Logo Brand Reuse',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $reusedBrand = Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('name', 'Uploaded Logo Brand Reuse')
+            ->sole();
+
+        $this->assertSame($asset->id, $reusedBrand->logo_media_asset_id);
+        $this->assertSame(1, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('content_sha256', $asset->content_sha256)
+            ->count());
+    }
+
+    #[Test]
+    public function brand_logo_admission_failure_is_a_form_error_and_creates_nothing(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $file = UploadedFile::fake()->createWithContent(
+            'too-many-pixels.png',
+            $this->pngHeader(5001, 5000),
+        );
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Rejected Logo Brand',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['logo_upload']);
+
+        $this->assertDatabaseMissing('brands', [
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Rejected Logo Brand',
+        ]);
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->count());
+    }
+
+    #[Test]
+    public function failed_brand_create_rolls_back_new_logo_asset_and_file(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        app(BrandManager::class)->create($this->actor, $this->workspace, 'Duplicate UI Brand');
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Duplicate UI Brand',
+                'logo_upload' => UploadedFile::fake()->image('rollback-create.png', 800, 600),
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['name']);
+
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->count());
+        Storage::disk('public')->assertDirectoryEmpty('media/originals/'.$this->workspace->id);
+    }
+
+    #[Test]
+    public function failed_brand_edit_rolls_back_new_logo_asset_and_file(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $target = app(BrandManager::class)->create($this->actor, $this->workspace, 'Editable Brand');
+        app(BrandManager::class)->create($this->actor, $this->workspace, 'Existing Brand');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $target->getRouteKey()])
+            ->fillForm([
+                'name' => 'Existing Brand',
+                'logo_upload' => UploadedFile::fake()->image('rollback-edit.png', 800, 600),
+                'is_active' => true,
+            ])
+            ->call('save')
+            ->assertHasErrors(['name']);
+
+        $target->refresh();
+        $this->assertSame('Editable Brand', $target->name);
+        $this->assertNull($target->logo_media_asset_id);
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->count());
+        Storage::disk('public')->assertDirectoryEmpty('media/originals/'.$this->workspace->id);
+    }
+
+    #[Test]
+    public function failed_brand_write_never_deletes_a_reused_logo_asset(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $file = UploadedFile::fake()->image('reused-on-failure.png', 640, 480);
+        $asset = app(OriginalImageIngestService::class)
+            ->ingestStandalone($this->actor, $this->workspace, $file);
+        $storedPath = (string) $asset->storage_path;
+
+        app(BrandManager::class)->create($this->actor, $this->workspace, 'Duplicate With Reuse');
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Duplicate With Reuse',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['name']);
+
+        $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+        Storage::disk('public')->assertExists($storedPath);
+    }
+
+    #[Test]
     public function unauthorized_actor_and_physical_delete_are_denied(): void
     {
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Protected');
@@ -359,6 +527,16 @@ final class BrandManagementTest extends TestCase
             'brand_id' => $brandId,
             'is_active' => true,
         ]);
+    }
+
+    private function pngHeader(int $width, int $height): string
+    {
+        $bytes = "\x89PNG\r\n\x1a\n";
+        $ihdr = pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0);
+        $bytes .= pack('N', 13).'IHDR'.$ihdr.pack('N', crc32('IHDR'.$ihdr));
+        $bytes .= pack('N', 0).'IEND'.pack('N', crc32('IEND'));
+
+        return $bytes;
     }
 
     private function imageAsset(Workspace $workspace, string $filename, ?MediaAsset $parent = null): MediaAsset

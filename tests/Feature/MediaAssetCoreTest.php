@@ -6,8 +6,10 @@ use App\Enums\MediaAssetType;
 use App\Enums\MediaDiagnosisStatus;
 use App\Enums\MediaRole;
 use App\Enums\UserRole;
+use App\Filament\Resources\BrandResource;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
+use App\Filament\Resources\ProductResource;
 use App\Models\Brand;
 use App\Models\MediaAsset;
 use App\Models\Product;
@@ -479,8 +481,8 @@ class MediaAssetCoreTest extends TestCase
         Livewire::actingAs($this->actor)
             ->test(ListMediaAssets::class)
             ->assertCanSeeTableRecords([$managed, $external, $attention])
-            ->assertSee('Managed')
-            ->assertSee('External')
+            ->assertSee('У платформі')
+            ->assertSee('Зовнішнє')
             ->assertSee('Потребує уваги')
             ->filterTable('source', 'managed')
             ->assertCanSeeTableRecords([$managed])
@@ -489,6 +491,77 @@ class MediaAssetCoreTest extends TestCase
             ->filterTable('attention')
             ->assertCanSeeTableRecords([$attention])
             ->assertCanNotSeeTableRecords([$managed, $external]);
+    }
+
+    #[Test]
+    public function asset_preview_contains_wide_images_and_details_link_real_usage(): void
+    {
+        $asset = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'asset_type' => MediaAssetType::Image,
+            'storage_disk' => 'public',
+            'storage_path' => 'media/originals/'.$this->workspace->id.'/wide-logo.png',
+            'original_filename' => 'wide-logo.png',
+            'mime_type' => 'image/png',
+            'width_px' => 1200,
+            'height_px' => 180,
+            'diagnosis_status' => MediaDiagnosisStatus::Ready,
+        ]);
+
+        $product = $this->product();
+        $product->update(['name' => 'Usage Product']);
+        $variant = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'USAGE-VARIANT',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+        $brand = Brand::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Usage Brand',
+            'logo_media_asset_id' => $asset->id,
+            'is_active' => true,
+        ]);
+
+        ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $asset->id,
+            'role' => MediaRole::Primary,
+            'sort_order' => 0,
+        ]);
+
+        DB::table('variant_media')->insert([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $this->workspace->id,
+            'variant_id' => $variant->id,
+            'media_asset_id' => $asset->id,
+            'role' => MediaRole::Primary->value,
+            'sort_order' => 0,
+            'locale' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ListMediaAssets::class)
+            ->assertCanSeeTableRecords([$asset])
+            ->assertSeeHtml('object-fit: contain')
+            ->assertSee('У платформі')
+            ->assertDontSee('Перевірено');
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertSeeHtml('object-fit: contain')
+            ->assertSee('Технічний стан')
+            ->assertSee('Перевірено')
+            ->assertSee('Бренд · Usage Brand')
+            ->assertSee('Товар · Usage Product')
+            ->assertSee('Варіант · USAGE-VARIANT · Usage Product')
+            ->assertSee(BrandResource::getUrl('edit', ['record' => $brand]))
+            ->assertSee(ProductResource::getUrl('edit', ['record' => $product]));
     }
 
     #[Test]
