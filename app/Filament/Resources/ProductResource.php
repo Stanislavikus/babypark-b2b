@@ -891,7 +891,8 @@ class ProductResource extends Resource
                             ->label('Відкрити повну картку')
                             ->icon('heroicon-m-arrow-top-right-on-square')
                             ->color('gray')
-                            ->url(static::getUrl('view', ['record' => $record])),
+                            ->url(static::getUrl('view', ['record' => $record]))
+                            ->openUrlInNewTab(),
                     ]),
             ])
             ->toolbarActions([

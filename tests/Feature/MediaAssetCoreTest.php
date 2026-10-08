@@ -7,6 +7,7 @@ use App\Enums\MediaDiagnosisStatus;
 use App\Enums\MediaRole;
 use App\Enums\UserRole;
 use App\Filament\Resources\BrandResource;
+use App\Filament\Resources\MediaAssetResource;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Filament\Resources\ProductResource;
@@ -561,8 +562,16 @@ class MediaAssetCoreTest extends TestCase
         $this->assertTrue($table->hasDeferredFilters());
         $filterTrigger = $table->getFiltersTriggerAction();
         $this->assertTrue($filterTrigger->isModalSlideOver());
+        $this->assertTrue($filterTrigger->isOutlined());
+        $this->assertSame('gray', $filterTrigger->getColor());
         $this->assertSame('Застосувати', $table->getFiltersApplyAction()->getLabel());
-        $this->assertTrue($filterTrigger->getExtraModalFooterActions()['applyFilters']->shouldClose());
+        $this->assertSame('gray', $table->getFiltersApplyAction()->getColor());
+
+        $filterFooterActions = $filterTrigger->getExtraModalFooterActions();
+        $this->assertTrue($filterFooterActions['applyFilters']->shouldClose());
+        $this->assertSame('gray', $filterFooterActions['resetFilters']->getColor());
+        $this->assertTrue($filterFooterActions['resetFilters']->isOutlined());
+        $this->assertTrue($filterFooterActions['resetFilters']->shouldClose());
 
         $list->mountTableAction('view', $asset);
 
@@ -570,6 +579,7 @@ class MediaAssetCoreTest extends TestCase
         $this->assertNotNull($mountedView);
         $this->assertTrue($mountedView->isModalSlideOver());
         $this->assertArrayHasKey('open_full_page_footer', $mountedView->getExtraModalFooterActions());
+        $this->assertTrue($mountedView->getExtraModalFooterActions()['open_full_page_footer']->shouldOpenUrlInNewTab());
 
         Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
@@ -594,6 +604,45 @@ class MediaAssetCoreTest extends TestCase
         $this->assertStringContainsString('.bp-media-preview-frame.fi-in-image', $theme);
         $this->assertStringContainsString('.bp-media-preview-frame.fi-ta-image', $theme);
         $this->assertStringContainsString('object-fit: contain !important;', $theme);
+        $this->assertStringContainsString("--bp-media-preview-width: 4rem;\n    --bp-media-preview-height: 4rem;", $theme);
+        $this->assertStringContainsString("--bp-media-preview-width: 9rem;\n    --bp-media-preview-height: 9rem;", $theme);
+        $this->assertStringContainsString("--bp-media-preview-width: min(100%, 18rem);\n    --bp-media-preview-height: 18rem;", $theme);
+    }
+
+    #[Test]
+    public function unused_asset_detail_is_structured_and_small_image_megapixels_remain_informative(): void
+    {
+        $asset = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'asset_type' => MediaAssetType::Image,
+            'storage_disk' => 'public',
+            'storage_path' => 'media/originals/'.$this->workspace->id.'/small-logo.png',
+            'original_filename' => 'small-logo.png',
+            'mime_type' => 'image/png',
+            'byte_size' => 3072,
+            'width_px' => 140,
+            'height_px' => 27,
+            'diagnosis_status' => MediaDiagnosisStatus::Ready,
+        ]);
+
+        $this->assertSame('0,004 МП', MediaAssetResource::megapixels($asset));
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertSee('Файл')
+            ->assertSee('small-logo.png')
+            ->assertSee('Розмір')
+            ->assertSee('140 × 27 px')
+            ->assertSee('Мегапікселі')
+            ->assertSee('0,004 МП')
+            ->assertSee('Вага')
+            ->assertSee('3 КіБ')
+            ->assertSee('Формат')
+            ->assertSee('image/png')
+            ->assertSee('Зберігання')
+            ->assertSee('Технічний стан')
+            ->assertSee('Додано')
+            ->assertSee('Не використовується');
     }
 
     #[Test]
