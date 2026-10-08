@@ -5,11 +5,15 @@ namespace App\Services\Catalog;
 use App\Models\MediaAsset;
 use App\Models\Product;
 use App\Models\ProductMedia;
+use App\Services\Media\MediaAssetSourceResolver;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 
 final class ProductMediaReadService
 {
+    public function __construct(
+        private readonly MediaAssetSourceResolver $sourceResolver,
+    ) {}
+
     /**
      * @return Collection<int, ProductMedia>
      */
@@ -90,24 +94,6 @@ final class ProductMediaReadService
 
     public function sourceReference(?MediaAsset $asset): ?string
     {
-        if (! $asset instanceof MediaAsset || ! $asset->isOriginal()) {
-            return null;
-        }
-
-        if (filled($asset->source_url)) {
-            return trim((string) $asset->source_url);
-        }
-
-        if (! filled($asset->storage_disk) || ! filled($asset->storage_path)) {
-            return null;
-        }
-
-        $url = Storage::disk((string) $asset->storage_disk)->url((string) $asset->storage_path);
-
-        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
-            return $url;
-        }
-
-        return rtrim((string) config('app.url'), '/').'/'.ltrim($url, '/');
+        return $this->sourceResolver->sourceReference($asset);
     }
 }

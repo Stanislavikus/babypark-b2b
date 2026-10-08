@@ -71,6 +71,11 @@ class MediaAsset extends Model
         return $this->hasMany(VariantMedia::class, 'media_asset_id');
     }
 
+    public function brandsAsLogo(): HasMany
+    {
+        return $this->hasMany(Brand::class, 'logo_media_asset_id');
+    }
+
     public function isOriginal(): bool
     {
         return $this->parent_media_asset_id === null;
