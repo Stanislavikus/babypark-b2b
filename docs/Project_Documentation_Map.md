@@ -15,6 +15,27 @@ for a non-technical user to operate without special training.
 
 ---
 
+## DELIVERY_ROADMAP.md
+
+Living delivery-control document for execution order and campaign state.
+
+It records:
+
+- the active capability;
+- what is next and what is queued;
+- dependencies between Product/Magento, Smart Import, SEO, SaaS Core and 1C/ERP work;
+- acceptance evidence and known blockers;
+- mandatory unfinished work that must not disappear when a chat/session ends.
+
+It does **not** replace Product Vision, Domain Model, Architecture Principles,
+connector contracts, GAP documents or later `[Resolved]` decisions. Those authority
+documents win on conflict.
+
+The roadmap must be updated in the same campaign whenever a merge materially changes
+delivery status or sequencing.
+
+---
+
 ## 00-WHY.md
 
 Explains why the platform exists.
