@@ -142,6 +142,17 @@ domain.
   wording are now deployed.
 - `docs/06-UI_DESIGN_SYSTEM.md` now freezes the shared media-frame, entity
   quick-view and modal-action-label standards.
+- PR **#269 — fix: close media interaction visual acceptance** merged 2026-10-08
+  after production screenshot review and deployed on
+  `develop` SHA `dd8bb36cd9a0e48ab116f048959a7e462ccbee8a`.
+- Exact-head CI **#596** passed on
+  `995bdd43ed5832829103b1b5d8de3e6708b2fc33`.
+- Post-deploy corrections now enforce square 1:1 Asset/Brand preview geometry,
+  structured Asset details, neutral filter utility actions, informative tiny-image
+  megapixels and new-tab full-card navigation.
+- Production post-deploy health: HEAD equals `origin/develop`, maintenance OFF,
+  nginx/PHP-FPM/Supervisor and queues healthy, managed storage link present, and
+  `npm audit --omit=dev` reports zero production vulnerabilities.
 
 **Acceptance evidence:**
 
@@ -156,9 +167,9 @@ domain.
 
 **Dependency:** A1.
 
-**Remaining closure evidence:** Product Owner visually confirms the deployed Brand
-logo upload/select/remove flow plus the final Assets stable-frame, quick-view and
-filter-drawer presentation.
+**Remaining closure evidence:** Product Owner visually confirms the newly deployed
+PR #269 square Brand/Assets frame geometry, structured Asset detail, neutral filter
+actions, new-tab full-card navigation, plus the Brand upload/select/remove flow.
 
 **Shortest safe path:** merchant visual smoke only; no engineering blocker is known.
 
