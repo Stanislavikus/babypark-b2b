@@ -20,6 +20,8 @@ use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -334,6 +336,92 @@ final class BrandManagementTest extends TestCase
     }
 
     #[Test]
+    public function brand_can_upload_new_logo_into_assets_and_reuse_the_same_original(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $file = UploadedFile::fake()->image('brand-wide.png', 1200, 180)->size(128);
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Uploaded Logo Brand',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $brand = Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('name', 'Uploaded Logo Brand')
+            ->sole();
+
+        $asset = MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereKey($brand->logo_media_asset_id)
+            ->sole();
+
+        $this->assertTrue($asset->isOriginal());
+        $this->assertSame('brand-wide.png', $asset->original_filename);
+        $this->assertSame(1200, $asset->width_px);
+        $this->assertSame(180, $asset->height_px);
+        Storage::disk('public')->assertExists((string) $asset->storage_path);
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Uploaded Logo Brand Reuse',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $reusedBrand = Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('name', 'Uploaded Logo Brand Reuse')
+            ->sole();
+
+        $this->assertSame($asset->id, $reusedBrand->logo_media_asset_id);
+        $this->assertSame(1, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('content_sha256', $asset->content_sha256)
+            ->count());
+    }
+
+    #[Test]
+    public function brand_logo_admission_failure_is_a_form_error_and_creates_nothing(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $file = UploadedFile::fake()->createWithContent(
+            'too-many-pixels.png',
+            $this->pngHeader(5001, 5000),
+        );
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->fillForm([
+                'name' => 'Rejected Logo Brand',
+                'logo_upload' => $file,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['logo_upload']);
+
+        $this->assertDatabaseMissing('brands', [
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Rejected Logo Brand',
+        ]);
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->count());
+    }
+
+    #[Test]
     public function unauthorized_actor_and_physical_delete_are_denied(): void
     {
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Protected');
@@ -359,6 +447,16 @@ final class BrandManagementTest extends TestCase
             'brand_id' => $brandId,
             'is_active' => true,
         ]);
+    }
+
+    private function pngHeader(int $width, int $height): string
+    {
+        $bytes = "\x89PNG\r\n\x1a\n";
+        $ihdr = pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0);
+        $bytes .= pack('N', 13).'IHDR'.$ihdr.pack('N', crc32('IHDR'.$ihdr));
+        $bytes .= pack('N', 0).'IEND'.pack('N', crc32('IEND'));
+
+        return $bytes;
     }
 
     private function imageAsset(Workspace $workspace, string $filename, ?MediaAsset $parent = null): MediaAsset

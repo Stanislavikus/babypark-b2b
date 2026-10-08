@@ -5,7 +5,9 @@ namespace App\Services\Media;
 use App\Enums\MediaDiagnosisStatus;
 use App\Models\Brand;
 use App\Models\MediaAsset;
+use App\Models\Product;
 use App\Models\ProductMedia;
+use App\Models\ProductVariant;
 use App\Models\VariantMedia;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
@@ -121,7 +123,7 @@ final class MediaAssetLibraryReadService
         }
 
         if ($brands > 0) {
-            $parts[] = 'Бренди: '.$brands;
+            $parts[] = 'Логотипи брендів: '.$brands;
         }
 
         if ($derivatives > 0) {
@@ -137,6 +139,90 @@ final class MediaAssetLibraryReadService
             + (int) ($asset->getAttribute('variants_usage_count') ?? 0)
             + (int) ($asset->getAttribute('brands_usage_count') ?? 0)
             + (int) ($asset->getAttribute('derivatives_usage_count') ?? 0)) > 0;
+    }
+
+    /**
+     * @return list<array{type:string,id:string,label:string,detail:?string,product_id:?string}>
+     */
+    public function usageItems(MediaAsset $asset): array
+    {
+        $workspaceId = (string) $asset->workspace_id;
+        $assetId = (string) $asset->id;
+        $items = [];
+
+        $brands = Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('logo_media_asset_id', $assetId)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name']);
+
+        foreach ($brands as $brand) {
+            $items[] = [
+                'type' => 'brand',
+                'id' => (string) $brand->id,
+                'label' => (string) $brand->name,
+                'detail' => null,
+                'product_id' => null,
+            ];
+        }
+
+        $products = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn(
+                'id',
+                ProductMedia::withoutWorkspaceScope()
+                    ->select('product_id')
+                    ->where('workspace_id', $workspaceId)
+                    ->where('media_asset_id', $assetId),
+            )
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'sku']);
+
+        foreach ($products as $product) {
+            $items[] = [
+                'type' => 'product',
+                'id' => (string) $product->id,
+                'label' => (string) $product->name,
+                'detail' => filled($product->sku) ? 'SKU '.$product->sku : null,
+                'product_id' => (string) $product->id,
+            ];
+        }
+
+        $variants = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn(
+                'id',
+                VariantMedia::withoutWorkspaceScope()
+                    ->select('variant_id')
+                    ->where('workspace_id', $workspaceId)
+                    ->where('media_asset_id', $assetId),
+            )
+            ->orderBy('sku')
+            ->orderBy('id')
+            ->get(['id', 'product_id', 'sku']);
+
+        $variantProductNames = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('id', $variants->pluck('product_id')->filter()->unique()->values())
+            ->pluck('name', 'id');
+
+        foreach ($variants as $variant) {
+            $productName = $variantProductNames->get($variant->product_id);
+
+            $items[] = [
+                'type' => 'variant',
+                'id' => (string) $variant->id,
+                'label' => filled($variant->sku)
+                    ? (string) $variant->sku
+                    : 'Variant '.substr((string) $variant->id, 0, 8),
+                'detail' => is_string($productName) && $productName !== '' ? $productName : null,
+                'product_id' => filled($variant->product_id) ? (string) $variant->product_id : null,
+            ];
+        }
+
+        return $items;
     }
 
     private function whereUsed(Builder $query): Builder

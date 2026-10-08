@@ -71,6 +71,11 @@ npm run build
 php artisan migrate --force
 php artisan db:seed --class=WorkspaceRbacPermissionSeeder --force
 php artisan db:seed --class=CanonicalActiveFieldSeeder --force
+if [[ -e public/storage && ! -L public/storage ]]; then
+    echo "public/storage exists but is not a symlink; refusing to replace it automatically." >&2
+    exit 1
+fi
+php artisan storage:link --force
 php artisan optimize:clear
 php artisan queue:restart
 php artisan up

@@ -54,12 +54,16 @@ class MediaAssetResource extends Resource
                     ->label('Зображення')
                     ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
                     ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180)))
-                    ->height(240),
+                    ->imageWidth('100%')
+                    ->imageHeight('20rem')
+                    ->extraImgAttributes([
+                        'style' => 'object-fit: contain; max-width: 100%; max-height: 20rem; background-color: white;',
+                    ]),
                 TextEntry::make('display_name')
                     ->label('Файл')
                     ->state(fn (MediaAsset $record): string => self::displayName($record)),
                 TextEntry::make('source_kind')
-                    ->label('Джерело')
+                    ->label('Зберігання')
                     ->state(fn (MediaAsset $record): string => self::sourceLabel($record))
                     ->badge()
                     ->color(fn (MediaAsset $record): string => self::sourceColor($record)),
@@ -73,16 +77,30 @@ class MediaAssetResource extends Resource
                     ->label('Формат')
                     ->placeholder('—'),
                 TextEntry::make('diagnosis_status')
-                    ->label('Стан')
+                    ->label('Технічний стан')
                     ->formatStateUsing(fn (mixed $state): string => self::diagnosisLabel($state))
-                    ->badge(),
-                TextEntry::make('usage')
-                    ->label('Використання')
-                    ->state(fn (MediaAsset $record): string => app(MediaAssetLibraryReadService::class)->usageSummary($record)),
+                    ->badge()
+                    ->color(fn (MediaAsset $record): string => self::diagnosisColor($record)),
+                TextEntry::make('diagnosis_help')
+                    ->label('Що це означає')
+                    ->state(fn (MediaAsset $record): ?string => self::diagnosisHelp($record))
+                    ->visible(fn (MediaAsset $record): bool => $record->diagnosis_status !== MediaDiagnosisStatus::Ready),
                 TextEntry::make('source_url')
-                    ->label('External URL')
+                    ->label('Зовнішнє посилання')
                     ->visible(fn (MediaAsset $record): bool => filled($record->source_url)),
             ])->columns(2),
+            Section::make('Використовується в')->schema([
+                TextEntry::make('usage_items')
+                    ->label('')
+                    ->state(fn (MediaAsset $record): array => app(MediaAssetLibraryReadService::class)->usageItems($record))
+                    ->formatStateUsing(fn (array $state): string => self::usageItemLabel($state))
+                    ->url(fn (array $state): ?string => self::usageItemUrl($state))
+                    ->listWithLineBreaks()
+                    ->bulleted()
+                    ->limitList(8)
+                    ->expandableLimitedList()
+                    ->placeholder('Не використовується'),
+            ]),
         ]);
     }
 
@@ -94,9 +112,12 @@ class MediaAssetResource extends Resource
                     ImageColumn::make('asset_preview')
                         ->label('')
                         ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
-                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(72)))
-                        ->square()
-                        ->size(72)
+                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(88)))
+                        ->imageWidth(88)
+                        ->imageHeight(88)
+                        ->extraImgAttributes([
+                            'style' => 'object-fit: contain; width: 88px; height: 88px; max-width: 88px; max-height: 88px; background-color: white;',
+                        ])
                         ->grow(false),
                     Stack::make([
                         TextColumn::make('asset_name')
@@ -116,14 +137,14 @@ class MediaAssetResource extends Resource
                     ])->space(1),
                     Stack::make([
                         TextColumn::make('asset_source')
-                            ->label('Джерело')
+                            ->label('Зберігання')
                             ->state(fn (MediaAsset $record): string => self::sourceLabel($record))
                             ->badge()
                             ->color(fn (MediaAsset $record): string => self::sourceColor($record))
                             ->grow(false),
                         TextColumn::make('asset_status')
-                            ->label('Стан')
-                            ->state(fn (MediaAsset $record): string => self::diagnosisLabel($record->diagnosis_status))
+                            ->label('Технічний стан')
+                            ->state(fn (MediaAsset $record): ?string => self::diagnosisIssueLabel($record))
                             ->badge()
                             ->color(fn (MediaAsset $record): string => self::diagnosisColor($record))
                             ->grow(false),
@@ -136,10 +157,10 @@ class MediaAssetResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('source')
-                    ->label('Джерело')
+                    ->label('Зберігання')
                     ->options([
-                        'managed' => 'Managed',
-                        'external' => 'External',
+                        'managed' => 'У платформі',
+                        'external' => 'Зовнішнє',
                     ])
                     ->query(fn (Builder $query, array $data): Builder => app(MediaAssetLibraryReadService::class)
                         ->applySourceFilter($query, is_string($data['value'] ?? null) ? $data['value'] : null)),
@@ -254,8 +275,8 @@ class MediaAssetResource extends Resource
     private static function sourceLabel(MediaAsset $asset): string
     {
         return match (app(MediaAssetSourceResolver::class)->sourceKind($asset)) {
-            'managed' => 'Managed',
-            'external' => 'External',
+            'managed' => 'У платформі',
+            'external' => 'Зовнішнє',
             default => 'Немає джерела',
         };
     }
@@ -274,11 +295,60 @@ class MediaAssetResource extends Resource
         $value = $state instanceof MediaDiagnosisStatus ? $state->value : (string) $state;
 
         return match ($value) {
-            MediaDiagnosisStatus::Ready->value => 'Готово',
-            MediaDiagnosisStatus::Pending->value => 'Очікує перевірки',
+            MediaDiagnosisStatus::Ready->value => 'Перевірено',
+            MediaDiagnosisStatus::Pending->value => 'Ще не перевірено',
             MediaDiagnosisStatus::Attention->value => 'Потребує уваги',
             MediaDiagnosisStatus::Failed->value => 'Помилка',
             default => 'Невідомо',
+        };
+    }
+
+    private static function diagnosisIssueLabel(MediaAsset $asset): ?string
+    {
+        return $asset->diagnosis_status === MediaDiagnosisStatus::Ready
+            ? null
+            : self::diagnosisLabel($asset->diagnosis_status);
+    }
+
+    private static function diagnosisHelp(MediaAsset $asset): ?string
+    {
+        return match ($asset->diagnosis_status) {
+            MediaDiagnosisStatus::Ready => null,
+            MediaDiagnosisStatus::Pending => 'Джерело ще не перевірено. Перед критичним використанням перевірте посилання або завантажте файл у платформу.',
+            MediaDiagnosisStatus::Attention => 'Перевірте джерело або замініть зображення перед критичним використанням.',
+            MediaDiagnosisStatus::Failed => 'Зображення не пройшло технічну перевірку. Замініть файл або джерело.',
+        };
+    }
+
+    /**
+     * @param  array{type:string,id:string,label:string,detail:?string,product_id:?string}  $state
+     */
+    private static function usageItemLabel(array $state): string
+    {
+        $type = match ($state['type']) {
+            'brand' => 'Бренд',
+            'product' => 'Товар',
+            'variant' => 'Варіант',
+            default => 'Використання',
+        };
+
+        $detail = filled($state['detail'] ?? null) ? ' · '.$state['detail'] : '';
+
+        return $type.' · '.$state['label'].$detail;
+    }
+
+    /**
+     * @param  array{type:string,id:string,label:string,detail:?string,product_id:?string}  $state
+     */
+    private static function usageItemUrl(array $state): ?string
+    {
+        return match ($state['type']) {
+            'brand' => BrandResource::getUrl('edit', ['record' => $state['id']]),
+            'product' => ProductResource::getUrl('edit', ['record' => $state['id']]),
+            'variant' => filled($state['product_id'] ?? null)
+                ? ProductResource::getUrl('edit', ['record' => $state['product_id']])
+                : null,
+            default => null,
         };
     }
 

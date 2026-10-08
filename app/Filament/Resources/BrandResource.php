@@ -2,24 +2,29 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\MediaAssetType;
 use App\Filament\Resources\BrandResource\Pages\CreateBrand;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Filament\Resources\BrandResource\Pages\ListBrands;
+use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\MediaAsset;
 use App\Models\User;
-use App\Services\Catalog\ProductMediaReadService;
+use App\Services\Media\MediaAssetSourceResolver;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
@@ -33,7 +38,7 @@ class BrandResource extends Resource
 {
     protected static ?string $model = Brand::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-storefront';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-swatch';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
@@ -51,24 +56,71 @@ class BrandResource extends Resource
                     ->label('Назва')
                     ->required()
                     ->maxLength(255),
-                Select::make('logo_media_asset_id')
-                    ->label('Логотип')
-                    ->options(fn (): array => MediaAsset::withoutWorkspaceScope()
-                        ->where('workspace_id', app(WorkspaceContext::class)->id())
-                        ->whereNull('parent_media_asset_id')
-                        ->where('asset_type', MediaAssetType::Image->value)
-                        ->orderBy('original_filename')
-                        ->orderBy('id')
-                        ->get()
-                        ->mapWithKeys(fn (MediaAsset $asset): array => [
-                            (string) $asset->id => filled($asset->original_filename)
-                                ? (string) $asset->original_filename
-                                : 'Image '.substr((string) $asset->id, 0, 8),
-                        ])
-                        ->all())
-                    ->searchable()
-                    ->preload()
-                    ->helperText('Використовується існуючий Original із MediaAsset. Завантаження нового файлу залишається в Media workspace.'),
+                ImageEntry::make('logo_preview')
+                    ->label('Поточний логотип')
+                    ->state(function (Get $get): ?string {
+                        $assetId = $get('logo_media_asset_id');
+
+                        if (! is_string($assetId) || $assetId === '') {
+                            return null;
+                        }
+
+                        $asset = MediaAsset::withoutWorkspaceScope()
+                            ->where('workspace_id', app(WorkspaceContext::class)->id())
+                            ->whereNull('parent_media_asset_id')
+                            ->whereKey($assetId)
+                            ->first();
+
+                        return app(MediaAssetSourceResolver::class)->sourceReference($asset);
+                    })
+                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160)))
+                    ->imageWidth('12rem')
+                    ->imageHeight('6rem')
+                    ->extraImgAttributes([
+                        'style' => 'object-fit: contain; width: 12rem; height: 6rem; max-width: 100%; background-color: white;',
+                    ]),
+                OriginalImageAssetPicker::make('logo_media_asset_id')
+                    ->label('Обрати з Assets')
+                    ->placeholder('Без логотипу')
+                    ->live()
+                    ->afterStateUpdated(function (Set $set, mixed $state): void {
+                        if (filled($state)) {
+                            $set('logo_upload', null);
+                        }
+                    })
+                    ->helperText('Оберіть існуючий Original. Один Asset можна повторно використовувати без дублювання файлу.'),
+                FileUpload::make('logo_upload')
+                    ->label('Завантажити новий логотип')
+                    ->storeFiles(false)
+                    ->maxSize(20 * 1024)
+                    ->acceptedFileTypes([
+                        'image/jpeg',
+                        'image/png',
+                        'image/gif',
+                        'image/webp',
+                        'image/avif',
+                    ])
+                    ->validationMessages([
+                        'max' => 'Файл завеликий. Максимальний розмір Original — 20 МіБ.',
+                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                    ])
+                    ->live()
+                    ->afterStateUpdated(function (Set $set, mixed $state): void {
+                        if (filled($state)) {
+                            $set('logo_media_asset_id', null);
+                        }
+                    })
+                    ->helperText('Новий файл буде додано в Assets і використано як логотип. До 20 МіБ і 25 МП.'),
+                Actions::make([
+                    Action::make('remove_logo')
+                        ->label('Прибрати логотип')
+                        ->icon('heroicon-o-x-mark')
+                        ->color('gray')
+                        ->action(function (Set $set): void {
+                            $set('logo_media_asset_id', null);
+                            $set('logo_upload', null);
+                        }),
+                ]),
                 Textarea::make('short_description')
                     ->label('Короткий опис')
                     ->rows(3)
@@ -87,10 +139,14 @@ class BrandResource extends Resource
             ->columns([
                 ImageColumn::make('logo_preview')
                     ->label('Лого')
-                    ->state(fn (Brand $record): ?string => app(ProductMediaReadService::class)
+                    ->state(fn (Brand $record): ?string => app(MediaAssetSourceResolver::class)
                         ->sourceReference($record->logo))
-                    ->square()
-                    ->size(36),
+                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(48)))
+                    ->imageWidth(64)
+                    ->imageHeight(44)
+                    ->extraImgAttributes([
+                        'style' => 'object-fit: contain; width: 64px; height: 44px; max-width: 64px; max-height: 44px; background-color: white;',
+                    ]),
                 TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
