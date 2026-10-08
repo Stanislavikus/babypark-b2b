@@ -133,6 +133,15 @@ domain.
   reference. No separate `BrandLogo` media domain was introduced.
 - Production deploy completed successfully; `storage:link` is now part of deploy
   bootstrap and runtime services/routes are healthy.
+- PR **#268 — feat: standardize Assets interaction UX** merged and deployed on
+  `develop` SHA `463ea7232dae7690e0d5783530b9903c37fc6c42`.
+- Exact-head CI **#595** passed on
+  `115051a85cdbd2951dcdd9bf9c826d21a44e4772`.
+- Shared stable Media Preview Frame, Assets right-side quick view, locally deferred
+  filter drawer with `Застосувати`, richer Asset details and explicit upload
+  wording are now deployed.
+- `docs/06-UI_DESIGN_SYSTEM.md` now freezes the shared media-frame, entity
+  quick-view and modal-action-label standards.
 
 **Acceptance evidence:**
 
@@ -148,9 +157,48 @@ domain.
 **Dependency:** A1.
 
 **Remaining closure evidence:** Product Owner visually confirms the deployed Brand
-logo upload/select/remove flow and the final Assets contain-fit/details presentation.
+logo upload/select/remove flow plus the final Assets stable-frame, quick-view and
+filter-drawer presentation.
 
 **Shortest safe path:** merchant visual smoke only; no engineering blocker is known.
+
+## A2b — Assets Lifecycle: Replace + guarded Delete
+
+**Status:** `NEXT` after A2 visual closure.
+
+**Goal:** give merchants safe Replace/Delete operations without mutating bytes under
+an existing MediaAsset identity or breaking Product/Variant/Brand references.
+
+**Resolved direction:**
+
+- `Замінити у використаннях` creates/selects a canonical replacement Original and
+  migrates references through governed owners;
+- if the target Asset is already attached to the same Product/Variant locale,
+  duplicate association conflicts are resolved deterministically rather than by
+  violating unique constraints;
+- ProductMedia/VariantMedia order and primary semantics are preserved/normalized;
+- used Assets are not directly deleted;
+- physical delete is allowed only once the Asset is unused and derivative/reference
+  guards pass;
+- DB commit precedes managed-file deletion; filesystem failure leaves an orphan file
+  for cleanup rather than a broken DB reference;
+- replacing Product media requires a new Magento Preview before publication.
+
+**Required regression evidence:**
+
+- replacement target already attached to Product;
+- replacement target already attached to Variant;
+- replacement of primary Product/Variant media;
+- Brand logo replacement;
+- derivative blocks delete;
+- concurrent Replace vs new usage;
+- filesystem delete failure after DB commit;
+- idempotent rerun.
+
+**Risk:** `ORANGE` — reference integrity, filesystem/DB transaction boundary and
+concurrency.
+
+**Dependency:** A2 interaction/visual closure.
 
 ## A3 — Merchant Master Product → Magento end-to-end publication
 
@@ -497,7 +545,8 @@ gate.
 As of 2026-10-08:
 
 ```text
-A2 Brand UX / BrandLogo — final merchant visual smoke
+A2 Brand UX / BrandLogo + Assets Interaction — final merchant visual smoke
+→ A2b Assets Lifecycle: Replace + guarded Delete
 → A3 full merchant Master Product → Magento Simple + Configurable E2E
 → A4 Smart file import
 → A5 Product SEO
