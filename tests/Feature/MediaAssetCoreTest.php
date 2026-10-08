@@ -161,6 +161,47 @@ class MediaAssetCoreTest extends TestCase
     }
 
     #[Test]
+    public function supported_original_image_headers_are_admitted_without_full_decode(): void
+    {
+        $fixtures = [
+            'jpg' => [
+                'mime' => 'image/jpeg',
+                'bytes' => '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAADAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDi6KKK++PcP//Z',
+            ],
+            'png' => [
+                'mime' => 'image/png',
+                'bytes' => 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAIAAAA2iEnWAAAAFElEQVR4nGOskDvBwMDAxMDAgKAAGf4BZGzWmUMAAAAASUVORK5CYII=',
+            ],
+            'webp' => [
+                'mime' => 'image/webp',
+                'bytes' => 'UklGRjwAAABXRUJQVlA4IDAAAADwAQCdASoCAAMAAUAmJaACdLoB+AAEgwAA/vLrf/2Vj6Vj6Vj94L/4H5dOGIAAAAA=',
+            ],
+            'gif' => [
+                'mime' => 'image/gif',
+                'bytes' => 'R0lGODdhAgADAIEAAHgeyAAAAAAAAAAAACwAAAAAAgADAAAIBgABCBwYEAA7',
+            ],
+            'avif' => [
+                'mime' => 'image/avif',
+                'bytes' => 'AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADrbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAAB5pbG9jAAAAAEQAAAEAAQAAAAEAAAETAAAAKQAAAChpaW5mAAAAAAABAAAAGmluZmUCAAAAAAEAAGF2MDFDb2xvcgAAAABqaXBycAAAAEtpcGNvAAAAFGlzcGUAAAAAAAAAAgAAAAMAAAAQcGl4aQAAAAADCAgIAAAADGF2MUOBAAwAAAAAE2NvbHJuY2x4AAEADQAGgAAAABdpcG1hAAAAAAAAAAEAAQQBAoMEAAAAMW1kYXQSAAoIGABzRAQ0GhAyGxTHh4ZlAgggnlAAAABIWtlc1jIqYYpS8GhFiA==',
+            ],
+        ];
+
+        foreach ($fixtures as $extension => $fixture) {
+            $bytes = base64_decode($fixture['bytes'], true);
+            $this->assertIsString($bytes);
+
+            $prepared = app(OriginalImageIngestService::class)->prepare(
+                UploadedFile::fake()->createWithContent('sample.'.$extension, $bytes),
+            );
+
+            $this->assertSame($fixture['mime'], $prepared->mimeType);
+            $this->assertSame($extension, $prepared->extension);
+            $this->assertSame(2, $prepared->widthPx);
+            $this->assertSame(3, $prepared->heightPx);
+        }
+    }
+
+    #[Test]
     public function long_untrusted_original_filename_is_bounded_as_display_metadata(): void
     {
         Storage::fake('public');

@@ -5,10 +5,10 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\MediaAsset;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspacePermission;
 use App\Support\Workspace\WorkspacePermissions;
-use Database\Seeders\WorkspaceRbacPermissionSeeder;
-use Database\Seeders\WorkspaceSeeder;
-use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +19,7 @@ use Tests\TestCase;
 
 final class MediaAssetMysqlConcurrencyTest extends TestCase
 {
-    use DatabaseTruncation;
+    use DatabaseMigrations;
     use InteractsWithWorkspaceRbac;
 
     #[Test]
@@ -29,9 +29,15 @@ final class MediaAssetMysqlConcurrencyTest extends TestCase
             $this->markTestSkipped('MediaAsset ingest concurrency proof requires MySQL.');
         }
 
-        $this->seed(WorkspaceSeeder::class);
-        $this->seed(WorkspaceRbacPermissionSeeder::class);
-        $workspace = $this->defaultWorkspace();
+        $permission = WorkspacePermission::query()->firstOrCreate([
+            'code' => WorkspacePermissions::MANAGE_PRODUCTS,
+        ]);
+        $permissionWasCreated = $permission->wasRecentlyCreated;
+
+        $workspace = Workspace::query()->create([
+            'name' => 'MediaAsset concurrency '.uniqid('', true),
+            'is_default' => false,
+        ]);
         $actor = User::factory()->create([
             'role' => UserRole::Admin,
             'is_active' => true,
@@ -127,7 +133,14 @@ final class MediaAssetMysqlConcurrencyTest extends TestCase
                 Storage::disk('public')->delete($storedPath);
             }
 
-            DB::transaction(function () use ($workspace, $actor, $membership, $role): void {
+            DB::transaction(function () use (
+                $workspace,
+                $actor,
+                $membership,
+                $role,
+                $permission,
+                $permissionWasCreated,
+            ): void {
                 DB::table('media_assets')
                     ->where('workspace_id', $workspace->id)
                     ->delete();
@@ -153,7 +166,12 @@ final class MediaAssetMysqlConcurrencyTest extends TestCase
                     ->where('id', $membership->id)
                     ->delete();
 
+                Workspace::query()->whereKey($workspace->id)->delete();
                 DB::table('users')->where('id', $actor->id)->delete();
+
+                if ($permissionWasCreated) {
+                    WorkspacePermission::query()->whereKey($permission->id)->delete();
+                }
             });
 
             File::deleteDirectory($ipcDir);
