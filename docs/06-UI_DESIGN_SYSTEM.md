@@ -1019,6 +1019,10 @@ Required action-zone rules:
 
 Context drawer is the preferred pattern for quick review and focused editing without losing table context.
 
+This is a general entity-list pattern, not a Product-only pattern. When an entity
+has both a list and a deeper full page, ordinary row/card inspection should
+prefer the context drawer unless the task itself is inherently full-page.
+
 On desktop:
 
 - neutral row click opens side drawer;
@@ -1041,6 +1045,30 @@ Closing the drawer must preserve:
 - column settings;
 - scroll position;
 - cart state.
+
+When a deeper page exists, the drawer should expose an explicit
+`Відкрити повну картку` / localized equivalent rather than forcing navigation
+for ordinary inspection.
+
+### Shared Media Preview Frame
+
+Image-bearing admin surfaces use a stable preview frame instead of sizing only
+the raw `<img>`.
+
+The frame owns:
+
+- bounded width and height appropriate to the context;
+- neutral background/border;
+- centered content;
+- `object-fit: contain`;
+- identical geometry for placeholder and real media;
+- no crop solely to make an image fill the frame.
+
+This applies to reusable Assets, Brand logos, Product/Variant media previews and
+future media pickers when those surfaces are materially touched.
+
+The frame is a presentation rule only. It must not resize, recompress or mutate
+the canonical Original merely to fit UI geometry.
 
 ### Admin Product Drawer Content
 

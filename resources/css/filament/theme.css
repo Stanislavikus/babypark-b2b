@@ -21,6 +21,52 @@
     --color-primary-700: #b45309;
 }
 
+/* Shared Media Preview Frame.
+   Filament's stock ImageEntry/ImageColumn sizes the <img>, but does not provide
+   a stable merchant-facing frame. These variants keep placeholders and real
+   images aligned and contain every aspect ratio without cropping. */
+.bp-media-preview-frame {
+    --bp-media-preview-width: 5.5rem;
+    --bp-media-preview-height: 5.5rem;
+}
+
+.bp-media-preview-frame .fi-in-image,
+.bp-media-preview-frame .fi-ta-image {
+    width: var(--bp-media-preview-width);
+    height: var(--bp-media-preview-height);
+    max-width: 100%;
+    @apply flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5 dark:border-white/10 dark:bg-gray-900;
+}
+
+.bp-media-preview-frame .bp-media-preview-frame__image {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
+}
+
+.bp-media-preview-frame--asset-card {
+    --bp-media-preview-width: 5.5rem;
+    --bp-media-preview-height: 5.5rem;
+}
+
+.bp-media-preview-frame--brand-list {
+    --bp-media-preview-width: 4rem;
+    --bp-media-preview-height: 3rem;
+}
+
+.bp-media-preview-frame--brand-form {
+    --bp-media-preview-width: 12rem;
+    --bp-media-preview-height: 6rem;
+}
+
+.bp-media-preview-frame--detail {
+    --bp-media-preview-width: min(100%, 30rem);
+    --bp-media-preview-height: 18rem;
+}
+
 /* Category Tree: keep the package as the interaction engine, but present it
    with the same visual language as native Filament tables. */
 .bp-category-tree-frame {

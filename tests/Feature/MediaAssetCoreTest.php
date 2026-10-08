@@ -491,6 +491,11 @@ class MediaAssetCoreTest extends TestCase
             ->filterTable('attention')
             ->assertCanSeeTableRecords([$attention])
             ->assertCanNotSeeTableRecords([$managed, $external]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $external->getRouteKey()])
+            ->assertSee('Перевірка джерела')
+            ->assertSee('Відсутність попередження не означає, що посилання було нещодавно перевірено');
     }
 
     #[Test]
@@ -545,18 +550,34 @@ class MediaAssetCoreTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        Livewire::actingAs($this->actor)
+        $list = Livewire::actingAs($this->actor)
             ->test(ListMediaAssets::class)
             ->assertCanSeeTableRecords([$asset])
-            ->assertSeeHtml('object-fit: contain')
+            ->assertSeeHtml('bp-media-preview-frame--asset-card')
             ->assertSee('У платформі')
             ->assertDontSee('Перевірено');
 
+        $table = $list->instance()->getTable();
+        $this->assertTrue($table->hasDeferredFilters());
+        $filterTrigger = $table->getFiltersTriggerAction();
+        $this->assertTrue($filterTrigger->isModalSlideOver());
+        $this->assertSame('Застосувати', $table->getFiltersApplyAction()->getLabel());
+        $this->assertTrue($filterTrigger->getExtraModalFooterActions()['applyFilters']->shouldClose());
+
+        $list->mountTableAction('view', $asset);
+
+        $mountedView = $list->instance()->getMountedAction();
+        $this->assertNotNull($mountedView);
+        $this->assertTrue($mountedView->isModalSlideOver());
+        $this->assertArrayHasKey('open_full_page_footer', $mountedView->getExtraModalFooterActions());
+
         Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->assertSeeHtml('object-fit: contain')
+            ->assertSeeHtml('bp-media-preview-frame--detail')
             ->assertSee('Технічний стан')
             ->assertSee('Перевірено')
+            ->assertSee('0,22 МП')
+            ->assertSeeHtml('fi-in-entry-label fi-sr-only')
             ->assertSee('Бренд · Usage Brand')
             ->assertSee('Товар · Usage Product')
             ->assertSee('Варіант · USAGE-VARIANT · Usage Product')
@@ -620,9 +641,15 @@ class MediaAssetCoreTest extends TestCase
     {
         Storage::fake('public');
 
-        Livewire::actingAs($this->actor)
+        $component = Livewire::actingAs($this->actor)
             ->test(ListMediaAssets::class)
-            ->assertActionVisible('upload_assets')
+            ->assertActionVisible('upload_assets');
+
+        $uploadAction = $component->instance()->getAction('upload_assets');
+        $this->assertNotNull($uploadAction);
+        $this->assertSame('Завантажити', $uploadAction->getModalSubmitActionLabel());
+
+        $component
             ->assertSet('assetLayout', 'grid')
             ->callAction('toggle_layout')
             ->assertSet('assetLayout', 'list')

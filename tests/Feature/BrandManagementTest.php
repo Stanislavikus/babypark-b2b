@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Filament\Resources\BrandResource;
 use App\Filament\Resources\BrandResource\Pages\CreateBrand;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
+use App\Filament\Resources\BrandResource\Pages\ListBrands;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\Brand;
 use App\Models\MediaAsset;
@@ -334,6 +335,29 @@ final class BrandManagementTest extends TestCase
         $this->assertNull($brand->logo_media_asset_id);
         $this->assertSame('Updated from Brand resource', $brand->short_description);
         $this->assertFalse($brand->is_active);
+    }
+
+    #[Test]
+    public function brand_logo_preview_uses_the_shared_stable_media_frame(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $logo = $this->imageAsset($this->workspace, 'wide-frame-logo.png');
+        $brand = app(BrandManager::class)->create(
+            $this->actor,
+            $this->workspace,
+            'Frame Brand',
+            logoMediaAssetId: (string) $logo->id,
+        );
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->assertSeeHtml('bp-media-preview-frame--brand-form');
+
+        Livewire::actingAs($this->actor)
+            ->test(ListBrands::class)
+            ->assertCanSeeTableRecords([$brand])
+            ->assertSeeHtml('bp-media-preview-frame--brand-list');
     }
 
     #[Test]
