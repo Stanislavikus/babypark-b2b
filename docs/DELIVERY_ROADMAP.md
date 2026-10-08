@@ -62,7 +62,7 @@ Detailed architecture remains in the owning documents.
 
 ## A1 — Assets v1 Core
 
-**Status:** `PARTIAL` — merged/deployed; merchant-browser visual/action smoke pending.
+**Status:** `DONE`
 
 **Goal:** one reusable workspace-owned MediaAsset library and shared Original image
 ingest for Product, Variant, and the next Brand-logo campaign.
@@ -100,27 +100,39 @@ ingest for Product, Variant, and the next Brand-logo campaign.
 - exact-head MySQL CI;
 - production upload transport smoke after approved deployment/configuration.
 
-**Known blocker:** no engineering blocker remains. Final closure evidence still
-needs merchant-browser visual/action smoke of the deployed Assets surface.
+**Closure evidence:** Product Owner completed merchant upload smoke in production;
+managed originals rendered after the production storage link was restored, and the
+follow-up Assets preview/status/usage corrections were delivered with A2.
 
-**Shortest safe path:** Product Owner visually checks deployed Assets and performs a
-normal merchant upload; record any UX findings into A2 Brand UX / BrandLogo campaign.
+**Known blocker:** none.
+
+**Shortest safe path:** none; A1 is closed.
 
 ## A2 — Brand UX completion / BrandLogo usage
 
-**Status:** `NEXT`
+**Status:** `PARTIAL` — merged/deployed; final merchant visual/action smoke pending.
 
 **Goal:** make Brand authoring complete without creating a separate Brand media
 domain.
 
 **Current state:**
 
-- Master Brand entity is already merged.
-- `brands.logo_media_asset_id` already points at canonical same-workspace
-  `MediaAsset`.
-- Brand form can currently choose an existing image asset, but direct merchant
-  upload/reuse UX is incomplete.
-- Brand logo must remain a MediaAsset usage, not a `BrandLogo` entity.
+- Master Brand entity is merged.
+- PR **#267 — feat: close Brand and Assets UX** merged 2026-10-08.
+- Verified pre-merge HEAD:
+  `924801c7a220e551fc779994b5cf63ff196957d9`.
+- Squash merge / deployed production SHA:
+  `92b38af4a9bbc4ca759ef399dc43edbf23dc8d55`.
+- Exact-head MySQL CI **#593**: **3846 passed / 15 skipped / 85,436 assertions**;
+  Pint **1636 files PASS**; `git diff --check` PASS.
+- Brand upload + Brand mutation are atomic: failed create/update rolls back a newly
+  created MediaAsset/file; deduplicated existing assets are preserved.
+- Assets/Brand previews use contain-fit; storage/source/status wording is merchant
+  facing; concrete `Використовується в` links are implemented.
+- `brands.logo_media_asset_id` remains the canonical same-workspace MediaAsset
+  reference. No separate `BrandLogo` media domain was introduced.
+- Production deploy completed successfully; `storage:link` is now part of deploy
+  bootstrap and runtime services/routes are healthy.
 
 **Acceptance evidence:**
 
@@ -134,6 +146,11 @@ domain.
 - no Brand-specific storage/upload implementation.
 
 **Dependency:** A1.
+
+**Remaining closure evidence:** Product Owner visually confirms the deployed Brand
+logo upload/select/remove flow and the final Assets contain-fit/details presentation.
+
+**Shortest safe path:** merchant visual smoke only; no engineering blocker is known.
 
 ## A3 — Merchant Master Product → Magento end-to-end publication
 
@@ -480,8 +497,7 @@ gate.
 As of 2026-10-08:
 
 ```text
-A1 Assets v1 Core
-→ A2 Brand UX / BrandLogo
+A2 Brand UX / BrandLogo — final merchant visual smoke
 → A3 full merchant Master Product → Magento Simple + Configurable E2E
 → A4 Smart file import
 → A5 Product SEO
