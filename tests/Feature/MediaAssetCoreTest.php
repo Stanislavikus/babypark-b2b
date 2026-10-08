@@ -586,6 +586,17 @@ class MediaAssetCoreTest extends TestCase
     }
 
     #[Test]
+    public function shared_media_frame_styles_target_the_filament_image_container_itself(): void
+    {
+        $theme = file_get_contents(resource_path('css/filament/theme.css'));
+
+        $this->assertIsString($theme);
+        $this->assertStringContainsString('.bp-media-preview-frame.fi-in-image', $theme);
+        $this->assertStringContainsString('.bp-media-preview-frame.fi-ta-image', $theme);
+        $this->assertStringContainsString('object-fit: contain !important;', $theme);
+    }
+
+    #[Test]
     public function forged_foreign_asset_record_cannot_be_opened(): void
     {
         $foreignWorkspace = Workspace::query()->create(['name' => 'Foreign direct view']);

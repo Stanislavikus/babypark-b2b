@@ -30,8 +30,8 @@
     --bp-media-preview-height: 5.5rem;
 }
 
-.bp-media-preview-frame .fi-in-image,
-.bp-media-preview-frame .fi-ta-image {
+.bp-media-preview-frame.fi-in-image,
+.bp-media-preview-frame.fi-ta-image {
     width: var(--bp-media-preview-width);
     height: var(--bp-media-preview-height);
     max-width: 100%;
