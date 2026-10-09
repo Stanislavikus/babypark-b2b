@@ -92,8 +92,10 @@ A preview frame owns:
 
 Post-deploy visual acceptance on 2026-10-08 proved that merely bounding width and
 height was still ambiguous: Asset detail and Brand variants diverged into
-rectangular frames. The square default is therefore an acceptance-driven
-clarification of this [Resolved] interaction contract.
+rectangular frames. A second production check proved that equal fixed width/height
+was still insufficient inside a constrained drawer column because width could
+shrink while height remained fixed. The square default is therefore implemented
+responsively through width + `aspect-ratio: 1 / 1`, not independent fixed height.
 
 Approved first variants:
 
@@ -118,8 +120,14 @@ list-backed entity quick review:
   context remains available;
 - the modal close action remains explicit.
 
-Assets adopts this pattern now. This does not require every existing resource to
-be mass-migrated in the same PR.
+Assets adopts this pattern now. Brand list inspection also adopts it after
+post-deploy acceptance showed that Brand still navigated directly to edit instead
+of opening the approved drawer. In Filament lists the quick-view interaction uses
+a dedicated forced-modal `inspect` action with `recordUrl(null)`; the visible
+`Деталі` action and neutral row both mount the same drawer action. This avoids
+resource view/edit routing from becoming the quick-review interaction.
+
+This does not require every existing resource to be mass-migrated in the same PR.
 
 ### Assets filter interaction
 

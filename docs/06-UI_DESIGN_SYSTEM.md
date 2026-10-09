@@ -1088,6 +1088,13 @@ close it without losing list context. This applies to Product, Asset and future
 entity drawers unless a documented workflow explicitly requires same-tab
 navigation.
 
+For Filament resource lists, quick inspection must be an explicit modal action,
+not inferred resource navigation. Use a dedicated non-routing action name such as
+`inspect`, force modal behavior, bind the neutral row to that action, and keep
+`recordUrl(null)`. The same explicit drawer action must back any visible
+`Деталі` control so row click and Details cannot diverge into different
+navigation behavior.
+
 ### Shared Media Preview Frame
 
 Image-bearing admin surfaces use a stable preview frame instead of sizing only
@@ -1096,6 +1103,9 @@ the raw `<img>`.
 The frame owns:
 
 - a **1:1 square** default geometry for ordinary single-image previews;
+- square geometry must remain responsive when a drawer/grid column is narrower:
+  derive height from width via `aspect-ratio: 1 / 1`, not an independent fixed
+  height that can leave a vertical rectangle after width is constrained;
 - bounded size appropriate to the context;
 - neutral background/border;
 - centered content;

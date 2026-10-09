@@ -354,10 +354,21 @@ final class BrandManagementTest extends TestCase
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
             ->assertSeeHtml('bp-media-preview-frame--brand-form');
 
-        Livewire::actingAs($this->actor)
+        $list = Livewire::actingAs($this->actor)
             ->test(ListBrands::class)
             ->assertCanSeeTableRecords([$brand])
             ->assertSeeHtml('bp-media-preview-frame--brand-list');
+
+        $list->mountTableAction('inspect', $brand);
+
+        $mountedInspect = $list->instance()->getMountedAction();
+        $this->assertNotNull($mountedInspect);
+        $this->assertSame('inspect', $mountedInspect->getName());
+        $this->assertTrue($mountedInspect->hasModal());
+        $this->assertTrue($mountedInspect->isModalSlideOver());
+        $this->assertNull($mountedInspect->getUrl());
+        $this->assertTrue($mountedInspect->getExtraModalFooterActions()['open_full_page_footer']->shouldOpenUrlInNewTab());
+        $list->assertSee('Frame Brand');
     }
 
     #[Test]

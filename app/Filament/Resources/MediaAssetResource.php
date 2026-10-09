@@ -11,7 +11,6 @@ use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
-use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
@@ -250,13 +249,18 @@ class MediaAssetResource extends Resource
                     ])
             )
             ->recordUrl(null)
-            ->recordAction('view')
+            ->recordAction('inspect')
             ->recordActions([
-                ViewAction::make()
+                Action::make('inspect')
                     ->label('Деталі')
+                    ->icon('heroicon-o-eye')
+                    ->color('gray')
+                    ->modal(true)
                     ->slideOver()
                     ->modalWidth(Width::Large)
                     ->modalHeading(fn (MediaAsset $record): string => self::displayName($record))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Закрити')
                     ->schema(fn (): array => self::detailSchema())
                     ->extraModalFooterActions(fn (MediaAsset $record): array => [
                         Action::make('open_full_page_footer')

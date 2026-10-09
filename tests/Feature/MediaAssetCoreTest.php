@@ -573,11 +573,14 @@ class MediaAssetCoreTest extends TestCase
         $this->assertTrue($filterFooterActions['resetFilters']->isOutlined());
         $this->assertTrue($filterFooterActions['resetFilters']->shouldClose());
 
-        $list->mountTableAction('view', $asset);
+        $list->mountTableAction('inspect', $asset);
 
         $mountedView = $list->instance()->getMountedAction();
         $this->assertNotNull($mountedView);
+        $this->assertSame('inspect', $mountedView->getName());
+        $this->assertTrue($mountedView->hasModal());
         $this->assertTrue($mountedView->isModalSlideOver());
+        $this->assertNull($mountedView->getUrl());
         $this->assertArrayHasKey('open_full_page_footer', $mountedView->getExtraModalFooterActions());
         $this->assertTrue($mountedView->getExtraModalFooterActions()['open_full_page_footer']->shouldOpenUrlInNewTab());
 
@@ -603,10 +606,13 @@ class MediaAssetCoreTest extends TestCase
         $this->assertIsString($theme);
         $this->assertStringContainsString('.bp-media-preview-frame.fi-in-image', $theme);
         $this->assertStringContainsString('.bp-media-preview-frame.fi-ta-image', $theme);
+        $this->assertStringContainsString('aspect-ratio: 1 / 1;', $theme);
+        $this->assertStringContainsString('height: auto;', $theme);
         $this->assertStringContainsString('object-fit: contain !important;', $theme);
-        $this->assertStringContainsString("--bp-media-preview-width: 4rem;\n    --bp-media-preview-height: 4rem;", $theme);
-        $this->assertStringContainsString("--bp-media-preview-width: 9rem;\n    --bp-media-preview-height: 9rem;", $theme);
-        $this->assertStringContainsString("--bp-media-preview-width: min(100%, 18rem);\n    --bp-media-preview-height: 18rem;", $theme);
+        $this->assertStringContainsString('--bp-media-preview-width: 4rem;', $theme);
+        $this->assertStringContainsString('--bp-media-preview-width: 9rem;', $theme);
+        $this->assertStringContainsString('--bp-media-preview-width: min(100%, 18rem);', $theme);
+        $this->assertStringNotContainsString('--bp-media-preview-height:', $theme);
     }
 
     #[Test]

@@ -21,12 +21,15 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -132,6 +135,47 @@ class BrandResource extends Resource
         ]);
     }
 
+    /**
+     * @return array<int, Section>
+     */
+    public static function quickViewSchema(): array
+    {
+        return [
+            Section::make('Бренд')->schema([
+                Group::make([
+                    MediaPreviewFrame::entry(
+                        ImageEntry::make('logo_quick_view')
+                            ->label('Логотип')
+                            ->hiddenLabel()
+                            ->state(fn (Brand $record): ?string => app(MediaAssetSourceResolver::class)
+                                ->sourceReference($record->logo))
+                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
+                        MediaPreviewFrame::BRAND_FORM,
+                    ),
+                    Group::make([
+                        TextEntry::make('name')
+                            ->label('Назва'),
+                        TextEntry::make('products_count_quick_view')
+                            ->label('Товарів')
+                            ->state(fn (Brand $record): int => $record->products()->count()),
+                        TextEntry::make('is_active_quick_view')
+                            ->label('Стан')
+                            ->state(fn (Brand $record): string => $record->is_active ? 'Активний' : 'Неактивний')
+                            ->badge()
+                            ->color(fn (Brand $record): string => $record->is_active ? 'success' : 'gray'),
+                    ])->columns(2),
+                ])->columns([
+                    'default' => 1,
+                    'md' => 2,
+                ])->columnSpanFull(),
+                TextEntry::make('short_description')
+                    ->label('Короткий опис')
+                    ->placeholder('—')
+                    ->columnSpanFull(),
+            ]),
+        ];
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -158,8 +202,30 @@ class BrandResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('name')
+            ->recordUrl(null)
+            ->recordAction('inspect')
             ->recordActions([
+                Action::make('inspect')
+                    ->label('Деталі')
+                    ->icon('heroicon-o-eye')
+                    ->color('gray')
+                    ->modal(true)
+                    ->slideOver()
+                    ->modalWidth(Width::Large)
+                    ->modalHeading(fn (Brand $record): string => $record->name)
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Закрити')
+                    ->schema(fn (): array => self::quickViewSchema())
+                    ->extraModalFooterActions(fn (Brand $record): array => [
+                        Action::make('open_full_page_footer')
+                            ->label('Відкрити повну картку')
+                            ->icon('heroicon-m-arrow-top-right-on-square')
+                            ->color('gray')
+                            ->url(self::getUrl('edit', ['record' => $record]))
+                            ->openUrlInNewTab(),
+                    ]),
                 EditAction::make()
+                    ->label('Змінити')
                     ->color('gray'),
             ])
             ->toolbarActions([]);
