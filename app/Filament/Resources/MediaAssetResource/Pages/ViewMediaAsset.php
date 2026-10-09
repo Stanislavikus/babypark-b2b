@@ -17,13 +17,21 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Actions as SchemaActions;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class ViewMediaAsset extends ViewRecord
 {
     protected static string $resource = MediaAssetResource::class;
+
+    /** @var array{file?: mixed} */
+    public array $replacementData = [];
 
     public function getTitle(): string
     {
@@ -33,71 +41,6 @@ class ViewMediaAsset extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('replace_asset')
-                ->label('Замінити')
-                ->icon('heroicon-o-arrow-path')
-                ->color('gray')
-                ->visible(fn (): bool => $this->canMutateLifecycleAsset())
-                ->modalHeading('Замінити зображення?')
-                ->modalDescription(fn (): string => $this->replaceDescription())
-                ->modalSubmitActionLabel('Замінити')
-                ->schema([
-                    FileUpload::make('file')
-                        ->label('Нове зображення')
-                        ->storeFiles(false)
-                        ->maxSize(20 * 1024)
-                        ->acceptedFileTypes([
-                            'image/jpeg',
-                            'image/png',
-                            'image/gif',
-                            'image/webp',
-                            'image/avif',
-                        ])
-                        ->validationMessages([
-                            'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
-                            'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
-                        ])
-                        ->required(),
-                ])
-                ->action(function (array $data): void {
-                    $actor = auth()->user();
-
-                    if (! $actor instanceof User || ! $this->canManageProducts()) {
-                        throw new AuthorizationException('This action is unauthorized.');
-                    }
-
-                    $file = $data['file'] ?? null;
-
-                    if (! $file instanceof UploadedFile) {
-                        throw ValidationException::withMessages([
-                            'file' => 'Оберіть нове зображення.',
-                        ]);
-                    }
-
-                    try {
-                        $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
-                            $actor,
-                            app(WorkspaceContext::class)->current(),
-                            $this->record,
-                            $file,
-                        );
-                    } catch (MediaAssetLifecycleException|MediaIngestException $e) {
-                        throw ValidationException::withMessages([
-                            'file' => $e->getMessage(),
-                        ]);
-                    }
-
-                    $this->record->refresh();
-                    $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($this->record);
-
-                    Notification::make()
-                        ->success()
-                        ->title($result->replaced ? 'Зображення замінено' : 'Зображення вже актуальне')
-                        ->body($usage['products'] > 0 && $result->replaced
-                            ? 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.'
-                            : null)
-                        ->send();
-                }),
             Action::make('delete_asset')
                 ->label('Видалити')
                 ->icon('heroicon-o-trash')
@@ -140,6 +83,114 @@ class ViewMediaAsset extends ViewRecord
                     $this->redirect(MediaAssetResource::getUrl('index'));
                 }),
         ];
+    }
+
+    public function content(Schema $schema): Schema
+    {
+        return $schema->components([
+            $this->getInfolistContentComponent(),
+            EmbeddedSchema::make('replacementForm'),
+            $this->getRelationManagersContentComponent(),
+        ]);
+    }
+
+    public function replacementForm(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make('Замінити зображення')
+                    ->description('Завантажте новий файл для цього самого Asset. Усі поточні використання залишаться прив’язаними до нього.')
+                    ->visible(fn (): bool => $this->canMutateLifecycleAsset())
+                    ->schema([
+                        FileUpload::make('file')
+                            ->label('Нове зображення')
+                            ->storeFiles(false)
+                            ->maxSize(20 * 1024)
+                            ->acceptedFileTypes([
+                                'image/jpeg',
+                                'image/png',
+                                'image/gif',
+                                'image/webp',
+                                'image/avif',
+                            ])
+                            ->validationMessages([
+                                'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
+                                'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                            ])
+                            ->helperText('Перетягніть файл або виберіть його. Максимум 20 МіБ і 25 МП. Поточний Asset ID буде збережено.')
+                            ->required(),
+                        SchemaActions::make([
+                            $this->replaceAssetAction(),
+                        ])->key('replacement_actions'),
+                    ]),
+            ])
+            ->statePath('replacementData');
+    }
+
+    public function replaceAssetAction(): Action
+    {
+        return Action::make('replace_asset')
+            ->label('Замінити зображення')
+            ->visible(fn (): bool => $this->canMutateLifecycleAsset())
+            ->icon('heroicon-o-arrow-path')
+            ->color('gray')
+            ->requiresConfirmation()
+            ->modalHeading('Замінити зображення?')
+            ->modalDescription(fn (): string => $this->replaceDescription())
+            ->modalSubmitActionLabel('Замінити')
+            ->action(fn (): mixed => $this->replaceSelectedImage());
+    }
+
+    private function replaceSelectedImage(): null
+    {
+        $actor = auth()->user();
+
+        if (! $actor instanceof User || ! $this->canManageProducts()) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        try {
+            $state = $this->getSchema('replacementForm')?->getState() ?? [];
+            $file = Arr::first(Arr::wrap($state['file'] ?? null));
+
+            if (! $file instanceof UploadedFile) {
+                throw ValidationException::withMessages([
+                    'replacementData.file' => 'Оберіть нове зображення.',
+                ]);
+            }
+
+            $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
+                $actor,
+                app(WorkspaceContext::class)->current(),
+                $this->record,
+                $file,
+            );
+        } catch (MediaAssetLifecycleException|MediaIngestException $e) {
+            $this->unmountAction();
+
+            throw ValidationException::withMessages([
+                'replacementData.file' => $e->getMessage(),
+            ]);
+        } catch (ValidationException $e) {
+            $this->unmountAction();
+
+            throw $e;
+        }
+
+        $this->record->refresh();
+        $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($this->record);
+        $this->replacementData = [];
+        $this->getSchema('replacementForm')?->fill([]);
+
+        Notification::make()
+            ->success()
+            ->title($result->replaced ? 'Зображення замінено' : 'Зображення вже актуальне')
+            ->body($usage['products'] > 0 && $result->replaced
+                ? 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.'
+                : null)
+            ->send();
+
+        return null;
     }
 
     private function replaceDescription(): string
