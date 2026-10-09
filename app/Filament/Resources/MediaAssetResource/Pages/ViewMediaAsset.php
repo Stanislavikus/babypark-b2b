@@ -120,7 +120,7 @@ class ViewMediaAsset extends ViewRecord
                             ->required(),
                         SchemaActions::make([
                             $this->replaceAssetAction(),
-                        ]),
+                        ])->key('replacement_actions'),
                     ]),
             ])
             ->statePath('replacementData');

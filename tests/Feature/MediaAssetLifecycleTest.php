@@ -23,6 +23,7 @@ use App\Support\Media\Exceptions\MediaAssetLifecycleException;
 use App\Support\Workspace\WorkspacePermissions;
 use Carbon\CarbonImmutable;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -509,17 +510,20 @@ class MediaAssetLifecycleTest extends TestCase
         $asset = $this->managedAsset('ui-old.png', 600, 400);
         [$productMedia] = $this->attachEveryUsage($asset);
 
+        $replaceAction = TestAction::make('replace_asset')
+            ->schemaComponent('replacement_actions', 'replacementForm');
+
         $component = Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertFormExists('replacementForm')
             ->assertFormFieldExists('file', 'replacementForm')
             ->assertSee('Замінити зображення')
-            ->assertActionVisible('replace_asset')
+            ->assertActionVisible($replaceAction)
             ->assertActionVisible('delete_asset')
             ->fillForm([
                 'file' => UploadedFile::fake()->image('ui-new.png', 800, 600),
             ], 'replacementForm')
-            ->mountAction('replace_asset')
+            ->mountAction($replaceAction)
             ->assertMountedActionModalSee('Товарів: 1')
             ->assertMountedActionModalSee('Варіантів: 1')
             ->assertMountedActionModalSee('Брендів: 1')
@@ -539,7 +543,7 @@ class MediaAssetLifecycleTest extends TestCase
         Livewire::actingAs($viewer)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertDontSee('Замінити зображення')
-            ->assertActionHidden('replace_asset')
+            ->assertActionHidden($replaceAction)
             ->assertActionHidden('delete_asset');
     }
 
