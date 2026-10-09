@@ -112,8 +112,16 @@ becomes a Managed Original: managed storage becomes authoritative and `source_ur
 is cleared.
 ### 2. Dedupe and derivative behavior
 
+Lifecycle v1 mutates **Originals only** (`parent_media_asset_id IS NULL`). Derivative
+rows are not merchant Replace/Delete targets: no lifecycle action is rendered for a
+derivative, and a direct service call against one fails closed. A future derivative
+management UI/regeneration lifecycle is a separate capability.
+
 - If uploaded bytes equal the current Asset's own `content_sha256`, Replace is an
   idempotent no-op; no new permanent file is written.
+- The collision lookup covers **all** same-workspace MediaAsset rows, including
+  derivatives, because `(workspace_id, content_sha256)` uniqueness is global to the
+  workspace media domain.
 - If uploaded bytes equal **another** same-workspace MediaAsset, Replace fails closed
   with a merchant-readable message that the image already exists in Assets.
   v1 does not merge identities or rebind usages automatically.
@@ -151,8 +159,10 @@ Lifecycle mutations live on the full Asset page opened through
   guarded-delete precondition succeeds.
 
 Replace confirmation must state that the image will change in every current usage of
-that Asset. Delete confirmation must state that the Asset and its managed Original file
-will be removed.
+that Asset **and show a fresh usage count by kind**, for example:
+`Зміниться у 5 товарах, 1 варіанті, 1 бренді`. The count is recomputed server-side at
+action time; it is not trusted as browser state. Delete confirmation must state that
+the Asset and its managed Original file will be removed.
 
 No bulk Replace/Delete in v1.
 
@@ -179,12 +189,12 @@ prepare/diagnose/hash upload
   → lock Workspace (same canonical hash serialization seam as ingest)
   → lock target MediaAsset
   → revalidate workspace + Original + derivative guard
-  → recheck content-hash collision
+  → recheck content-hash collision across all same-workspace MediaAssets
   → write replacement bytes to a NEW managed path
   → update the SAME MediaAsset row to new storage/hash/metadata
-  → enqueue retired-path cleanup with afterCommit semantics
+  → dispatch retired-path cleanup explicitly with `->afterCommit()`
 → commit
-→ cleanup job removes only the retired path
+→ cleanup job removes only the retired path according to the approved retention policy
 ```
 
 The old managed path is never overwritten in place before the database commit.
@@ -205,7 +215,7 @@ DB transaction
   → lock target MediaAsset
   → fresh zero-reference / zero-derivative check
   → delete MediaAsset row
-  → enqueue managed-path cleanup with afterCommit semantics
+  → dispatch managed-path cleanup explicitly with `->afterCommit()`
 → commit
 → cleanup job removes retired managed bytes
 ```
@@ -221,7 +231,8 @@ missing bytes.
 
 Retired-path cleanup is an idempotent queued job:
 
-- dispatch after DB commit;
+- dispatch explicitly with Laravel `->afterCommit()` because the repository's queue
+  connections currently configure `after_commit => false`;
 - safe to retry;
 - before deleting, verify no current MediaAsset references the same
   `storage_disk + storage_path`;
@@ -233,7 +244,44 @@ the BabyPark `media/originals` namespace. It compares stored paths against curre
 MediaAsset rows and supports dry-run before deletion. It must never traverse or delete
 outside that owned namespace.
 
+Production runtime verification on 2026-10-09 confirms both Supervisor workers are
+running: the default `babypark-queue` and the dedicated connector queue. Lifecycle
+cleanup therefore uses the default database queue. Acceptance must still prove the
+safe degraded case: with no worker consuming the queued cleanup, committed Asset/DB
+state remains correct and only retired bytes persist until the worker resumes.
+
+### Replace-retention Product Owner choice
+
+This is the only unresolved business choice in the proposed contract:
+
+- **A — recommended:** keep the retired managed file for **14 days** before the cleanup
+  job becomes eligible. This is an **operational recovery buffer**, not user-facing
+  versioning or Undo. Physical Delete remains immediate post-commit cleanup; only
+  replaced old bytes receive the grace period. The orphan-recovery command must ignore
+  owned-namespace files younger than the same 14-day grace so it cannot defeat the
+  retention window.
+- **B:** make the retired path eligible for cleanup immediately after successful Replace.
+
+The 14-day buffer does **not** solve Preview freshness and is not required for Live URL
+safety. It only gives operations a bounded window to recover an accidental replacement
+before old bytes are retired.
+
 No new persistence table is introduced for lifecycle v1.
+
+
+## Preview / Live interaction evidence
+
+A targeted code/doc review after the initial proposal disproved the stale-URL hypothesis.
+`SyncLiveRunJob` rebuilds `ProductExecutionAggregate` immediately before consequential
+execution, and `ProductMediaReadService` resolves the current MediaAsset source again.
+Therefore Live does not execute the historical media URL stored by an older Preview.
+
+This is intentional frozen behavior: Preview is guidance rather than a frozen write
+payload, while Live rereads current Product/Variant/Price state before transfer. The
+existing Product-data freshness contract also says verification after Product-data
+change requires an explicit new Preview. Replace UI should therefore tell the merchant
+to run Preview again when the Asset has Product usages, but lifecycle v1 must **not**
+invent a media-specific configuration revision or Product-wide revision gate.
 
 ## Architecture invariants
 
@@ -271,13 +319,17 @@ No schema migration is expected.
 - ProductMedia, VariantMedia and Brand FK values remain byte-for-byte unchanged;
 - all those usages resolve the new image after commit;
 - current-file hash replacement is idempotent;
-- same-workspace hash collision with another Asset fails closed without writes;
+- same-workspace hash collision with another Original **or derivative** fails closed without writes;
+- direct Replace/Delete against a derivative fails closed and derivative lifecycle actions are not exposed;
 - cross-workspace replacement fails closed;
 - derivative child blocks replacement;
 - External Original → Managed Original replacement succeeds on same UUID;
 - failed DB mutation preserves old row + old file and removes only newly written path;
 - successful replacement schedules old managed path cleanup only after commit;
-- cleanup job retry is idempotent and never deletes a currently referenced path.
+- cleanup is dispatched with explicit `->afterCommit()`;
+- with the queue worker stopped, DB/Asset state remains correct and retired bytes remain safely present;
+- cleanup job retry is idempotent and never deletes a currently referenced path;
+- if retention option A is approved, old replaced bytes are not cleanup-eligible before 14 days and orphan recovery respects the same minimum age.
 
 ### Delete
 
@@ -295,7 +347,8 @@ No schema migration is expected.
 
 - drawer remains read-only quick inspection;
 - full Asset page exposes Replace/Delete actions;
-- Replace confirmation explains all usages will update;
+- Replace confirmation explains all usages will update and shows fresh Product/Variant/Brand usage counts;
+- Product-used Asset replacement tells the merchant to run Preview again for verification;
 - blocked Delete exposes a merchant-readable reason rather than an SQL/FK error;
 - no generic framework `Submit` wording leaks into the action;
 - no bulk lifecycle action appears in v1.
