@@ -3,6 +3,7 @@
 namespace App\Jobs\Media;
 
 use App\Models\MediaAsset;
+use App\Services\Media\RetiredMediaPathRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -10,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 final class RetiredMediaPathCleanupJob implements ShouldQueue
 {
@@ -28,11 +30,14 @@ final class RetiredMediaPathCleanupJob implements ShouldQueue
         public readonly string $disk,
         public readonly string $path,
         public readonly ?string $eligibleAt = null,
+        public readonly ?string $markerPath = null,
     ) {}
 
-    public function handle(): void
+    public function handle(RetiredMediaPathRegistry $registry): void
     {
         if (! $this->isOwnedOriginalPath()) {
+            $this->forgetMarker($registry);
+
             return;
         }
 
@@ -46,10 +51,25 @@ final class RetiredMediaPathCleanupJob implements ShouldQueue
             ->exists();
 
         if ($stillReferenced) {
+            $this->forgetMarker($registry);
+
             return;
         }
 
-        Storage::disk($this->disk)->delete($this->path);
+        $storage = Storage::disk($this->disk);
+
+        if ($storage->exists($this->path) && ! $storage->delete($this->path)) {
+            throw new RuntimeException('Failed to clean retired managed media path.');
+        }
+
+        $this->forgetMarker($registry);
+    }
+
+    private function forgetMarker(RetiredMediaPathRegistry $registry): void
+    {
+        if ($this->markerPath !== null) {
+            $registry->forget($this->markerPath);
+        }
     }
 
     private function isOwnedOriginalPath(): bool

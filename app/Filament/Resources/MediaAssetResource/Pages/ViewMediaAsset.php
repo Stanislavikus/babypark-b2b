@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MediaAssetResource\Pages;
 
+use App\Enums\MediaAssetType;
 use App\Filament\Resources\MediaAssetResource;
 use App\Models\MediaAsset;
 use App\Models\User;
@@ -36,7 +37,7 @@ class ViewMediaAsset extends ViewRecord
                 ->label('Замінити')
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
-                ->visible(fn (): bool => $this->canManageProducts())
+                ->visible(fn (): bool => $this->canMutateLifecycleAsset())
                 ->modalHeading('Замінити зображення?')
                 ->modalDescription(fn (): string => $this->replaceDescription())
                 ->modalSubmitActionLabel('Замінити')
@@ -101,7 +102,7 @@ class ViewMediaAsset extends ViewRecord
                 ->label('Видалити')
                 ->icon('heroicon-o-trash')
                 ->color('danger')
-                ->visible(fn (): bool => $this->canManageProducts())
+                ->visible(fn (): bool => $this->canMutateLifecycleAsset())
                 ->requiresConfirmation()
                 ->modalHeading('Видалити Asset?')
                 ->modalDescription(fn (): string => $this->deleteDescription())
@@ -180,6 +181,14 @@ class ViewMediaAsset extends ViewRecord
             $usage['brands'],
             $usage['derivatives'],
         );
+    }
+
+    private function canMutateLifecycleAsset(): bool
+    {
+        return $this->canManageProducts()
+            && $this->record instanceof MediaAsset
+            && $this->record->isOriginal()
+            && $this->record->asset_type === MediaAssetType::Image;
     }
 
     private function canManageProducts(): bool

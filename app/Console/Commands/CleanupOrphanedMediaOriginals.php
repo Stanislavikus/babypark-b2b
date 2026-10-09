@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\Media\RetiredMediaPathCleanupJob;
 use App\Models\MediaAsset;
+use App\Services\Media\RetiredMediaPathRegistry;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -11,69 +12,100 @@ use Throwable;
 final class CleanupOrphanedMediaOriginals extends Command
 {
     protected $signature = 'media:cleanup-orphaned-originals
-        {--delete : Delete eligible orphaned managed Originals. Without this flag the command is dry-run only.}';
+        {--delete : Delete eligible registered retired paths. Without this flag the command is dry-run only.}';
 
-    protected $description = 'Find managed Original files with no MediaAsset row, respecting the 14-day recovery grace';
+    protected $description = 'Recover registered retired managed Original paths whose queued cleanup did not complete';
 
-    public function handle(): int
+    public function handle(RetiredMediaPathRegistry $registry): int
     {
-        $disk = 'public';
-        $root = 'media/originals';
         $delete = (bool) $this->option('delete');
-        $cutoff = now()->subDays(RetiredMediaPathCleanupJob::REPLACE_RETENTION_DAYS)->getTimestamp();
         $eligible = 0;
-        $deleted = 0;
-        $skippedFresh = 0;
-        $skippedReferenced = 0;
+        $cleaned = 0;
+        $protectedByGrace = 0;
+        $referenced = 0;
+        $invalid = 0;
+        $failed = 0;
 
-        foreach (Storage::disk($disk)->allFiles($root) as $path) {
-            $normalized = ltrim((string) $path, '/');
+        foreach ($registry->markerPaths() as $markerPath) {
+            try {
+                $record = $registry->read($markerPath);
+                $eligibleAt = CarbonImmutable::parse($record['eligible_at']);
+            } catch (Throwable $e) {
+                $invalid++;
+                $this->warn('Некоректний cleanup marker: '.$markerPath.' · '.$e->getMessage());
 
-            if (! str_starts_with($normalized, $root.'/') || str_contains($normalized, '../')) {
+                continue;
+            }
+
+            $disk = $record['disk'];
+            $path = ltrim($record['path'], '/');
+
+            if (! $this->isOwnedOriginalPath($path)) {
+                $invalid++;
+                $this->warn('Cleanup marker поза дозволеним media/originals namespace: '.$markerPath);
+
                 continue;
             }
 
             if (MediaAsset::withoutWorkspaceScope()
                 ->where('storage_disk', $disk)
-                ->where('storage_path', $normalized)
+                ->where('storage_path', $path)
                 ->exists()
             ) {
-                $skippedReferenced++;
+                $referenced++;
 
                 continue;
             }
 
-            try {
-                $lastModified = Storage::disk($disk)->lastModified($normalized);
-            } catch (Throwable) {
-                $this->warn('Не вдалося визначити вік файлу: '.$normalized);
-
-                continue;
-            }
-
-            if ($lastModified > $cutoff) {
-                $skippedFresh++;
+            if (now()->lt($eligibleAt)) {
+                $protectedByGrace++;
 
                 continue;
             }
 
             $eligible++;
-            $this->line(($delete ? 'DELETE ' : 'DRY-RUN ').$normalized);
+            $this->line(($delete ? 'DELETE ' : 'DRY-RUN ').$disk.':'.$path);
 
-            if ($delete && Storage::disk($disk)->delete($normalized)) {
-                $deleted++;
+            if (! $delete) {
+                continue;
+            }
+
+            try {
+                $storage = Storage::disk($disk);
+
+                if ($storage->exists($path) && ! $storage->delete($path)) {
+                    $failed++;
+                    $this->warn('Не вдалося видалити retired path: '.$disk.':'.$path);
+
+                    continue;
+                }
+
+                $registry->forget($markerPath);
+                $cleaned++;
+            } catch (Throwable $e) {
+                $failed++;
+                $this->warn('Cleanup failed: '.$disk.':'.$path.' · '.$e->getMessage());
             }
         }
 
         $this->info(sprintf(
-            '%s: eligible=%d, deleted=%d, protected_by_grace=%d, referenced=%d.',
+            '%s: eligible=%d, cleaned=%d, protected_by_grace=%d, referenced=%d, invalid=%d, failed=%d.',
             $delete ? 'Cleanup complete' : 'Dry-run complete',
             $eligible,
-            $deleted,
-            $skippedFresh,
-            $skippedReferenced,
+            $cleaned,
+            $protectedByGrace,
+            $referenced,
+            $invalid,
+            $failed,
         ));
 
-        return self::SUCCESS;
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function isOwnedOriginalPath(string $path): bool
+    {
+        return str_starts_with($path, 'media/originals/')
+            && ! str_contains($path, '../')
+            && ! str_contains($path, "\0");
     }
 }

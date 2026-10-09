@@ -18,6 +18,7 @@ use App\Models\VariantMedia;
 use App\Models\Workspace;
 use App\Services\Media\MediaAssetLifecycleService;
 use App\Services\Media\OriginalImageIngestService;
+use App\Services\Media\RetiredMediaPathRegistry;
 use App\Support\Media\Exceptions\MediaAssetLifecycleException;
 use App\Support\Workspace\WorkspacePermissions;
 use Carbon\CarbonImmutable;
@@ -26,6 +27,7 @@ use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -47,6 +49,7 @@ class MediaAssetLifecycleTest extends TestCase
     {
         parent::setUp();
 
+        Storage::fake('local');
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->workspace = $this->defaultWorkspace();
         $this->actor = User::factory()->create(['role' => UserRole::Admin]);
@@ -98,13 +101,85 @@ class MediaAssetLifecycleTest extends TestCase
             $this->assertSame('public', $job->disk);
             $this->assertSame($oldPath, $job->path);
             $this->assertNotNull($job->eligibleAt);
+            $this->assertNotNull($job->markerPath);
+            $this->assertTrue($job->afterCommit);
             $this->assertSame(
                 now()->addDays(RetiredMediaPathCleanupJob::REPLACE_RETENTION_DAYS)->format('Y-m-d'),
                 CarbonImmutable::parse($job->eligibleAt)->format('Y-m-d'),
             );
+            Storage::disk('local')->assertExists($job->markerPath);
 
             return true;
         });
+    }
+
+    #[Test]
+    public function outer_transaction_rollback_restores_replaced_asset_and_cleans_new_file_and_marker(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $asset = $this->managedAsset('rollback-old.png', 600, 400);
+        $oldPath = (string) $asset->storage_path;
+        $oldHash = (string) $asset->content_sha256;
+        $newPath = null;
+
+        DB::beginTransaction();
+
+        try {
+            $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
+                $this->actor,
+                $this->workspace,
+                $asset,
+                UploadedFile::fake()->image('rollback-new.png', 900, 700),
+            );
+
+            $this->assertTrue($result->replaced);
+            $inside = $asset->fresh();
+            $newPath = (string) $inside->storage_path;
+            $this->assertNotSame($oldPath, $newPath);
+            Storage::disk('public')->assertExists($oldPath);
+            Storage::disk('public')->assertExists($newPath);
+            $this->assertCount(1, Storage::disk('local')->allFiles('media-retirement/v1'));
+        } finally {
+            DB::rollBack();
+        }
+
+        $fresh = $asset->fresh();
+        $this->assertSame($oldPath, (string) $fresh->storage_path);
+        $this->assertSame($oldHash, (string) $fresh->content_sha256);
+        Storage::disk('public')->assertExists($oldPath);
+        $this->assertNotNull($newPath);
+        Storage::disk('public')->assertMissing($newPath);
+        $this->assertSame([], Storage::disk('local')->allFiles('media-retirement/v1'));
+    }
+
+    #[Test]
+    public function outer_transaction_rollback_restores_deleted_asset_and_removes_cleanup_marker(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $asset = $this->managedAsset('delete-rollback.png', 600, 400);
+        $path = (string) $asset->storage_path;
+
+        DB::beginTransaction();
+
+        try {
+            app(MediaAssetLifecycleService::class)->deleteUnusedOriginal(
+                $this->actor,
+                $this->workspace,
+                $asset,
+            );
+
+            $this->assertDatabaseMissing('media_assets', ['id' => $asset->id]);
+            Storage::disk('public')->assertExists($path);
+            $this->assertCount(1, Storage::disk('local')->allFiles('media-retirement/v1'));
+        } finally {
+            DB::rollBack();
+        }
+
+        $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+        Storage::disk('public')->assertExists($path);
+        $this->assertSame([], Storage::disk('local')->allFiles('media-retirement/v1'));
     }
 
     #[Test]
@@ -291,17 +366,28 @@ class MediaAssetLifecycleTest extends TestCase
         Queue::fake();
         $asset = $this->managedAsset('unused.png', 600, 400);
         $path = (string) $asset->storage_path;
+        $cleanupJob = null;
 
         app(MediaAssetLifecycleService::class)->deleteUnusedOriginal($this->actor, $this->workspace, $asset);
 
         $this->assertDatabaseMissing('media_assets', ['id' => $asset->id]);
         Storage::disk('public')->assertExists($path);
-        Queue::assertPushed(RetiredMediaPathCleanupJob::class, fn (RetiredMediaPathCleanupJob $job): bool =>
-            $job->path === $path && $job->eligibleAt === null
-        );
+        Queue::assertPushed(RetiredMediaPathCleanupJob::class, function (RetiredMediaPathCleanupJob $job) use ($path, &$cleanupJob): bool {
+            $cleanupJob = $job;
 
-        (new RetiredMediaPathCleanupJob('public', $path))->handle();
+            return $job->path === $path
+                && $job->eligibleAt !== null
+                && $job->markerPath !== null
+                && $job->afterCommit === true;
+        });
+        $this->assertInstanceOf(RetiredMediaPathCleanupJob::class, $cleanupJob);
+        $this->assertNotNull($cleanupJob->markerPath);
+        Storage::disk('local')->assertExists($cleanupJob->markerPath);
+
+        $cleanupJob->handle(app(RetiredMediaPathRegistry::class));
+
         Storage::disk('public')->assertMissing($path);
+        Storage::disk('local')->assertMissing($cleanupJob->markerPath);
     }
 
     #[Test]
@@ -360,7 +446,7 @@ class MediaAssetLifecycleTest extends TestCase
             'public',
             $path,
             now()->addDays(RetiredMediaPathCleanupJob::REPLACE_RETENTION_DAYS)->toIso8601String(),
-        ))->handle();
+        ))->handle(app(RetiredMediaPathRegistry::class));
         Storage::disk('public')->assertExists($path);
 
         $asset = MediaAsset::withoutWorkspaceScope()->create([
@@ -371,43 +457,48 @@ class MediaAssetLifecycleTest extends TestCase
             'diagnosis_status' => MediaDiagnosisStatus::Ready,
         ]);
 
-        (new RetiredMediaPathCleanupJob('public', $path, now()->subMinute()->toIso8601String()))->handle();
+        (new RetiredMediaPathCleanupJob('public', $path, now()->subMinute()->toIso8601String()))->handle(app(RetiredMediaPathRegistry::class));
         Storage::disk('public')->assertExists($path);
 
         $asset->delete();
-        (new RetiredMediaPathCleanupJob('public', $path, now()->subMinute()->toIso8601String()))->handle();
+        (new RetiredMediaPathCleanupJob('public', $path, now()->subMinute()->toIso8601String()))->handle(app(RetiredMediaPathRegistry::class));
         Storage::disk('public')->assertMissing($path);
     }
 
     #[Test]
-    public function orphan_recovery_catches_lost_cleanup_after_grace_without_touching_fresh_or_referenced_files(): void
+    public function lost_replace_cleanup_job_cannot_bypass_grace_even_when_old_file_mtime_is_old(): void
     {
         Storage::fake('public');
-        $oldOrphan = 'media/originals/'.$this->workspace->id.'/lost-job.png';
-        $freshOrphan = 'media/originals/'.$this->workspace->id.'/fresh-orphan.png';
-        $referenced = 'media/originals/'.$this->workspace->id.'/referenced.png';
-        Storage::disk('public')->put($oldOrphan, 'old');
-        Storage::disk('public')->put($freshOrphan, 'fresh');
-        Storage::disk('public')->put($referenced, 'referenced');
-        touch(Storage::disk('public')->path($oldOrphan), now()->subDays(15)->getTimestamp());
-        touch(Storage::disk('public')->path($referenced), now()->subDays(15)->getTimestamp());
+        Queue::fake();
+        $this->travelTo('2026-10-09 08:00:00');
+        $asset = $this->managedAsset('old-for-grace.png', 600, 400);
+        $oldPath = (string) $asset->storage_path;
+        touch(Storage::disk('public')->path($oldPath), now()->subDays(60)->getTimestamp());
 
-        MediaAsset::withoutWorkspaceScope()->create([
-            'workspace_id' => $this->workspace->id,
-            'asset_type' => MediaAssetType::Image,
-            'storage_disk' => 'public',
-            'storage_path' => $referenced,
-            'diagnosis_status' => MediaDiagnosisStatus::Ready,
-        ]);
+        app(MediaAssetLifecycleService::class)->replaceOriginal(
+            $this->actor,
+            $this->workspace,
+            $asset,
+            UploadedFile::fake()->image('replacement-for-grace.png', 900, 700),
+        );
 
-        $this->artisan('media:cleanup-orphaned-originals')->assertSuccessful();
-        Storage::disk('public')->assertExists($oldOrphan);
+        $markers = Storage::disk('local')->allFiles('media-retirement/v1');
+        $this->assertCount(1, $markers);
+        Storage::disk('public')->assertExists($oldPath);
 
+        // Simulate a cleared/lost delayed queue job: only the durable cleanup marker remains.
         $this->artisan('media:cleanup-orphaned-originals', ['--delete' => true])->assertSuccessful();
+        Storage::disk('public')->assertExists($oldPath);
+        Storage::disk('local')->assertExists($markers[0]);
 
-        Storage::disk('public')->assertMissing($oldOrphan);
-        Storage::disk('public')->assertExists($freshOrphan);
-        Storage::disk('public')->assertExists($referenced);
+        $this->travel(13)->days();
+        $this->artisan('media:cleanup-orphaned-originals', ['--delete' => true])->assertSuccessful();
+        Storage::disk('public')->assertExists($oldPath);
+
+        $this->travel(2)->days();
+        $this->artisan('media:cleanup-orphaned-originals', ['--delete' => true])->assertSuccessful();
+        Storage::disk('public')->assertMissing($oldPath);
+        Storage::disk('local')->assertMissing($markers[0]);
     }
 
     #[Test]

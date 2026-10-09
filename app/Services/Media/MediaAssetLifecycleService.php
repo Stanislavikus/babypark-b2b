@@ -26,6 +26,7 @@ final class MediaAssetLifecycleService
         private readonly WorkspaceAuthorization $authorization,
         private readonly OriginalImageIngestService $ingest,
         private readonly MediaAssetLibraryReadService $readService,
+        private readonly RetiredMediaPathRegistry $retiredRegistry,
     ) {}
 
     public function replaceOriginal(
@@ -36,6 +37,7 @@ final class MediaAssetLifecycleService
     ): MediaAssetReplaceResult {
         $prepared = $this->ingest->prepare($file);
         $newStoredPath = null;
+        $retirementMarkerPath = null;
 
         try {
             return DB::transaction(function () use (
@@ -44,6 +46,7 @@ final class MediaAssetLifecycleService
                 $asset,
                 $prepared,
                 &$newStoredPath,
+                &$retirementMarkerPath,
             ): MediaAssetReplaceResult {
                 $lockedWorkspace = $this->lockWorkspaceAndAuthorize($actor, $workspace);
                 $lockedAsset = $this->lockAsset($lockedWorkspace, $asset);
@@ -83,7 +86,28 @@ final class MediaAssetLifecycleService
                 }
 
                 $newStoredPath = ['disk' => 'public', 'path' => $storagePath];
+                DB::connection()->afterRollBack(function () use ($newStoredPath): void {
+                    Storage::disk($newStoredPath['disk'])->delete($newStoredPath['path']);
+                });
+
                 $retiredStoredPath = $this->storedPath($lockedAsset);
+                $eligibleAt = null;
+
+                if ($retiredStoredPath !== null
+                    && ($retiredStoredPath['disk'] !== $newStoredPath['disk']
+                        || $retiredStoredPath['path'] !== $newStoredPath['path'])
+                ) {
+                    $eligibleAt = now()->addDays(RetiredMediaPathCleanupJob::REPLACE_RETENTION_DAYS);
+                    $retirementMarkerPath = $this->retiredRegistry->register(
+                        $retiredStoredPath['disk'],
+                        $retiredStoredPath['path'],
+                        $eligibleAt,
+                    );
+                    $markerPath = $retirementMarkerPath;
+                    DB::connection()->afterRollBack(function () use ($markerPath): void {
+                        $this->retiredRegistry->forget($markerPath);
+                    });
+                }
 
                 $lockedAsset->forceFill([
                     'asset_type' => MediaAssetType::Image,
@@ -110,15 +134,14 @@ final class MediaAssetLifecycleService
                 ])->save();
 
                 if ($retiredStoredPath !== null
-                    && ($retiredStoredPath['disk'] !== $newStoredPath['disk']
-                        || $retiredStoredPath['path'] !== $newStoredPath['path'])
+                    && $eligibleAt !== null
+                    && $retirementMarkerPath !== null
                 ) {
-                    $eligibleAt = now()->addDays(RetiredMediaPathCleanupJob::REPLACE_RETENTION_DAYS);
-
                     RetiredMediaPathCleanupJob::dispatch(
                         $retiredStoredPath['disk'],
                         $retiredStoredPath['path'],
                         $eligibleAt->toIso8601String(),
+                        $retirementMarkerPath,
                     )
                         ->delay($eligibleAt)
                         ->afterCommit();
@@ -148,6 +171,10 @@ final class MediaAssetLifecycleService
                 Storage::disk($newStoredPath['disk'])->delete($newStoredPath['path']);
             }
 
+            if ($retirementMarkerPath !== null) {
+                $this->retiredRegistry->forget($retirementMarkerPath);
+            }
+
             if ($e instanceof QueryException) {
                 $collisionExists = MediaAsset::withoutWorkspaceScope()
                     ->where('workspace_id', $workspace->id)
@@ -169,8 +196,15 @@ final class MediaAssetLifecycleService
         Workspace $workspace,
         MediaAsset $asset,
     ): void {
+        $retirementMarkerPath = null;
+
         try {
-            DB::transaction(function () use ($actor, $workspace, $asset): void {
+            DB::transaction(function () use (
+                $actor,
+                $workspace,
+                $asset,
+                &$retirementMarkerPath,
+            ): void {
                 $lockedWorkspace = $this->lockWorkspaceAndAuthorize($actor, $workspace);
                 $lockedAsset = $this->lockAsset($lockedWorkspace, $asset);
                 $this->assertLifecycleOriginal($lockedAsset);
@@ -181,12 +215,28 @@ final class MediaAssetLifecycleService
                 }
 
                 $retiredStoredPath = $this->storedPath($lockedAsset);
-                $lockedAsset->delete();
+                $eligibleAt = now();
 
                 if ($retiredStoredPath !== null) {
+                    $retirementMarkerPath = $this->retiredRegistry->register(
+                        $retiredStoredPath['disk'],
+                        $retiredStoredPath['path'],
+                        $eligibleAt,
+                    );
+                    $markerPath = $retirementMarkerPath;
+                    DB::connection()->afterRollBack(function () use ($markerPath): void {
+                        $this->retiredRegistry->forget($markerPath);
+                    });
+                }
+
+                $lockedAsset->delete();
+
+                if ($retiredStoredPath !== null && $retirementMarkerPath !== null) {
                     RetiredMediaPathCleanupJob::dispatch(
                         $retiredStoredPath['disk'],
                         $retiredStoredPath['path'],
+                        $eligibleAt->toIso8601String(),
+                        $retirementMarkerPath,
                     )->afterCommit();
                 }
             });
@@ -200,6 +250,10 @@ final class MediaAssetLifecycleService
                 report($e);
 
                 return;
+            }
+
+            if ($retirementMarkerPath !== null) {
+                $this->retiredRegistry->forget($retirementMarkerPath);
             }
 
             if ($e instanceof QueryException) {

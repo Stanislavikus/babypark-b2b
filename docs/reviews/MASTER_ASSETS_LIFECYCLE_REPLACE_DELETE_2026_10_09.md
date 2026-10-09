@@ -2,6 +2,11 @@
 
 > **STATUS: [Resolved — Product Owner approved 2026-10-09 — option A]**
 >
+> **Implementation-safety amendment 2026-10-09:** a durable, non-authoritative cleanup
+> marker records `eligible_at` for retired managed paths. This closes the proven
+> queue-clear/file-mtime gap without changing MediaAsset identity, the approved 14-day
+> product behavior, or introducing a new database table/media authority.
+>
 > Base: `origin/develop @ 407c6aac82e0f56c4efb13e0bab50daad0852b4e`.
 >
 > This campaign continues the frozen contracts in
@@ -191,18 +196,24 @@ prepare/diagnose/hash upload
   → revalidate workspace + Original + derivative guard
   → recheck content-hash collision across all same-workspace MediaAssets
   → write replacement bytes to a NEW managed path
+  → if a managed path is retired, persist a small non-authoritative cleanup marker
+    with `eligible_at = now + 14 days`
   → update the SAME MediaAsset row to new storage/hash/metadata
-  → dispatch retired-path cleanup explicitly with `->afterCommit()`
+  → dispatch retired-path cleanup explicitly with `->afterCommit()`, carrying the marker
 → commit
 → cleanup job removes only the retired path according to the approved retention policy
+  and then removes the marker
 ```
 
 The old managed path is never overwritten in place before the database commit.
 
-If any database step fails after the new path was written:
+If any database step fails after the new path was written, or an enclosing caller
+transaction later rolls back:
 
 - DB state rolls back to the old Asset state;
-- the new path is synchronously removed by rollback cleanup;
+- the new path is removed by Laravel's transaction `afterRollBack()` cleanup hook
+  (the local catch remains an idempotent immediate fallback);
+- any pre-commit retirement marker is removed by the same rollback-hook discipline;
 - the old path remains untouched.
 
 ### Delete ordering
@@ -214,10 +225,12 @@ DB transaction
   → lock Workspace
   → lock target MediaAsset
   → fresh zero-reference / zero-derivative check
+  → for a managed path, persist a non-authoritative cleanup marker with
+    `eligible_at = now`
   → delete MediaAsset row
-  → dispatch managed-path cleanup explicitly with `->afterCommit()`
+  → dispatch managed-path cleanup explicitly with `->afterCommit()`, carrying the marker
 → commit
-→ cleanup job removes retired managed bytes
+→ cleanup job removes retired managed bytes and then removes the marker
 ```
 
 For External Originals with no managed path, successful Delete removes only the
@@ -237,12 +250,25 @@ Retired-path cleanup is an idempotent queued job:
 - before deleting, verify no current MediaAsset references the same
   `storage_disk + storage_path`;
 - already-missing files count as successful cleanup;
+- remove the cleanup marker only after successful cleanup (or a safe already-missing
+  outcome);
 - failures use normal queue retry/failed-job handling.
 
-A narrow maintenance command provides crash-gap recovery for managed Originals under
-the BabyPark `media/originals` namespace. It compares stored paths against current
-MediaAsset rows and supports dry-run before deletion. It must never traverse or delete
-outside that owned namespace.
+The cleanup marker is a tiny operational record in application-local storage under
+`media-retirement/v1`. It stores only cleanup metadata (`disk`, `path`, `eligible_at`,
+`registered_at`) and is **not** media identity or business authority. It is persisted
+before commit because creating metadata cannot invalidate the old live file. A rollback
+removes it during normal error handling; if the process crashes first, the stale marker
+is still safe because cleanup always rechecks current MediaAsset references before any
+file deletion.
+
+A narrow maintenance command provides crash/queue-clear recovery by scanning these
+registered retirement markers, not by guessing retirement age from filesystem mtime.
+It rechecks current MediaAsset rows, honors each exact `eligible_at`, supports dry-run
+before deletion, and must never delete outside the owned BabyPark `media/originals`
+namespace. This is required because an old Original may have an mtime months before the
+actual Replace; mtime is therefore not valid evidence that the approved 14-day grace
+has elapsed.
 
 Production runtime verification on 2026-10-09 confirms both Supervisor workers are
 running: the default `babypark-queue` and the dedicated connector queue. Lifecycle
@@ -257,16 +283,18 @@ state remains correct and only retired bytes persist until the worker resumes.
 - **A — approved:** keep the retired managed file for **14 days** before the cleanup
   job becomes eligible. This is an **operational recovery buffer**, not user-facing
   versioning or Undo. Physical Delete remains immediate post-commit cleanup; only
-  replaced old bytes receive the grace period. The orphan-recovery command must ignore
-  owned-namespace files younger than the same 14-day grace so it cannot defeat the
-  retention window.
+  replaced old bytes receive the grace period. The durable cleanup marker carries the
+  exact retirement `eligible_at`; orphan recovery must use that timestamp rather than
+  file mtime so it cannot defeat the retention window.
 - **B — rejected for v1:** immediate cleanup after successful Replace.
 
 The 14-day buffer does **not** solve Preview freshness and is not required for Live URL
 safety. It only gives operations a bounded window to recover an accidental replacement
 before old bytes are retired.
 
-No new persistence table is introduced for lifecycle v1.
+No new persistence table is introduced for lifecycle v1. The cleanup-marker registry is
+non-authoritative operational filesystem metadata; losing a marker can only leak retired
+bytes, never create a live DB row that points to missing bytes.
 
 
 ## Preview / Live interaction evidence
@@ -293,9 +321,12 @@ invent a media-specific configuration revision or Product-wide revision gate.
 - **DerivativeLineageTruth** — parent Replace/Delete cannot leave derivative lineage
   referring to content that no longer exists.
 - **DatabaseBeforeFilesystemCleanup** — committed DB truth precedes retired-byte delete.
-- **RollbackPreservesOldAsset** — failed Replace cannot destroy the previous valid
-  bytes/state.
+- **RollbackPreservesOldAsset** — failed Replace, including rollback of an enclosing
+  caller transaction after the lifecycle method returned, cannot destroy the previous
+  valid bytes/state or leave the replacement file/retirement marker behind.
 - **HashUniquenessFailClosed** — Replace does not merge two existing canonical identities.
+- **RetentionTimestampDurability** — the 14-day Replace grace is measured from a durable
+  retirement marker, never inferred from the Original file's historical mtime.
 
 ## Expected implementation surfaces
 
@@ -304,7 +335,8 @@ Likely existing files touched:
 - `app/Services/Media/OriginalImageIngestService.php` — reuse preparation contract only;
 - new focused `app/Services/Media/MediaAssetLifecycleService.php`;
 - new idempotent retired-path cleanup job;
-- new narrow orphan-recovery Artisan command;
+- new non-authoritative retired-path marker registry in application-local storage;
+- new narrow marker-driven orphan-recovery Artisan command;
 - `app/Filament/Resources/MediaAssetResource.php`;
 - `app/Filament/Resources/MediaAssetResource/Pages/ViewMediaAsset.php`;
 - focused lifecycle tests plus existing Assets/Product/Variant/Brand/Magento regression.
@@ -325,11 +357,14 @@ No schema migration is expected.
 - derivative child blocks replacement;
 - External Original → Managed Original replacement succeeds on same UUID;
 - failed DB mutation preserves old row + old file and removes only newly written path;
+- rollback of an enclosing transaction after Replace/Delete returned also removes the
+  replacement file/cleanup marker and restores the DB state;
 - successful replacement schedules old managed path cleanup only after commit;
 - cleanup is dispatched with explicit `->afterCommit()`;
 - with the queue worker stopped, DB/Asset state remains correct and retired bytes remain safely present;
 - cleanup job retry is idempotent and never deletes a currently referenced path;
-- if retention option A is approved, old replaced bytes are not cleanup-eligible before 14 days and orphan recovery respects the same minimum age.
+- option A: old replaced bytes are not cleanup-eligible before 14 days and orphan recovery respects the exact durable `eligible_at`;
+- a replaced file whose filesystem mtime predates Replace by weeks/months still survives the full 14-day grace if its delayed queue job is lost/cleared.
 
 ### Delete
 
