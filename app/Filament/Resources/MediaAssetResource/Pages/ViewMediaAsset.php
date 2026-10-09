@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class ViewMediaAsset extends ViewRecord
@@ -149,7 +150,7 @@ class ViewMediaAsset extends ViewRecord
         }
 
         $state = $this->getSchema('replacementForm')?->getState() ?? [];
-        $file = $state['file'] ?? null;
+        $file = Arr::first(Arr::wrap($state['file'] ?? null));
 
         if (! $file instanceof UploadedFile) {
             throw ValidationException::withMessages([

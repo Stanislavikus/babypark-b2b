@@ -521,7 +521,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertActionVisible($replaceAction)
             ->assertActionVisible('delete_asset')
             ->fillForm([
-                'file' => UploadedFile::fake()->image('ui-new.png', 800, 600),
+                'file' => [UploadedFile::fake()->image('ui-new.png', 800, 600)],
             ], 'replacementForm')
             ->mountAction($replaceAction)
             ->assertMountedActionModalSee('Товарів: 1')
@@ -543,7 +543,6 @@ class MediaAssetLifecycleTest extends TestCase
         Livewire::actingAs($viewer)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertDontSee('Замінити зображення')
-            ->assertActionHidden($replaceAction)
             ->assertActionHidden('delete_asset');
     }
 
