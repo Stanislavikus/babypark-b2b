@@ -1088,6 +1088,16 @@ close it without losing list context. This applies to Product, Asset and future
 entity drawers unless a documented workflow explicitly requires same-tab
 navigation.
 
+[Resolved 2026-10-09] Asset and Brand full cards that are intentionally opened in a new browser tab
+from a list/drawer must expose a neutral page-level `Закрити` / localized equivalent.
+The close action attempts to close that tab; if the browser does not allow scripted
+closing (for example, a tab opened manually or with a modifier gesture), it falls
+back to the corresponding resource list in the same tab. Pending unsaved edits must
+remain protected by the page's unsaved-changes guard. Form-level `Зберегти` /
+`Скасувати` remain scoped to the edit itself and must not be repurposed as page
+navigation. This rule is scoped to Asset and Brand full cards; Product and future
+full-card close behavior requires its own explicit decision before implementation.
+
 For Filament resource lists, quick inspection must be an explicit modal action,
 not inferred resource navigation. Use a dedicated non-routing action name such as
 `inspect`, force modal behavior, bind the neutral row to that action, and keep

@@ -6,6 +6,7 @@ use App\Enums\MediaAssetType;
 use App\Enums\MediaDiagnosisStatus;
 use App\Enums\MediaRole;
 use App\Enums\UserRole;
+use App\Filament\Resources\MediaAssetResource;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Jobs\Media\RetiredMediaPathCleanupJob;
 use App\Models\Brand;
@@ -31,6 +32,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -503,6 +505,37 @@ class MediaAssetLifecycleTest extends TestCase
     }
 
     #[Test]
+    public function full_asset_page_close_action_closes_new_tab_with_list_fallback_and_guards_pending_replace(): void
+    {
+        Storage::fake('public');
+        $asset = $this->managedAsset('close-page.png', 600, 400);
+        $fallback = Js::from(MediaAssetResource::getUrl('index'));
+        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertActionVisible('close_page')
+            ->assertSeeHtml('setUpUnsavedDataChangesAlert')
+            ->callAction('close_page')
+            ->assertJs($closeJs);
+
+        $component
+            ->fillForm([
+                'file' => [UploadedFile::fake()->image('pending.png', 800, 600)],
+            ], 'replacementForm');
+
+        $this->assertNotSame(
+            $component->get('savedDataHash'),
+            md5((string) str(json_encode($component->get('data'), JSON_UNESCAPED_UNICODE))->replace('\\', '')),
+        );
+
+        $component
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?')
+            ->assertMountedActionModalSee('Вибране нове зображення не буде збережено.');
+    }
+
+    #[Test]
     public function replace_failure_closes_confirmation_and_surfaces_inline_file_error(): void
     {
         Storage::fake('public');
@@ -526,7 +559,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->mountAction($replaceAction)
             ->callMountedAction()
             ->assertActionNotMounted()
-            ->assertHasErrors(['replacementData.file']);
+            ->assertHasErrors(['data.file']);
 
         $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
     }
@@ -541,14 +574,28 @@ class MediaAssetLifecycleTest extends TestCase
 
         $replaceAction = TestAction::make('replace_asset')
             ->schemaComponent('replacement_actions', 'replacementForm');
+        $cancelAction = TestAction::make('cancel_replace')
+            ->schemaComponent('replacement_actions', 'replacementForm');
 
         $component = Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertFormExists('replacementForm')
             ->assertFormFieldExists('file', 'replacementForm')
-            ->assertSee('Замінити зображення')
+            ->assertSee('Поточне зображення')
+            ->assertSee('Нове зображення')
+            ->assertSee('Зберегти')
             ->assertActionVisible($replaceAction)
+            ->assertActionDisabled($replaceAction)
+            ->assertDontSee('Скасувати')
             ->assertActionVisible('delete_asset')
+            ->fillForm([
+                'file' => [UploadedFile::fake()->image('ui-cancel.png', 640, 480)],
+            ], 'replacementForm')
+            ->assertActionEnabled($replaceAction)
+            ->assertActionVisible($cancelAction)
+            ->callAction($cancelAction)
+            ->assertFormSet(['file' => null], 'replacementForm')
+            ->assertActionDisabled($replaceAction)
             ->fillForm([
                 'file' => [UploadedFile::fake()->image('ui-new.png', 800, 600)],
             ], 'replacementForm')
@@ -571,7 +618,7 @@ class MediaAssetLifecycleTest extends TestCase
 
         Livewire::actingAs($viewer)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->assertDontSee('Замінити зображення')
+            ->assertDontSee('Нове зображення')
             ->assertActionHidden('delete_asset');
     }
 
