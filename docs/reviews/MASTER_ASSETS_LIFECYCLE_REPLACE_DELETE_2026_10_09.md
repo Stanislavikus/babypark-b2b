@@ -1,6 +1,6 @@
 # Master Assets Lifecycle: Replace + Guarded Delete — 2026-10-09
 
-> **STATUS: PROPOSED — Product Owner approval required before application code**
+> **STATUS: [Resolved — Product Owner approved 2026-10-09 — option A]**
 >
 > Base: `origin/develop @ 407c6aac82e0f56c4efb13e0bab50daad0852b4e`.
 >
@@ -250,17 +250,17 @@ cleanup therefore uses the default database queue. Acceptance must still prove t
 safe degraded case: with no worker consuming the queued cleanup, committed Asset/DB
 state remains correct and only retired bytes persist until the worker resumes.
 
-### Replace-retention Product Owner choice
+### Replace-retention decision
 
-This is the only unresolved business choice in the proposed contract:
+**[Resolved — option A]**
 
-- **A — recommended:** keep the retired managed file for **14 days** before the cleanup
+- **A — approved:** keep the retired managed file for **14 days** before the cleanup
   job becomes eligible. This is an **operational recovery buffer**, not user-facing
   versioning or Undo. Physical Delete remains immediate post-commit cleanup; only
   replaced old bytes receive the grace period. The orphan-recovery command must ignore
   owned-namespace files younger than the same 14-day grace so it cannot defeat the
   retention window.
-- **B:** make the retired path eligible for cleanup immediately after successful Replace.
+- **B — rejected for v1:** immediate cleanup after successful Replace.
 
 The 14-day buffer does **not** solve Preview freshness and is not required for Live URL
 safety. It only gives operations a bounded window to recover an accidental replacement
@@ -378,8 +378,4 @@ No schema migration is expected.
 
 ## Approval gate
 
-Application code is blocked until Product Owner approves the observable lifecycle
-behavior in this document.
-
-After approval, this document status becomes `[Resolved]` in the same campaign branch
-before production implementation continues.
+**CLOSED — Product Owner approved option A on 2026-10-09.** Production implementation may proceed on this campaign branch; merge and deploy still require their normal explicit approvals.
