@@ -515,13 +515,21 @@ class MediaAssetLifecycleTest extends TestCase
         $component = Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertActionVisible('close_page')
+            ->assertSeeHtml('setUpUnsavedDataChangesAlert')
             ->callAction('close_page')
             ->assertJs($closeJs);
 
         $component
             ->fillForm([
                 'file' => [UploadedFile::fake()->image('pending.png', 800, 600)],
-            ], 'replacementForm')
+            ], 'replacementForm');
+
+        $this->assertNotSame(
+            $component->get('savedDataHash'),
+            md5((string) str(json_encode($component->get('data'), JSON_UNESCAPED_UNICODE))->replace('\\', '')),
+        );
+
+        $component
             ->mountAction('close_page')
             ->assertMountedActionModalSee('Закрити без збереження?')
             ->assertMountedActionModalSee('Вибране нове зображення не буде збережено.');
@@ -551,7 +559,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->mountAction($replaceAction)
             ->callMountedAction()
             ->assertActionNotMounted()
-            ->assertHasErrors(['replacementData.file']);
+            ->assertHasErrors(['data.file']);
 
         $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
     }

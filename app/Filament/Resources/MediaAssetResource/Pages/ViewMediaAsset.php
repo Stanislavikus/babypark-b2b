@@ -16,6 +16,7 @@ use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
+use Filament\Pages\Concerns\HasUnsavedDataChangesAlert;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\EmbeddedSchema;
@@ -31,8 +32,12 @@ class ViewMediaAsset extends ViewRecord
 {
     protected static string $resource = MediaAssetResource::class;
 
-    /** @var array{file?: mixed} */
-    public array $replacementData = [];
+    use HasUnsavedDataChangesAlert;
+
+    protected function hasUnsavedDataChangesAlert(): bool
+    {
+        return true;
+    }
 
     public function getTitle(): string
     {
@@ -50,7 +55,11 @@ class ViewMediaAsset extends ViewRecord
                 ->modalHeading('Закрити без збереження?')
                 ->modalDescription('Вибране нове зображення не буде збережено.')
                 ->modalSubmitActionLabel('Закрити')
-                ->action(fn (): mixed => $this->closeCurrentTab(MediaAssetResource::getUrl('index'))),
+                ->action(function (): mixed {
+                    $this->rememberData();
+
+                    return $this->closeCurrentTab(MediaAssetResource::getUrl('index'));
+                }),
             Action::make('delete_asset')
                 ->label('Видалити')
                 ->icon('heroicon-o-trash')
@@ -129,7 +138,7 @@ class ViewMediaAsset extends ViewRecord
                             ])
                             ->helperText('Перетягніть файл або виберіть його. Максимум 20 МіБ і 25 МП.')
                             ->live()
-                            ->afterStateUpdated(fn (): mixed => $this->resetValidation('replacementData.file'))
+                            ->afterStateUpdated(fn (): mixed => $this->resetValidation('data.file'))
                             ->required(),
                         SchemaActions::make([
                             $this->replaceAssetAction(),
@@ -137,7 +146,7 @@ class ViewMediaAsset extends ViewRecord
                         ])->key('replacement_actions'),
                     ]),
             ])
-            ->statePath('replacementData');
+            ->statePath('data');
     }
 
     public function replaceAssetAction(): Action
@@ -179,7 +188,7 @@ class ViewMediaAsset extends ViewRecord
 
             if (! $file instanceof UploadedFile) {
                 throw ValidationException::withMessages([
-                    'replacementData.file' => 'Оберіть нове зображення.',
+                    'data.file' => 'Оберіть нове зображення.',
                 ]);
             }
 
@@ -193,7 +202,7 @@ class ViewMediaAsset extends ViewRecord
             $this->unmountAction();
 
             throw ValidationException::withMessages([
-                'replacementData.file' => $e->getMessage(),
+                'data.file' => $e->getMessage(),
             ]);
         } catch (ValidationException $e) {
             $this->unmountAction();
@@ -218,14 +227,15 @@ class ViewMediaAsset extends ViewRecord
 
     private function hasReplacementFile(): bool
     {
-        return Arr::first(Arr::wrap($this->replacementData['file'] ?? null)) instanceof UploadedFile;
+        return Arr::first(Arr::wrap($this->data['file'] ?? null)) instanceof UploadedFile;
     }
 
     private function clearReplacementSelection(): null
     {
-        $this->replacementData = [];
+        $this->data = [];
         $this->getSchema('replacementForm')?->fill([]);
-        $this->resetValidation('replacementData.file');
+        $this->resetValidation('data.file');
+        $this->rememberData();
 
         return null;
     }
