@@ -171,7 +171,7 @@ final class OriginalImageIngestService
         return new OriginalImageIngestResult($asset, $stored);
     }
 
-    private function safeOriginalFilename(PreparedOriginalImage $prepared): string
+    public function safeOriginalFilename(PreparedOriginalImage $prepared): string
     {
         $name = preg_replace('/[\x00-\x1F\x7F]/u', ' ', $prepared->file->getClientOriginalName());
         $name = is_string($name) ? trim($name) : '';

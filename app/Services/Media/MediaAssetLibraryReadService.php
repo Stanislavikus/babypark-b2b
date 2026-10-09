@@ -142,6 +142,36 @@ final class MediaAssetLibraryReadService
     }
 
     /**
+     * @return array{products:int,variants:int,brands:int,derivatives:int}
+     */
+    public function freshUsageCounts(MediaAsset $asset): array
+    {
+        $workspaceId = (string) $asset->workspace_id;
+        $assetId = (string) $asset->id;
+
+        return [
+            'products' => ProductMedia::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->where('media_asset_id', $assetId)
+                ->distinct()
+                ->count('product_id'),
+            'variants' => VariantMedia::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->where('media_asset_id', $assetId)
+                ->distinct()
+                ->count('variant_id'),
+            'brands' => Brand::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->where('logo_media_asset_id', $assetId)
+                ->count(),
+            'derivatives' => MediaAsset::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->where('parent_media_asset_id', $assetId)
+                ->count(),
+        ];
+    }
+
+    /**
      * @return list<array{type:string,id:string,label:string,detail:?string,product_id:?string}>
      */
     public function usageItems(MediaAsset $asset): array
