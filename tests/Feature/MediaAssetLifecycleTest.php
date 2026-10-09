@@ -511,16 +511,19 @@ class MediaAssetLifecycleTest extends TestCase
 
         $component = Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertFormExists('replacementForm')
+            ->assertFormFieldExists('file', 'replacementForm')
+            ->assertSee('Замінити зображення')
             ->assertActionVisible('replace_asset')
             ->assertActionVisible('delete_asset')
+            ->fillForm([
+                'file' => UploadedFile::fake()->image('ui-new.png', 800, 600),
+            ], 'replacementForm')
             ->mountAction('replace_asset')
             ->assertMountedActionModalSee('Товарів: 1')
             ->assertMountedActionModalSee('Варіантів: 1')
             ->assertMountedActionModalSee('Брендів: 1')
-            ->unmountAction()
-            ->callAction('replace_asset', [
-                'file' => UploadedFile::fake()->image('ui-new.png', 800, 600),
-            ])
+            ->callMountedAction()
             ->assertNotified();
 
         $this->assertSame((string) $asset->id, (string) $productMedia->fresh()->media_asset_id);
@@ -535,6 +538,7 @@ class MediaAssetLifecycleTest extends TestCase
 
         Livewire::actingAs($viewer)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertDontSee('Замінити зображення')
             ->assertActionHidden('replace_asset')
             ->assertActionHidden('delete_asset');
     }
