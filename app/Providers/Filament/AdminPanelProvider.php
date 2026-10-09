@@ -38,6 +38,7 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/theme.css')
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
+            ->unsavedChangesAlerts()
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()

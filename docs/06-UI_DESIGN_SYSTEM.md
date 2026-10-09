@@ -1098,6 +1098,15 @@ remain protected by the page's unsaved-changes guard. Form-level `Зберегт
 navigation. This rule is scoped to Asset and Brand full cards; Product and future
 full-card close behavior requires its own explicit decision before implementation.
 
+[Resolved 2026-10-09] Asset Original replacement uses a native Filament Action modal,
+not an inline custom edit-state embedded into the read-only full card. The modal owns
+the temporary `FileUpload` state and exposes explicit `Зберегти` / `Скасувати` actions.
+After a successful save the action is unmounted and the full card has no pending
+replacement state, so page-level `Закрити` must not ask for a second save/discard
+confirmation. Admin uses Filament's native `unsavedChangesAlerts()` for standard
+Create/Edit pages and open action forms; no parallel page-level dirty-state machine
+is allowed for Asset replacement.
+
 For Filament resource lists, quick inspection must be an explicit modal action,
 not inferred resource navigation. Use a dedicated non-routing action name such as
 `inspect`, force modal behavior, bind the neutral row to that action, and keep
