@@ -541,14 +541,28 @@ class MediaAssetLifecycleTest extends TestCase
 
         $replaceAction = TestAction::make('replace_asset')
             ->schemaComponent('replacement_actions', 'replacementForm');
+        $cancelAction = TestAction::make('cancel_replace')
+            ->schemaComponent('replacement_actions', 'replacementForm');
 
         $component = Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertFormExists('replacementForm')
             ->assertFormFieldExists('file', 'replacementForm')
-            ->assertSee('Замінити зображення')
+            ->assertSee('Поточне зображення')
+            ->assertSee('Нове зображення')
+            ->assertSee('Зберегти')
             ->assertActionVisible($replaceAction)
+            ->assertActionDisabled($replaceAction)
+            ->assertDontSee('Скасувати')
             ->assertActionVisible('delete_asset')
+            ->fillForm([
+                'file' => [UploadedFile::fake()->image('ui-cancel.png', 640, 480)],
+            ], 'replacementForm')
+            ->assertActionEnabled($replaceAction)
+            ->assertActionVisible($cancelAction)
+            ->callAction($cancelAction)
+            ->assertFormSet(['file' => null], 'replacementForm')
+            ->assertActionDisabled($replaceAction)
             ->fillForm([
                 'file' => [UploadedFile::fake()->image('ui-new.png', 800, 600)],
             ], 'replacementForm')
@@ -571,7 +585,7 @@ class MediaAssetLifecycleTest extends TestCase
 
         Livewire::actingAs($viewer)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->assertDontSee('Замінити зображення')
+            ->assertDontSee('Нове зображення')
             ->assertActionHidden('delete_asset');
     }
 

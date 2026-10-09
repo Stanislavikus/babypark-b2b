@@ -61,7 +61,7 @@ class MediaAssetResource extends Resource
     public static function detailSchema(): array
     {
         return [
-            Section::make('Зображення')->schema([
+            Section::make('Поточне зображення')->schema([
                 Group::make([
                     MediaPreviewFrame::entry(
                         ImageEntry::make('preview_url')
