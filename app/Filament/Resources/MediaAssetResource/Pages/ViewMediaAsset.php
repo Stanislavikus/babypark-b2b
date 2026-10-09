@@ -24,6 +24,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
 
 class ViewMediaAsset extends ViewRecord
@@ -41,6 +42,15 @@ class ViewMediaAsset extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('close_page')
+                ->label('Закрити')
+                ->icon('heroicon-o-x-mark')
+                ->color('gray')
+                ->requiresConfirmation(fn (): bool => $this->hasReplacementFile())
+                ->modalHeading('Закрити без збереження?')
+                ->modalDescription('Вибране нове зображення не буде збережено.')
+                ->modalSubmitActionLabel('Закрити')
+                ->action(fn (): mixed => $this->closeCurrentTab(MediaAssetResource::getUrl('index'))),
             Action::make('delete_asset')
                 ->label('Видалити')
                 ->icon('heroicon-o-trash')
@@ -259,6 +269,15 @@ class ViewMediaAsset extends ViewRecord
             $usage['brands'],
             $usage['derivatives'],
         );
+    }
+
+    private function closeCurrentTab(string $fallbackUrl): null
+    {
+        $fallback = Js::from($fallbackUrl);
+
+        $this->js("window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
+
+        return null;
     }
 
     private function canMutateLifecycleAsset(): bool

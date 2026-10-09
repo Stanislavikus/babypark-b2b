@@ -6,6 +6,7 @@ use App\Enums\MediaAssetType;
 use App\Enums\MediaDiagnosisStatus;
 use App\Enums\MediaRole;
 use App\Enums\UserRole;
+use App\Filament\Resources\MediaAssetResource;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Jobs\Media\RetiredMediaPathCleanupJob;
 use App\Models\Brand;
@@ -31,6 +32,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -500,6 +502,29 @@ class MediaAssetLifecycleTest extends TestCase
         $this->artisan('media:cleanup-orphaned-originals', ['--delete' => true])->assertSuccessful();
         Storage::disk('public')->assertMissing($oldPath);
         Storage::disk('local')->assertMissing($markers[0]);
+    }
+
+    #[Test]
+    public function full_asset_page_close_action_closes_new_tab_with_list_fallback_and_guards_pending_replace(): void
+    {
+        Storage::fake('public');
+        $asset = $this->managedAsset('close-page.png', 600, 400);
+        $fallback = Js::from(MediaAssetResource::getUrl('index'));
+        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertActionVisible('close_page')
+            ->callAction('close_page')
+            ->assertJs($closeJs);
+
+        $component
+            ->fillForm([
+                'file' => [UploadedFile::fake()->image('pending.png', 800, 600)],
+            ], 'replacementForm')
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?')
+            ->assertMountedActionModalSee('Вибране нове зображення не буде збережено.');
     }
 
     #[Test]

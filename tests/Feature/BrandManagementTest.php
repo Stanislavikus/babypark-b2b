@@ -24,6 +24,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -335,6 +336,30 @@ final class BrandManagementTest extends TestCase
         $this->assertNull($brand->logo_media_asset_id);
         $this->assertSame('Updated from Brand resource', $brand->short_description);
         $this->assertFalse($brand->is_active);
+    }
+
+    #[Test]
+    public function full_brand_card_has_close_action_with_list_fallback_and_unsaved_changes_guard(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Close Brand');
+        $fallback = Js::from(BrandResource::getUrl('index'));
+        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->assertActionVisible('close_page')
+            ->assertSeeHtml('setUpUnsavedDataChangesAlert')
+            ->callAction('close_page')
+            ->assertJs($closeJs);
+
+        $component
+            ->fillForm(['name' => 'Unsaved Close Brand'])
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?')
+            ->assertMountedActionModalSee('Незбережені зміни бренду буде втрачено.')
+            ->callMountedAction()
+            ->assertJs($closeJs);
     }
 
     #[Test]
