@@ -503,6 +503,35 @@ class MediaAssetLifecycleTest extends TestCase
     }
 
     #[Test]
+    public function replace_failure_closes_confirmation_and_surfaces_inline_file_error(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $asset = $this->managedAsset('blocked.png', 600, 400);
+        MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'parent_media_asset_id' => $asset->id,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/blocked-child.png',
+            'diagnosis_status' => MediaDiagnosisStatus::Ready,
+        ]);
+        $replaceAction = TestAction::make('replace_asset')
+            ->schemaComponent('replacement_actions', 'replacementForm');
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm([
+                'file' => [UploadedFile::fake()->image('replacement.png', 800, 600)],
+            ], 'replacementForm')
+            ->mountAction($replaceAction)
+            ->callMountedAction()
+            ->assertActionNotMounted()
+            ->assertHasErrors(['replacementData.file']);
+
+        $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+    }
+
+    #[Test]
     public function full_asset_page_exposes_lifecycle_actions_with_fresh_usage_impact_and_viewer_cannot_mutate(): void
     {
         Storage::fake('public');

@@ -149,16 +149,16 @@ class ViewMediaAsset extends ViewRecord
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        $state = $this->getSchema('replacementForm')?->getState() ?? [];
-        $file = Arr::first(Arr::wrap($state['file'] ?? null));
-
-        if (! $file instanceof UploadedFile) {
-            throw ValidationException::withMessages([
-                'replacementData.file' => 'Оберіть нове зображення.',
-            ]);
-        }
-
         try {
+            $state = $this->getSchema('replacementForm')?->getState() ?? [];
+            $file = Arr::first(Arr::wrap($state['file'] ?? null));
+
+            if (! $file instanceof UploadedFile) {
+                throw ValidationException::withMessages([
+                    'replacementData.file' => 'Оберіть нове зображення.',
+                ]);
+            }
+
             $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
                 $actor,
                 app(WorkspaceContext::class)->current(),
@@ -166,9 +166,15 @@ class ViewMediaAsset extends ViewRecord
                 $file,
             );
         } catch (MediaAssetLifecycleException|MediaIngestException $e) {
+            $this->unmountAction();
+
             throw ValidationException::withMessages([
                 'replacementData.file' => $e->getMessage(),
             ]);
+        } catch (ValidationException $e) {
+            $this->unmountAction();
+
+            throw $e;
         }
 
         $this->record->refresh();
