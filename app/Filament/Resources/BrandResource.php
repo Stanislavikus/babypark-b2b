@@ -55,32 +55,48 @@ class BrandResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Основне')->schema([
+            Section::make()->schema([
                 TextInput::make('name')
                     ->label('Назва')
                     ->required()
                     ->maxLength(255),
-                MediaPreviewFrame::entry(
-                    ImageEntry::make('logo_preview')
-                        ->label('Поточний логотип')
-                        ->state(function (Get $get): ?string {
-                            $assetId = $get('logo_media_asset_id');
+                Group::make()
+                    ->schema(function (Get $get): array {
+                        $asset = self::selectedLogoAsset($get);
 
-                            if (! is_string($assetId) || $assetId === '') {
-                                return null;
-                            }
-
-                            $asset = MediaAsset::withoutWorkspaceScope()
-                                ->where('workspace_id', app(WorkspaceContext::class)->id())
-                                ->whereNull('parent_media_asset_id')
-                                ->whereKey($assetId)
-                                ->first();
-
-                            return app(MediaAssetSourceResolver::class)->sourceReference($asset);
-                        })
-                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
-                    MediaPreviewFrame::BRAND_FORM,
-                ),
+                        return [
+                            MediaPreviewFrame::entry(
+                                ImageEntry::make('logo_preview')
+                                    ->label('Поточне зображення')
+                                    ->state(app(MediaAssetSourceResolver::class)->sourceReference($asset))
+                                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
+                                MediaPreviewFrame::BRAND_FORM,
+                            ),
+                            Group::make([
+                                TextEntry::make('logo_file')
+                                    ->label('Файл')
+                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::displayName($asset) : '—')
+                                    ->columnSpanFull(),
+                                TextEntry::make('logo_dimensions')
+                                    ->label('Розмір')
+                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::dimensions($asset) : '—'),
+                                TextEntry::make('logo_megapixels')
+                                    ->label('Мегапікселі')
+                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::megapixels($asset) : '—'),
+                                TextEntry::make('logo_byte_size')
+                                    ->label('Вага')
+                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::formatBytes($asset->byte_size) : '—'),
+                                TextEntry::make('logo_mime_type')
+                                    ->label('Формат')
+                                    ->state($asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—'),
+                            ])->columns(2),
+                        ];
+                    })
+                    ->columns([
+                        'default' => 1,
+                        'md' => 2,
+                    ])
+                    ->columnSpanFull(),
                 OriginalImageAssetPicker::make('logo_media_asset_id')
                     ->label('Обрати з Assets')
                     ->placeholder('Без логотипу')
@@ -222,7 +238,8 @@ class BrandResource extends Resource
                             ->icon('heroicon-m-arrow-top-right-on-square')
                             ->color('gray')
                             ->url(self::getUrl('edit', ['record' => $record]))
-                            ->openUrlInNewTab(),
+                            ->openUrlInNewTab()
+                            ->close(),
                     ]),
                 EditAction::make()
                     ->label('Змінити')
@@ -269,6 +286,21 @@ class BrandResource extends Resource
     public static function getDeleteAuthorizationResponse(Model $record): Response
     {
         return Response::deny();
+    }
+
+    private static function selectedLogoAsset(Get $get): ?MediaAsset
+    {
+        $assetId = $get('logo_media_asset_id');
+
+        if (! is_string($assetId) || $assetId === '') {
+            return null;
+        }
+
+        return MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', app(WorkspaceContext::class)->id())
+            ->whereNull('parent_media_asset_id')
+            ->whereKey($assetId)
+            ->first();
     }
 
     private static function canManageCurrentWorkspaceProducts(): bool

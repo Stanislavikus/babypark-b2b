@@ -392,8 +392,20 @@ final class BrandManagementTest extends TestCase
         $this->assertTrue($mountedInspect->hasModal());
         $this->assertTrue($mountedInspect->isModalSlideOver());
         $this->assertNull($mountedInspect->getUrl());
-        $this->assertTrue($mountedInspect->getExtraModalFooterActions()['open_full_page_footer']->shouldOpenUrlInNewTab());
+        $openFullCard = $mountedInspect->getExtraModalFooterActions()['open_full_page_footer'];
+        $this->assertTrue($openFullCard->shouldOpenUrlInNewTab());
+        $this->assertTrue($openFullCard->shouldClose());
         $list->assertSee('Frame Brand');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->assertSee('Поточне зображення')
+            ->assertSee('Файл')
+            ->assertSee('Розмір')
+            ->assertSee('Мегапікселі')
+            ->assertSee('Вага')
+            ->assertSee('Формат')
+            ->assertDontSee('Основне');
     }
 
     #[Test]

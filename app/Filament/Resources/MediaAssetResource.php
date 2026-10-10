@@ -2,15 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\MediaAssetType;
 use App\Enums\MediaDiagnosisStatus;
+use App\Filament\Resources\MediaAssetResource\Pages\EditMediaAsset;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Filament\Support\MediaPreviewFrame;
 use App\Models\MediaAsset;
+use App\Models\User;
 use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetSourceResolver;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Workspace\WorkspaceContext;
+use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
@@ -47,7 +53,93 @@ class MediaAssetResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([]);
+        return $schema->components([
+            Section::make()->schema([
+                Group::make([
+                    MediaPreviewFrame::entry(
+                        ImageEntry::make('current_preview')
+                            ->label('Поточне зображення')
+                            ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
+                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
+                        MediaPreviewFrame::DETAIL,
+                    ),
+                    Group::make([
+                        TextEntry::make('current_file')
+                            ->label('Файл')
+                            ->state(fn (MediaAsset $record): string => self::displayName($record))
+                            ->columnSpanFull(),
+                        TextEntry::make('current_dimensions')
+                            ->label('Розмір')
+                            ->state(fn (MediaAsset $record): string => self::dimensions($record)),
+                        TextEntry::make('current_megapixels')
+                            ->label('Мегапікселі')
+                            ->state(fn (MediaAsset $record): string => self::megapixels($record)),
+                        TextEntry::make('current_byte_size')
+                            ->label('Вага')
+                            ->state(fn (MediaAsset $record): string => self::formatBytes($record->byte_size)),
+                        TextEntry::make('current_mime_type')
+                            ->label('Формат')
+                            ->state(fn (MediaAsset $record): string => filled($record->mime_type) ? (string) $record->mime_type : '—'),
+                    ])->columns(2),
+                ])->columns([
+                    'default' => 1,
+                    'md' => 2,
+                ])->columnSpanFull(),
+                FileUpload::make('replacement_upload')
+                    ->label('Нове зображення')
+                    ->storeFiles(false)
+                    ->maxSize(20 * 1024)
+                    ->acceptedFileTypes([
+                        'image/jpeg',
+                        'image/png',
+                        'image/gif',
+                        'image/webp',
+                        'image/avif',
+                    ])
+                    ->validationMessages([
+                        'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
+                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                    ])
+                    ->helperText('Перетягніть файл або виберіть його. Максимум 20 МіБ і 25 МП.')
+                    ->live(),
+                Group::make([
+                    TextEntry::make('source_kind_edit')
+                        ->label('Зберігання')
+                        ->state(fn (MediaAsset $record): string => self::sourceLabel($record))
+                        ->badge()
+                        ->color(fn (MediaAsset $record): string => self::sourceColor($record)),
+                    TextEntry::make('diagnosis_status_edit')
+                        ->label('Технічний стан')
+                        ->state(fn (MediaAsset $record): string => self::diagnosisLabel($record->diagnosis_status))
+                        ->badge()
+                        ->color(fn (MediaAsset $record): string => self::diagnosisColor($record)),
+                    TextEntry::make('created_at_edit')
+                        ->label('Додано')
+                        ->state(fn (MediaAsset $record): mixed => $record->created_at)
+                        ->dateTime('d.m.Y H:i'),
+                ])->columns([
+                    'default' => 1,
+                    'md' => 3,
+                ])->columnSpanFull(),
+            ]),
+            Section::make('Використовується в')->schema([
+                TextEntry::make('usage_items_edit')
+                    ->label('Використання')
+                    ->hiddenLabel()
+                    ->state(function (MediaAsset $record): ?array {
+                        $items = app(MediaAssetLibraryReadService::class)->usageItems($record);
+
+                        return $items === [] ? null : $items;
+                    })
+                    ->formatStateUsing(fn (array $state): string => self::usageItemLabel($state))
+                    ->url(fn (array $state): ?string => self::usageItemUrl($state))
+                    ->listWithLineBreaks()
+                    ->bulleted()
+                    ->limitList(8)
+                    ->expandableLimitedList()
+                    ->placeholder('Не використовується'),
+            ]),
+        ]);
     }
 
     public static function infolist(Schema $schema): Schema
@@ -267,8 +359,9 @@ class MediaAssetResource extends Resource
                             ->label('Відкрити повну картку')
                             ->icon('heroicon-m-arrow-top-right-on-square')
                             ->color('gray')
-                            ->url(self::getUrl('view', ['record' => $record]))
-                            ->openUrlInNewTab(),
+                            ->url(self::fullCardUrl($record))
+                            ->openUrlInNewTab()
+                            ->close(),
                     ]),
             ])
             ->toolbarActions([]);
@@ -279,6 +372,7 @@ class MediaAssetResource extends Resource
         return [
             'index' => ListMediaAssets::route('/'),
             'view' => ViewMediaAsset::route('/{record}'),
+            'edit' => EditMediaAsset::route('/{record}/edit'),
         ];
     }
 
@@ -303,7 +397,24 @@ class MediaAssetResource extends Resource
 
     public static function getEditAuthorizationResponse(Model $record): Response
     {
-        return Response::deny();
+        if (! $record instanceof MediaAsset
+            || (string) $record->workspace_id !== app(WorkspaceContext::class)->id()
+            || ! $record->isOriginal()
+            || $record->asset_type !== MediaAssetType::Image
+        ) {
+            return Response::deny();
+        }
+
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && app(WorkspaceAuthorization::class)->allows(
+                $actor,
+                app(WorkspaceContext::class)->current(),
+                WorkspacePermissions::MANAGE_PRODUCTS,
+            )
+                ? Response::allow()
+                : Response::deny();
     }
 
     public static function getDeleteAuthorizationResponse(Model $record): Response
@@ -314,6 +425,13 @@ class MediaAssetResource extends Resource
     public static function getDeleteAnyAuthorizationResponse(): Response
     {
         return Response::deny();
+    }
+
+    public static function fullCardUrl(MediaAsset $record): string
+    {
+        return self::canEdit($record)
+            ? self::getUrl('edit', ['record' => $record])
+            : self::getUrl('view', ['record' => $record]);
     }
 
     public static function displayName(MediaAsset $asset): string

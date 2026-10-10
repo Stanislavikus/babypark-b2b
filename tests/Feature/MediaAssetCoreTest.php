@@ -8,6 +8,7 @@ use App\Enums\MediaRole;
 use App\Enums\UserRole;
 use App\Filament\Resources\BrandResource;
 use App\Filament\Resources\MediaAssetResource;
+use App\Filament\Resources\MediaAssetResource\Pages\EditMediaAsset;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Filament\Resources\ProductResource;
@@ -582,7 +583,15 @@ class MediaAssetCoreTest extends TestCase
         $this->assertTrue($mountedView->isModalSlideOver());
         $this->assertNull($mountedView->getUrl());
         $this->assertArrayHasKey('open_full_page_footer', $mountedView->getExtraModalFooterActions());
-        $this->assertTrue($mountedView->getExtraModalFooterActions()['open_full_page_footer']->shouldOpenUrlInNewTab());
+        $openFullCard = $mountedView->getExtraModalFooterActions()['open_full_page_footer'];
+        $this->assertTrue($openFullCard->shouldOpenUrlInNewTab());
+        $this->assertTrue($openFullCard->shouldClose());
+        $this->assertSame(MediaAssetResource::getUrl('edit', ['record' => $asset]), $openFullCard->getUrl());
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertSee('Нове зображення')
+            ->assertSee('Поточне зображення');
 
         Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])

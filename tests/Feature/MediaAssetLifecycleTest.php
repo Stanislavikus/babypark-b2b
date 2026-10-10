@@ -7,6 +7,7 @@ use App\Enums\MediaDiagnosisStatus;
 use App\Enums\MediaRole;
 use App\Enums\UserRole;
 use App\Filament\Resources\MediaAssetResource;
+use App\Filament\Resources\MediaAssetResource\Pages\EditMediaAsset;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Jobs\Media\RetiredMediaPathCleanupJob;
 use App\Models\Brand;
@@ -223,7 +224,7 @@ class MediaAssetLifecycleTest extends TestCase
         ]);
 
         $this->expectException(MediaAssetLifecycleException::class);
-        $this->expectExceptionMessage('вже існує');
+        $this->expectExceptionMessage('вже є в Assets');
 
         app(MediaAssetLifecycleService::class)->replaceOriginal(
             $this->actor,
@@ -258,7 +259,7 @@ class MediaAssetLifecycleTest extends TestCase
         ]);
 
         $this->expectException(MediaAssetLifecycleException::class);
-        $this->expectExceptionMessage('вже існує');
+        $this->expectExceptionMessage('вже є в Assets');
 
         app(MediaAssetLifecycleService::class)->replaceOriginal(
             $this->actor,
@@ -504,7 +505,7 @@ class MediaAssetLifecycleTest extends TestCase
     }
 
     #[Test]
-    public function full_asset_page_uses_native_action_replace_and_close_has_no_page_level_dirty_state(): void
+    public function manager_full_asset_card_uses_native_edit_record_with_inline_replacement_and_close(): void
     {
         Storage::fake('public');
         Queue::fake();
@@ -513,20 +514,33 @@ class MediaAssetLifecycleTest extends TestCase
         $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         Livewire::actingAs($this->actor)
-            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->assertActionVisible('replace_asset')
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertSee('Поточне зображення')
+            ->assertSee('Нове зображення')
+            ->assertSee('Розмір')
+            ->assertSee('Мегапікселі')
+            ->assertSee('Вага')
+            ->assertSee('Формат')
             ->assertActionVisible('close_page')
-            ->assertDontSee('Нове зображення')
+            ->assertActionVisible('delete_asset')
+            ->assertSeeHtml('setUpUnsavedDataChangesAlert')
             ->callAction('close_page')
             ->assertJs($closeJs);
+
+        Livewire::actingAs($this->actor)
+            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->assertActionDoesNotExist('replace_asset')
+            ->assertDontSee('Нове зображення');
     }
 
     #[Test]
-    public function blocked_native_replace_keeps_modal_open_and_surfaces_file_error(): void
+    public function lifecycle_conflict_in_asset_editor_is_a_merchant_warning_and_leaves_asset_unchanged(): void
     {
         Storage::fake('public');
         Queue::fake();
         $asset = $this->managedAsset('blocked.png', 600, 400);
+        $oldHash = (string) $asset->content_sha256;
+        $oldPath = (string) $asset->storage_path;
         MediaAsset::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
             'parent_media_asset_id' => $asset->id,
@@ -536,20 +550,48 @@ class MediaAssetLifecycleTest extends TestCase
         ]);
 
         Livewire::actingAs($this->actor)
-            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->mountAction('replace_asset')
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm([
-                'file' => UploadedFile::fake()->image('replacement.png', 800, 600),
+                'replacement_upload' => UploadedFile::fake()->image('replacement.png', 800, 600),
             ])
-            ->callMountedAction()
-            ->assertActionMounted('replace_asset')
-            ->assertHasErrors(['file']);
+            ->call('save')
+            ->assertNotified('Зображення не змінено');
 
-        $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+        $fresh = $asset->fresh();
+        $this->assertSame($oldHash, (string) $fresh->content_sha256);
+        $this->assertSame($oldPath, (string) $fresh->storage_path);
     }
 
     #[Test]
-    public function native_replace_save_unmounts_action_then_close_runs_without_second_confirmation(): void
+    public function duplicate_asset_replacement_is_explained_as_a_warning_without_mutating_identity(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $target = $this->managedAsset('target-ui.png', 600, 400);
+        $oldHash = (string) $target->content_sha256;
+        $collisionFile = UploadedFile::fake()->image('already-in-assets.png', 500, 500);
+        $prepared = app(OriginalImageIngestService::class)->prepare($collisionFile);
+
+        MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/already-in-assets.png',
+            'content_sha256' => $prepared->sha256,
+            'diagnosis_status' => MediaDiagnosisStatus::Ready,
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $target->getRouteKey()])
+            ->fillForm(['replacement_upload' => $collisionFile])
+            ->call('save')
+            ->assertNotified('Зображення не змінено');
+
+        $this->assertSame($oldHash, (string) $target->fresh()->content_sha256);
+        $this->assertDatabaseCount('media_assets', 2);
+    }
+
+    #[Test]
+    public function native_asset_edit_save_replaces_same_identity_then_close_has_no_second_confirmation(): void
     {
         Storage::fake('public');
         Queue::fake();
@@ -559,21 +601,18 @@ class MediaAssetLifecycleTest extends TestCase
         $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $component = Livewire::actingAs($this->actor)
-            ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->assertActionVisible('replace_asset')
-            ->assertActionVisible('delete_asset')
-            ->mountAction('replace_asset')
-            ->assertMountedActionModalSee('Товарів: 1')
-            ->assertMountedActionModalSee('Варіантів: 1')
-            ->assertMountedActionModalSee('Брендів: 1')
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm([
-                'file' => UploadedFile::fake()->image('ui-new.png', 800, 600),
+                'replacement_upload' => UploadedFile::fake()->image('ui-new.png', 800, 600),
             ])
-            ->callMountedAction()
-            ->assertActionNotMounted()
-            ->assertNotified();
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified('Зображення замінено');
 
+        $fresh = $asset->fresh();
+        $this->assertSame('ui-new.png', $fresh->original_filename);
         $this->assertSame((string) $asset->id, (string) $productMedia->fresh()->media_asset_id);
+        $this->assertNull(data_get($component->get('data'), 'replacement_upload'));
 
         $component
             ->callAction('close_page')
@@ -583,15 +622,25 @@ class MediaAssetLifecycleTest extends TestCase
             ->callAction('delete_asset')
             ->assertNotified();
         $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+    }
 
+    #[Test]
+    public function viewer_keeps_read_only_asset_full_card_and_cannot_open_editor(): void
+    {
+        Storage::fake('public');
+        $asset = $this->managedAsset('viewer.png', 600, 400);
         $viewer = User::factory()->create(['role' => UserRole::Admin]);
         $this->makeWorkspaceMembership($this->workspace, $viewer);
 
         Livewire::actingAs($viewer)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
-            ->assertActionHidden('replace_asset')
             ->assertActionHidden('delete_asset')
             ->assertActionVisible('close_page');
+
+        $this->assertFalse(MediaAssetResource::canEdit($asset));
+        $this->actingAs($viewer)
+            ->get(MediaAssetResource::getUrl('edit', ['record' => $asset]))
+            ->assertForbidden();
     }
 
     private function managedAsset(string $name, int $width, int $height): MediaAsset
