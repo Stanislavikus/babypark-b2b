@@ -1,0 +1,207 @@
+{
+    "captured_at": "2026-09-13T12:07:25+03:00",
+    "connector_account_id": "a277fd7f-044c-4cc3-b3f5-7852acf5e3d3",
+    "workspace_id": "08f3480e-971b-41cc-8704-b58a8255df50",
+    "proof": "two consecutive live Stage2-C materializer runs against reconciled Adobe Commerce Product Attribute Set 9",
+    "scope": {
+        "materialize_only": "workspace_custom single-select fields with active set membership and exactly one trusted Product/Variant entity evidence",
+        "product_variant_write_performed": false,
+        "magento_product_write_performed": false
+    },
+    "run_1": {
+        "eligible_fields": 18,
+        "definitions_created": 18,
+        "bindings_created": 18,
+        "field_mappings": 18,
+        "option_mappings": 924,
+        "deferred_fields": 29
+    },
+    "run_2": {
+        "eligible_fields": 18,
+        "definitions_created": 0,
+        "bindings_created": 0,
+        "field_mappings": 18,
+        "option_mappings": 924,
+        "deferred_fields": 29
+    },
+    "identity_checksums": {
+        "before_run_2": {
+            "materializations": "90d33ab9bb8363e13ea6ff0006bce94542f55ea29367e6ee6dfe39f2ef5eeadc",
+            "workspace_custom_definitions": "ffca1ac2a7e10e29a22288990456e2c8277c662131f1f6992308b9b9b4e71364",
+            "variant_bindings": "cebd9a5c1aa25ea699008ab81ed774ddc35d43906fbd511f36372466b6a6cf9f",
+            "field_mappings": "c8dd03d90c35cfe7303224e03875bce95e220a98d73d64a3ddf7a9d3b4503e8c",
+            "option_mappings": "b877cb0342965480c98ebcf77526f1bcb64ae3c417815bfb3e8e7356e46f684b"
+        },
+        "after_run_2": {
+            "materializations": "90d33ab9bb8363e13ea6ff0006bce94542f55ea29367e6ee6dfe39f2ef5eeadc",
+            "workspace_custom_definitions": "ffca1ac2a7e10e29a22288990456e2c8277c662131f1f6992308b9b9b4e71364",
+            "variant_bindings": "cebd9a5c1aa25ea699008ab81ed774ddc35d43906fbd511f36372466b6a6cf9f",
+            "field_mappings": "c8dd03d90c35cfe7303224e03875bce95e220a98d73d64a3ddf7a9d3b4503e8c",
+            "option_mappings": "b877cb0342965480c98ebcf77526f1bcb64ae3c417815bfb3e8e7356e46f684b"
+        }
+    },
+    "materialized_fields": [
+        {
+            "external_field_key": "c_carseats_additional_protection",
+            "provider_attribute_id": 156,
+            "field_definition_id": "a2bc2788-2456-4285-978c-17d14ce6a22c",
+            "field_definition_code": "c_carseats_additional_protection",
+            "field_binding_id": "a2bc2788-256e-4345-a7f2-aa4df4b8fcd1",
+            "field_mapping_id": "a2bc2788-cf79-4507-bb2c-d78c81697d4f",
+            "option_mapping_count": 3
+        },
+        {
+            "external_field_key": "c_carseats_backrest_adjustment",
+            "provider_attribute_id": 157,
+            "field_definition_id": "a2bc2788-220c-438b-808f-8b1f759b6c16",
+            "field_definition_code": "c_carseats_backrest_adjustment",
+            "field_binding_id": "a2bc2788-2329-448c-8b9e-ff977310cb55",
+            "field_mapping_id": "a2bc2788-c0f7-4627-83c8-212260611b96",
+            "option_mapping_count": 3
+        },
+        {
+            "external_field_key": "c_carseats_color",
+            "provider_attribute_id": 140,
+            "field_definition_id": "a2bc2788-3cff-4c87-a281-ce6690117f60",
+            "field_definition_code": "c_carseats_color",
+            "field_binding_id": "a2bc2788-417a-4810-8627-4a733953ba71",
+            "field_mapping_id": "a2bc2789-fe95-4f3f-9289-6a686023c2ce",
+            "option_mapping_count": 65
+        },
+        {
+            "external_field_key": "c_carseats_cover_material",
+            "provider_attribute_id": 162,
+            "field_definition_id": "a2bc2788-2cc7-44c3-b0c5-a5c4653f3855",
+            "field_definition_code": "c_carseats_cover_material",
+            "field_binding_id": "a2bc2788-2dad-4105-8b24-25eb2303c59d",
+            "field_mapping_id": "a2bc2789-1177-43fe-94e3-c94b038c7141",
+            "option_mapping_count": 6
+        },
+        {
+            "external_field_key": "c_carseats_fixation",
+            "provider_attribute_id": 152,
+            "field_definition_id": "a2bc2788-28a3-4bf7-9f6c-111b6377c771",
+            "field_definition_code": "c_carseats_fixation",
+            "field_binding_id": "a2bc2788-2998-4852-a3b3-122aed0ffac3",
+            "field_mapping_id": "a2bc2788-eebe-4017-bfc2-8e23efda12c4",
+            "option_mapping_count": 8
+        },
+        {
+            "external_field_key": "c_carseats_group",
+            "provider_attribute_id": 159,
+            "field_definition_id": "a2bc2788-135b-4c09-a177-18227b132f56",
+            "field_definition_code": "c_carseats_group",
+            "field_binding_id": "a2bc2788-1772-4bd8-89b7-03136c7efff1",
+            "field_mapping_id": "a2bc2788-6571-43e4-85cd-dd912e3fdb69",
+            "option_mapping_count": 11
+        },
+        {
+            "external_field_key": "c_carseats_headrest",
+            "provider_attribute_id": 164,
+            "field_definition_id": "a2bc2788-1f7d-4c82-a400-a1117e27cd4a",
+            "field_definition_code": "c_carseats_headrest",
+            "field_binding_id": "a2bc2788-20a7-4c2d-9ec1-55d12cbae4ff",
+            "field_mapping_id": "a2bc2788-b24a-40c9-9e7c-045201e5a28e",
+            "option_mapping_count": 4
+        },
+        {
+            "external_field_key": "c_carseats_removable_cover",
+            "provider_attribute_id": 161,
+            "field_definition_id": "a2bc2788-1a2d-4743-bf74-0f1956d115ef",
+            "field_definition_code": "c_carseats_removable_cover",
+            "field_binding_id": "a2bc2788-1b10-4cda-9aff-e5887b00a6b5",
+            "field_mapping_id": "a2bc2788-8ac0-4e92-9fba-e020407e6596",
+            "option_mapping_count": 2
+        },
+        {
+            "external_field_key": "c_carseats_rotating_function",
+            "provider_attribute_id": 158,
+            "field_definition_id": "a2bc2788-2673-473f-9b9b-c7191e372bff",
+            "field_definition_code": "c_carseats_rotating_function",
+            "field_binding_id": "a2bc2788-2756-4540-ad7c-4a7a2db4ea0a",
+            "field_mapping_id": "a2bc2788-de8a-4e2f-9d3b-b1037132a125",
+            "option_mapping_count": 2
+        },
+        {
+            "external_field_key": "c_carseats_safety_standard",
+            "provider_attribute_id": 168,
+            "field_definition_id": "a2bc2788-186d-4886-9399-ab99518297b4",
+            "field_definition_code": "c_carseats_safety_standard",
+            "field_binding_id": "a2bc2788-1944-4e87-8fa8-726ed9f052da",
+            "field_mapping_id": "a2bc2788-7c41-4e6b-97a9-465ba13ac480",
+            "option_mapping_count": 6
+        },
+        {
+            "external_field_key": "c_carseats_seat_belt_type",
+            "provider_attribute_id": 154,
+            "field_definition_id": "a2bc2788-2ead-4b4d-aee4-5ecf07594244",
+            "field_definition_code": "c_carseats_seat_belt_type",
+            "field_binding_id": "a2bc2788-2fa6-481a-ad53-f2afb8211a69",
+            "field_mapping_id": "a2bc2789-2257-45ad-aca1-64cf70e413de",
+            "option_mapping_count": 6
+        },
+        {
+            "external_field_key": "c_carseats_stroller_installation",
+            "provider_attribute_id": 163,
+            "field_definition_id": "a2bc2788-1c20-4934-806d-5da7fb1801a1",
+            "field_definition_code": "c_carseats_stroller_installation",
+            "field_binding_id": "a2bc2788-1cea-4e55-8098-d9c09c586629",
+            "field_mapping_id": "a2bc2788-9812-4095-992f-ba36661c427c",
+            "option_mapping_count": 2
+        },
+        {
+            "external_field_key": "c_carseats_travel_direction",
+            "provider_attribute_id": 153,
+            "field_definition_id": "a2bc2788-5bc9-474b-a481-9a37c7e98a10",
+            "field_definition_code": "c_carseats_travel_direction",
+            "field_binding_id": "a2bc2788-5d4b-402f-9861-c658e27ec052",
+            "field_mapping_id": "a2bc278b-a5c8-4e3e-aa78-7fb233727206",
+            "option_mapping_count": 3
+        },
+        {
+            "external_field_key": "c_carseats_type",
+            "provider_attribute_id": 155,
+            "field_definition_id": "a2bc2788-2aa0-4ef4-9c50-f46addb05043",
+            "field_definition_code": "c_carseats_type",
+            "field_binding_id": "a2bc2788-2ba7-41e2-be63-25bba7933c8b",
+            "field_mapping_id": "a2bc2789-0017-4852-a801-508eaea3ac49",
+            "option_mapping_count": 4
+        },
+        {
+            "external_field_key": "manufacturer",
+            "provider_attribute_id": 83,
+            "field_definition_id": "a2bc2788-353d-4df8-899d-49bf6b90052a",
+            "field_definition_code": "manufacturer",
+            "field_binding_id": "a2bc2788-3864-4287-bed5-3726003c588d",
+            "field_mapping_id": "a2bc2789-3297-493f-9da3-f34f46b4bb6f",
+            "option_mapping_count": 300
+        },
+        {
+            "external_field_key": "x_country_of_brand_registration",
+            "provider_attribute_id": 169,
+            "field_definition_id": "a2bc2788-56d3-40ce-813e-f2775c96f4b1",
+            "field_definition_code": "x_country_of_brand_registration",
+            "field_binding_id": "a2bc2788-59dc-4988-97f8-13ed24f2612f",
+            "field_mapping_id": "a2bc278a-e623-4070-b541-5520dd9ad248",
+            "option_mapping_count": 248
+        },
+        {
+            "external_field_key": "x_country_of_manufacture",
+            "provider_attribute_id": 167,
+            "field_definition_id": "a2bc2788-49be-4f7a-b188-686b81d847a9",
+            "field_definition_code": "x_country_of_manufacture",
+            "field_binding_id": "a2bc2788-4e2b-4390-9eef-90b9cc339644",
+            "field_mapping_id": "a2bc278a-2dcd-431d-a3ad-d214f20a2b41",
+            "option_mapping_count": 248
+        },
+        {
+            "external_field_key": "x_delivery_availability",
+            "provider_attribute_id": 165,
+            "field_definition_id": "a2bc2788-1dd4-4e2d-a9c2-4e53451bfcfe",
+            "field_definition_code": "x_delivery_availability",
+            "field_binding_id": "a2bc2788-1ea0-4219-bae4-8aafed39ed4a",
+            "field_mapping_id": "a2bc2788-a4a4-48c7-9853-4c19d1e8f52a",
+            "option_mapping_count": 3
+        }
+    ]
+}

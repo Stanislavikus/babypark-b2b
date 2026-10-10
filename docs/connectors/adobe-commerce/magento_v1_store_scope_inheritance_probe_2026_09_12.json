@@ -1,0 +1,167 @@
+{
+  "schema_version": "1.0.0",
+  "probe_date": "2026-09-12",
+  "connector": "adobe-commerce",
+  "campaign": "magento-v1-real-certification",
+  "pending_item": "P-10",
+  "status": "blocked_before_mutation",
+  "target_scope": {
+    "sku": "1234567890",
+    "logical_entity_id": 1,
+    "configured_store_code": "default",
+    "configured_store_view_id": 1,
+    "target_application_version_observed": null,
+    "target_application_version_observation_note": "Stock REST /V1/magento/version is not exposed on this target; Safe Sync handshake is unavailable (HTTP 404), so this probe does not invent an application-version observation."
+  },
+  "store_topology": {
+    "active_storefront_view_count": 8,
+    "store_views": [
+      {
+        "id": 1,
+        "code": "default",
+        "website_id": 1,
+        "store_group_id": 1
+      },
+      {
+        "id": 2,
+        "code": "babypark_ua",
+        "website_id": 2,
+        "store_group_id": 2
+      },
+      {
+        "id": 3,
+        "code": "babypark_ru",
+        "website_id": 2,
+        "store_group_id": 2
+      },
+      {
+        "id": 4,
+        "code": "babypark_en",
+        "website_id": 2,
+        "store_group_id": 2
+      },
+      {
+        "id": 5,
+        "code": "babytomove_de",
+        "website_id": 3,
+        "store_group_id": 3
+      },
+      {
+        "id": 6,
+        "code": "babytomove_en",
+        "website_id": 3,
+        "store_group_id": 3
+      },
+      {
+        "id": 7,
+        "code": "babytomove_ru",
+        "website_id": 3,
+        "store_group_id": 3
+      },
+      {
+        "id": 8,
+        "code": "babytomove_ua",
+        "website_id": 3,
+        "store_group_id": 3
+      }
+    ],
+    "admin_store": {
+      "id": 0,
+      "code": "admin",
+      "website_id": 0,
+      "store_group_id": 0
+    }
+  },
+  "read_only_observations": {
+    "product_get": {
+      "default": {
+        "http_status": 200,
+        "logical_entity_id": 1,
+        "name": "Test Product"
+      },
+      "all": {
+        "http_status": 200,
+        "logical_entity_id": 1,
+        "name": "Test Product"
+      },
+      "admin": {
+        "http_status": 400,
+        "message": "Specified request cannot be processed."
+      },
+      "all_active_storefront_views_returned_product": true
+    },
+    "attribute_metadata": {
+      "name": {
+        "scope": "store",
+        "is_required": true,
+        "frontend_input": "text",
+        "backend_type": "varchar"
+      },
+      "meta_title": {
+        "scope": "store",
+        "is_required": false,
+        "frontend_input": "text",
+        "backend_type": "varchar"
+      },
+      "meta_description": {
+        "scope": "store",
+        "is_required": false,
+        "frontend_input": "textarea",
+        "backend_type": "varchar"
+      }
+    },
+    "safe_sync_handshake": {
+      "http_status": 404,
+      "raw_scope_evidence_available": false
+    },
+    "stock_magento_version_endpoint": {
+      "http_status": 404
+    }
+  },
+  "authoritative_evidence_assessment": {
+    "ordinary_product_get_is_sufficient": false,
+    "reason": "Product GET returns effective scoped values and cannot distinguish inheritance from an equal-valued store-specific EAV row.",
+    "admin_scope_product_rest_read_available": false,
+    "direct_db_or_admin_use_default_evidence_available_from_current_certification_control_plane": false,
+    "safe_sync_raw_scope_diagnostic_available": false,
+    "all_scope_write_usable_as_global_only_probe": false,
+    "all_scope_write_reason": "Adobe documents `all` writes as updating all store scopes, so using it would contaminate the inheritance experiment instead of providing a global-only control."
+  },
+  "upstream_evidence": {
+    "magento_issue_8897": {
+      "url": "https://github.com/magento/magento2/issues/8897",
+      "state": "closed",
+      "progress": "done",
+      "confirmed": true,
+      "reproduced_on_2_4_x_latest_develop": true,
+      "linked_fix_pr_observed": false,
+      "relevance": "Direct ProductRepository store-scope save case: untouched inherited EAV values can be copied into store-specific rows."
+    },
+    "magento_issue_26484": {
+      "url": "https://github.com/magento/magento2/issues/26484",
+      "state": "closed",
+      "fixed_in_2_4_x_label": true,
+      "relied_on_to_clear_p10": false,
+      "relevance": "Related REST/API Use Default Value symptom; its fixed label is not evidence that the distinct #8897 ProductRepository behavior is absent on this target."
+    },
+    "adobe_2_4_9_release_notes": {
+      "url": "https://experienceleague.adobe.com/en/docs/commerce-operations/release/notes/adobe-commerce/2-4-9",
+      "observed_scope_fix": "REST API product gallery inheritance control at store view level",
+      "general_product_eav_inheritance_fix_observed": false
+    },
+    "adobe_store_scope_semantics": {
+      "url": "https://developer.adobe.com/commerce/webapi/rest/use-rest/asynchronous-web-endpoints",
+      "all_write_semantics": "updates all store scopes",
+      "explicit_store_code_semantics": "updates only the defined store"
+    }
+  },
+  "mutation_probe": {
+    "stock_product_put_executed": false,
+    "reason": "Without authoritative before/after inheritance evidence, an ordinary store-view PUT would be non-probative and could itself materialize the hidden override rows P-10 is intended to detect."
+  },
+  "conclusion": {
+    "p10_cleared": false,
+    "public_live_support_flipped": false,
+    "next_required_proof": "Obtain direct Magento DB/Admin Use Default Value evidence or a temporary validation-only target-side raw-EAV diagnostic; baseline inherited store/website-scoped attributes, execute exactly one ordinary stock Product PUT through `default`, then prove no new store-specific rows/overrides appeared. If overrides appear, fail closed or narrow the standard V1 write scope/path before Live support."
+  }
+}

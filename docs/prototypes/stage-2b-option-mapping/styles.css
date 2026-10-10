@@ -1,0 +1,45 @@
+:root {
+  --bg: #f8fafc;
+  --card: #fff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --warn: #d97706;
+}
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --border: #334155;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+.app-header { background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
+.app-header-inner { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+.brand-row { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.contract-badge { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.nav-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.nav-tabs button { border: 1px solid var(--border); background: transparent; color: var(--text); padding: 0.4rem 0.7rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.85rem; }
+.nav-tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.page { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+.screen { display: none; }
+.screen.active { display: block; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1rem; }
+.context-line, .hint { color: var(--muted); font-size: 0.9rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.75rem; text-align: left; border-top: 1px solid var(--border); font-size: 0.9rem; }
+th { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); }
+.status.ok { color: var(--ok); }
+.status.warn { color: var(--warn); }
+.btn { border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 0.35rem 0.65rem; border-radius: 0.4rem; font-size: 0.8rem; cursor: pointer; }
+.btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn.danger { color: var(--danger); border-color: #fecaca; }
+.mobile .table-card { overflow-x: auto; }
+@media (max-width: 640px) {
+  .nav-tabs button { font-size: 0.75rem; }
+  th:nth-child(4), td:nth-child(4) { display: none; }
+}
