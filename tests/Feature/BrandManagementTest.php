@@ -363,6 +363,36 @@ final class BrandManagementTest extends TestCase
     }
 
     #[Test]
+    public function brand_edit_save_has_no_generic_success_toast_and_uploaded_logo_does_not_leave_false_dirty_state(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Quiet Save Brand');
+        $fallback = Js::from(BrandResource::getUrl('index'));
+        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->fillForm([
+                'short_description' => 'Публічний опис бренду',
+                'logo_upload' => UploadedFile::fake()->image('quiet-brand.png', 600, 200),
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotNotified();
+
+        $fresh = $brand->fresh();
+        $this->assertSame('Публічний опис бренду', $fresh->short_description);
+        $this->assertNotNull($fresh->logo_media_asset_id);
+        $this->assertNull(data_get($component->get('data'), 'logo_upload'));
+        $this->assertSame((string) $fresh->logo_media_asset_id, (string) data_get($component->get('data'), 'logo_media_asset_id'));
+
+        $component
+            ->callAction('close_page')
+            ->assertJs($closeJs);
+    }
+
+    #[Test]
     public function brand_logo_preview_uses_the_shared_stable_media_frame(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -408,6 +438,7 @@ final class BrandManagementTest extends TestCase
             ->assertSee('Зберігання')
             ->assertSee('Технічний стан')
             ->assertSee('Додано')
+            ->assertSee('Короткий опис бренду')
             ->assertDontSee('Основне');
     }
 

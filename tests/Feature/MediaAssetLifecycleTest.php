@@ -619,7 +619,9 @@ class MediaAssetLifecycleTest extends TestCase
             ])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertNotified('Зображення замінено');
+            ->assertNotNotified('Зображення замінено')
+            ->assertSet('replacementPostSaveNotice', fn (?string $value): bool => str_contains((string) $value, 'Запустіть Preview ще раз'))
+            ->assertSee('Запустіть Preview ще раз');
 
         $fresh = $asset->fresh();
         $this->assertSame('ui-new.png', $fresh->original_filename);
@@ -649,7 +651,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->fillForm(['internal_note' => '  Внутрішня нотатка для команди  '])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertNotified('Asset збережено');
+            ->assertNotNotified('Asset збережено');
 
         $fresh = $asset->fresh();
         $this->assertSame('Внутрішня нотатка для команди', $fresh->internal_note);
@@ -666,7 +668,10 @@ class MediaAssetLifecycleTest extends TestCase
         $asset->update(['internal_note' => 'Стара нотатка']);
         $id = (string) $asset->id;
 
-        Livewire::actingAs($this->actor)
+        $fallback = Js::from(MediaAssetResource::getUrl('index'));
+        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
+        $component = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm([
                 'replacement_upload' => UploadedFile::fake()->image('note-replace-new.png', 800, 600),
@@ -674,7 +679,11 @@ class MediaAssetLifecycleTest extends TestCase
             ])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertNotified('Зображення замінено');
+            ->assertNotNotified('Зображення замінено');
+
+        $component
+            ->callAction('close_page')
+            ->assertJs($closeJs);
 
         $fresh = $asset->fresh();
         $this->assertSame($id, (string) $fresh->id);
@@ -716,6 +725,28 @@ class MediaAssetLifecycleTest extends TestCase
         $this->assertSame('До зміни', $fresh->internal_note);
         $this->assertSame($beforeFiles, Storage::disk('public')->allFiles('media/originals/'.$this->workspace->id));
         $this->assertDatabaseCount('jobs', 0);
+    }
+
+    #[Test]
+    public function asset_close_confirmation_uses_semantic_unsaved_state_not_raw_fileupload_hash(): void
+    {
+        Storage::fake('public');
+        $asset = $this->managedAsset('semantic-close.png', 600, 400);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm(['internal_note' => 'Незбережена нотатка'])
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?')
+            ->assertMountedActionModalSee('Незбережені зміни не буде збережено.');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm([
+                'replacement_upload' => UploadedFile::fake()->image('semantic-new.png', 700, 500),
+            ])
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?');
     }
 
     #[Test]

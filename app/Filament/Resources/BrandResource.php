@@ -26,9 +26,11 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
@@ -60,6 +62,8 @@ class BrandResource extends Resource
                     ->label('Назва')
                     ->required()
                     ->maxLength(255),
+                Text::make('Поточне зображення')
+                    ->weight(FontWeight::SemiBold),
                 Group::make()
                     ->schema(function (Get $get): array {
                         $asset = self::selectedLogoAsset($get);
@@ -68,6 +72,7 @@ class BrandResource extends Resource
                             MediaPreviewFrame::entry(
                                 ImageEntry::make('logo_preview')
                                     ->label('Поточне зображення')
+                                    ->hiddenLabel()
                                     ->state(app(MediaAssetSourceResolver::class)->sourceReference($asset))
                                     ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
                                 MediaPreviewFrame::BRAND_FORM,
@@ -89,21 +94,6 @@ class BrandResource extends Resource
                                 TextEntry::make('logo_mime_type')
                                     ->label('Формат')
                                     ->state($asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—'),
-                                TextEntry::make('logo_source_kind')
-                                    ->label('Зберігання')
-                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::sourceLabel($asset) : '—')
-                                    ->badge()
-                                    ->color($asset instanceof MediaAsset ? MediaAssetResource::sourceColor($asset) : 'gray'),
-                                TextEntry::make('logo_diagnosis_status')
-                                    ->label('Технічний стан')
-                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::diagnosisLabel($asset->diagnosis_status) : '—')
-                                    ->badge()
-                                    ->color($asset instanceof MediaAsset ? MediaAssetResource::diagnosisColor($asset) : 'gray'),
-                                TextEntry::make('logo_created_at')
-                                    ->label('Додано')
-                                    ->state($asset?->created_at)
-                                    ->dateTime('d.m.Y H:i')
-                                    ->placeholder('—'),
                             ])->columns(2),
                         ];
                     })
@@ -155,9 +145,36 @@ class BrandResource extends Resource
                         }),
                 ]),
                 Textarea::make('short_description')
-                    ->label('Короткий опис')
+                    ->label('Короткий опис бренду')
                     ->rows(3)
                     ->maxLength(2000),
+                Group::make()
+                    ->schema(function (Get $get): array {
+                        $asset = self::selectedLogoAsset($get);
+
+                        return [
+                            TextEntry::make('logo_source_kind')
+                                ->label('Зберігання')
+                                ->state($asset instanceof MediaAsset ? MediaAssetResource::sourceLabel($asset) : '—')
+                                ->badge()
+                                ->color($asset instanceof MediaAsset ? MediaAssetResource::sourceColor($asset) : 'gray'),
+                            TextEntry::make('logo_diagnosis_status')
+                                ->label('Технічний стан')
+                                ->state($asset instanceof MediaAsset ? MediaAssetResource::diagnosisLabel($asset->diagnosis_status) : '—')
+                                ->badge()
+                                ->color($asset instanceof MediaAsset ? MediaAssetResource::diagnosisColor($asset) : 'gray'),
+                            TextEntry::make('logo_created_at')
+                                ->label('Додано')
+                                ->state($asset?->created_at)
+                                ->dateTime('d.m.Y H:i')
+                                ->placeholder('—'),
+                        ];
+                    })
+                    ->columns([
+                        'default' => 1,
+                        'md' => 3,
+                    ])
+                    ->columnSpanFull(),
                 Toggle::make('is_active')
                     ->label('Активний')
                     ->helperText('Неактивний бренд залишається у Master і на існуючих товарах, але не пропонується для нового призначення.')
@@ -200,7 +217,7 @@ class BrandResource extends Resource
                     'md' => 2,
                 ])->columnSpanFull(),
                 TextEntry::make('short_description')
-                    ->label('Короткий опис')
+                    ->label('Короткий опис бренду')
                     ->placeholder('—')
                     ->columnSpanFull(),
             ]),
