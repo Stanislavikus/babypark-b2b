@@ -234,3 +234,17 @@ These belong to Assets Lifecycle or later resource-alignment campaigns.
   transaction ambiguity.
 - Cost rationale: native Filament primitives plus one shared presentation seam are
   lower-risk than a custom media manager or one-off fixes per resource.
+
+
+## 2026-10-10 production UX supersession note
+
+Production acceptance after the lifecycle implementation proved the same-identity
+replacement semantics correct but exposed unnecessary interaction duplication between
+Asset and Brand full cards. The Product Owner requested full-card authoring alignment:
+manager-capable Asset full cards now use native Filament EditRecord lifecycle and expose
+the replacement FileUpload directly in the full card; read-only inspection drawers stay
+read-only. This supersedes only the earlier presentation choice that replacement be
+opened from a separate modal. MediaAsset identity, replace/delete guards, deduplication,
+retention, Brand association semantics and the shared preview-frame rules are unchanged.
+The drawer `Відкрити повну картку` action also closes the originating drawer through the
+native Filament action close primitive after opening the new tab.

@@ -381,7 +381,7 @@ No schema migration is expected.
 ### UI
 
 - drawer remains read-only quick inspection;
-- full Asset page exposes Replace/Delete actions;
+- manager-capable full Asset editor exposes same-identity replacement control and guarded Delete;
 - Replace confirmation explains all usages will update and shows fresh Product/Variant/Brand usage counts;
 - Product-used Asset replacement tells the merchant to run Preview again for verification;
 - blocked Delete exposes a merchant-readable reason rather than an SQL/FK error;

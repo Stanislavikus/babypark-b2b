@@ -1098,14 +1098,30 @@ remain protected by the page's unsaved-changes guard. Form-level `Зберегт
 navigation. This rule is scoped to Asset and Brand full cards; Product and future
 full-card close behavior requires its own explicit decision before implementation.
 
-[Resolved 2026-10-09] Asset Original replacement uses a native Filament Action modal,
-not an inline custom edit-state embedded into the read-only full card. The modal owns
-the temporary `FileUpload` state and exposes explicit `Зберегти` / `Скасувати` actions.
-After a successful save the action is unmounted and the full card has no pending
-replacement state, so page-level `Закрити` must not ask for a second save/discard
-confirmation. The modal's native `Зберегти` / `Скасувати` / close controls own the
-unsaved temporary upload. No panel-wide behavior change and no parallel page-level
-dirty-state machine is allowed for Asset replacement.
+[Resolved 2026-10-09] Asset Original replacement initially used a native Filament
+Action modal to remove the custom page-level dirty-state race found during production
+smoke. That modal flow is superseded by the 2026-10-10 production UX decision below;
+its underlying invariant remains: Asset replacement must use Filament-owned form
+lifecycle, never a parallel hand-built page dirty-state machine.
+
+[Resolved 2026-10-10] Asset and Brand full-card authoring use the same native Filament
+EditRecord interaction pattern where the actor has mutation permission: current image
+and merchant-relevant metadata are visible in the full card, editable image controls
+are present without an extra Replace modal, form-level `Зберегти` / `Скасувати` remain
+at the bottom, and neutral page-level `Закрити` remains in the header. Asset replacement
+continues to mutate the same canonical MediaAsset identity through
+`MediaAssetLifecycleService`; it must not offer `Обрати з Assets`, because rebinding or
+merging one Asset identity into another is not replacement. Brand may still select an
+existing Asset because `brands.logo_media_asset_id` is an association, not Asset
+identity mutation. No new Asset metadata column is introduced by this UX alignment.
+
+[Resolved 2026-10-10] Opening a full card from an Asset or Brand inspection drawer opens
+the full card in a new browser tab and closes that drawer using Filament's native action
+close behavior. The original list state remains in place. Successful mutations use the
+standard transient success notification. Business conflicts that leave state unchanged
+use a merchant-readable transient warning notification; field/file validation errors
+remain inline. Notification placement is not globally changed for this resource-level
+campaign.
 
 For Filament resource lists, quick inspection must be an explicit modal action,
 not inferred resource navigation. Use a dedicated non-routing action name such as
