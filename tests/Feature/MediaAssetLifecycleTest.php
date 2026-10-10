@@ -512,8 +512,6 @@ class MediaAssetLifecycleTest extends TestCase
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
-        $this->assertTrue(Filament::getPanel('admin')->hasUnsavedChangesAlerts());
-
         Livewire::actingAs($this->actor)
             ->test(ViewMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->assertActionVisible('replace_asset')

@@ -1103,9 +1103,9 @@ not an inline custom edit-state embedded into the read-only full card. The modal
 the temporary `FileUpload` state and exposes explicit `Зберегти` / `Скасувати` actions.
 After a successful save the action is unmounted and the full card has no pending
 replacement state, so page-level `Закрити` must not ask for a second save/discard
-confirmation. Admin uses Filament's native `unsavedChangesAlerts()` for standard
-Create/Edit pages and open action forms; no parallel page-level dirty-state machine
-is allowed for Asset replacement.
+confirmation. The modal's native `Зберегти` / `Скасувати` / close controls own the
+unsaved temporary upload. No panel-wide behavior change and no parallel page-level
+dirty-state machine is allowed for Asset replacement.
 
 For Filament resource lists, quick inspection must be an explicit modal action,
 not inferred resource navigation. Use a dedicated non-routing action name such as
