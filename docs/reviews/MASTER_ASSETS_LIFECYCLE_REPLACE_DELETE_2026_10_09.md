@@ -382,7 +382,7 @@ No schema migration is expected.
 
 - drawer remains read-only quick inspection;
 - manager-capable full Asset editor exposes same-identity replacement control and guarded Delete;
-- Replace confirmation explains all usages will update and shows fresh Product/Variant/Brand usage counts;
+- full Asset editor keeps `Використовується в` visible for current usages; replacement is saved through the native EditRecord form without a second confirmation modal;
 - Product-used Asset replacement tells the merchant to run Preview again for verification;
 - blocked Delete exposes a merchant-readable reason rather than an SQL/FK error;
 - no generic framework `Submit` wording leaks into the action;
