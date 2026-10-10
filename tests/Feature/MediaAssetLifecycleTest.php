@@ -25,6 +25,7 @@ use App\Support\Media\Exceptions\MediaAssetLifecycleException;
 use App\Support\Workspace\WorkspacePermissions;
 use Carbon\CarbonImmutable;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -512,7 +513,8 @@ class MediaAssetLifecycleTest extends TestCase
         Queue::fake();
         $asset = $this->managedAsset('close-page.png', 600, 400);
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
-        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $editor = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()]);
@@ -528,7 +530,8 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertSee('Формат')
             ->assertSee('Коментар')
             ->assertActionVisible('close_page')
-            ->assertActionVisible('delete_asset')
+            ->assertActionVisible(TestAction::make('delete_asset')->schemaComponent('form-actions', 'content'))
+            ->assertSeeHtml('ms-auto')
             ->assertSeeHtml('setUpUnsavedDataChangesAlert')
             ->callAction('close_page')
             ->assertJs($closeJs);
@@ -610,7 +613,8 @@ class MediaAssetLifecycleTest extends TestCase
         $asset = $this->managedAsset('ui-old.png', 600, 400);
         [$productMedia] = $this->attachEveryUsage($asset);
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
-        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
@@ -627,6 +631,9 @@ class MediaAssetLifecycleTest extends TestCase
         $this->assertSame('ui-new.png', $fresh->original_filename);
         $this->assertSame((string) $asset->id, (string) $productMedia->fresh()->media_asset_id);
         $this->assertNull(data_get($component->get('data'), 'replacement_upload'));
+        $component
+            ->assertSee((string) $fresh->storage_path)
+            ->assertDontSee('ui-old.png');
 
         $component
             ->mountAction('close_page')
@@ -634,7 +641,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertJs($closeJs);
 
         $component
-            ->callAction('delete_asset')
+            ->callAction(TestAction::make('delete_asset')->schemaComponent('form-actions', 'content'))
             ->assertNotified();
         $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
     }
@@ -670,7 +677,8 @@ class MediaAssetLifecycleTest extends TestCase
         $id = (string) $asset->id;
 
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
-        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
@@ -735,12 +743,19 @@ class MediaAssetLifecycleTest extends TestCase
         Storage::fake('public');
         $asset = $this->managedAsset('semantic-close.png', 600, 400);
 
+        $fallback = Js::from(MediaAssetResource::getUrl('index'));
+        $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
         Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm(['internal_note' => 'Незбережена нотатка'])
             ->mountAction('close_page')
             ->assertMountedActionModalSee('Закрити без збереження?')
-            ->assertMountedActionModalSee('Незбережені зміни не буде збережено.');
+            ->assertMountedActionModalSee('Незбережені зміни не буде збережено.')
+            ->callMountedAction()
+            ->assertActionNotMounted()
+            ->assertJs($closeJs);
 
         Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])

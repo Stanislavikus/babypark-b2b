@@ -71,8 +71,10 @@ class EditBrand extends EditRecord
     private function closeCurrentTab(string $fallbackUrl): null
     {
         $fallback = Js::from($fallbackUrl);
+        $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
 
-        $this->js("window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
+        $this->unmountAction();
+        $this->js("try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
 
         return null;
     }
@@ -136,12 +138,13 @@ class EditBrand extends EditRecord
                 );
             });
 
-            $this->record = $updatedRecord;
-            $this->record = $updatedRecord;
-            data_set($this->data, 'logo_media_asset_id', $updatedRecord->logo_media_asset_id ? (string) $updatedRecord->logo_media_asset_id : null);
+            $record->setRawAttributes($updatedRecord->getAttributes(), true);
+            $record->unsetRelations();
+            $this->record = $record;
+            data_set($this->data, 'logo_media_asset_id', $record->logo_media_asset_id ? (string) $record->logo_media_asset_id : null);
             data_set($this->data, 'logo_upload', null);
 
-            return $updatedRecord;
+            return $record;
         } catch (Throwable $exception) {
             foreach ($storedPaths as $storedPath) {
                 Storage::disk($storedPath['disk'])->delete($storedPath['path']);
@@ -162,9 +165,9 @@ class EditBrand extends EditRecord
         return null;
     }
 
-    protected function getRedirectUrl(): string
+    protected function getRedirectUrl(): ?string
     {
-        return $this->getResource()::getUrl('index');
+        return null;
     }
 
     private function logoUpload(mixed $state): ?UploadedFile

@@ -33,6 +33,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -552,8 +553,12 @@ class MediaAssetCoreTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
+        $refreshJs = "(() => { const key = {$refreshKey}; const slot = '__babyparkMediaAssetsRefreshHandler'; if (window[slot]) { window.removeEventListener('storage', window[slot]); } window[slot] = (event) => { if (event.key === key) { window.location.reload(); } }; window.addEventListener('storage', window[slot]); })();";
+
         $list = Livewire::actingAs($this->actor)
             ->test(ListMediaAssets::class)
+            ->assertJs($refreshJs)
             ->assertCanSeeTableRecords([$asset])
             ->assertSeeHtml('bp-media-preview-frame--asset-card')
             ->assertSee('У платформі')
@@ -586,6 +591,9 @@ class MediaAssetCoreTest extends TestCase
         $openFullCard = $mountedView->getExtraModalFooterActions()['open_full_page_footer'];
         $this->assertTrue($openFullCard->shouldOpenUrlInNewTab());
         $this->assertTrue($openFullCard->shouldClose());
+        $this->assertNotSame('opener', $openFullCard->getExtraAttributes()['rel'] ?? null);
+        $this->assertStringNotContainsString('rel="opener"', $openFullCard->toHtml());
+        $this->assertStringContainsString('target="_blank"', $openFullCard->toHtml());
         $this->assertSame(MediaAssetResource::getUrl('edit', ['record' => $asset]), $openFullCard->getUrl());
 
         Livewire::actingAs($this->actor)

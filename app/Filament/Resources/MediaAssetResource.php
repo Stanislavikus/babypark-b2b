@@ -43,6 +43,8 @@ use Illuminate\Support\HtmlString;
 
 class MediaAssetResource extends Resource
 {
+    public const LIST_REFRESH_STORAGE_KEY = 'babypark:admin:media-assets:refresh';
+
     protected static ?string $model = MediaAsset::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-photo';
@@ -113,7 +115,7 @@ class MediaAssetResource extends Resource
                         $livewire->replacementBusinessWarning = null;
                         $livewire->replacementPostSaveNotice = null;
                     }),
-                Callout::make('Зображення не змінено')
+                Callout::make(new HtmlString('<span class="font-semibold text-gray-950 dark:text-white">Зображення не змінено</span>'))
                     ->warning()
                     ->description(fn (EditMediaAsset $livewire): ?HtmlString => filled($livewire->replacementBusinessWarning)
                         ? new HtmlString('<span class="font-medium text-gray-950 dark:text-white">'.e($livewire->replacementBusinessWarning).'</span>')

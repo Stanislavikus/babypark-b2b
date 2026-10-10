@@ -2592,3 +2592,33 @@ technical Asset metadata (`Зберігання / Технічний стан / 
 text field instead of being mixed into the primary image metadata. Brand merchant-facing
 `short_description` is labelled `Короткий опис бренду`; Asset `Коментар` remains internal team
 metadata and is not the same semantic field.
+
+
+[Resolved 2026-10-10 — Media production-smoke follow-up] Full-card close confirmation must
+produce exactly one application confirmation. When the merchant confirms discarding semantic
+unsaved changes, the Filament action is unmounted before browser navigation/window close so
+Filament's mounted-action `beforeunload` guard cannot produce a second browser-native prompt.
+The ordinary Filament unsaved-data guard remains enabled for genuine browser/tab exits.
+
+[Resolved 2026-10-10 — Media production-smoke follow-up] Same-identity Asset replacement and
+Brand logo changes must become visually current in the still-open edit card immediately after
+Save; schema-bound Eloquent record instances are synchronized instead of swapping in a second
+model instance that leaves read-only ImageEntry/TextEntry components stale. Brand edit remains
+on the full card after Save. During an unsaved Brand logo upload, `Поточне зображення` continues
+to show the persisted logo; the FileUpload itself represents the pending replacement.
+
+[Resolved 2026-10-10 — Media production-smoke follow-up, security amendment] Full cards opened
+from Asset/Brand inspection drawers keep isolated browser `_blank` behavior and must not restore
+`window.opener` / `rel=opener`. On explicit `Закрити`, the full-card tab publishes a namespaced
+same-origin `localStorage` refresh signal and then closes. Only the matching Asset or Brand listing
+installs a `storage` listener for its own fixed key and reloads itself when that signal arrives;
+unrelated same-origin admin pages do not listen and therefore are not reloaded. Directly opened
+cards retain the existing fresh-list fallback when browser tab close is unavailable. Do not
+generalize the refresh channel to external or user-controlled keys/URLs.
+
+[Resolved 2026-10-10 — Media production-smoke follow-up] Asset `Видалити` is a secondary
+destructive action, not a peer of navigation `Закрити`. On the editable Asset full card, keep
+`Закрити` alone in the header and place the existing guarded `Видалити` action in the form footer,
+visually separated to the far end from `Зберегти / Скасувати`. Existing lifecycle guards and the
+danger confirmation remain unchanged. Replacement business conflicts remain warning/amber, not
+error/red; the heading is visually stronger than its explanatory text.

@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
 
@@ -32,6 +33,15 @@ class ListMediaAssets extends ListRecords
         if (! in_array($this->assetLayout, ['grid', 'list'], true)) {
             $this->assetLayout = 'grid';
         }
+
+        $this->installCrossTabRefreshListener();
+    }
+
+    private function installCrossTabRefreshListener(): void
+    {
+        $key = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
+
+        $this->js("(() => { const key = {$key}; const slot = '__babyparkMediaAssetsRefreshHandler'; if (window[slot]) { window.removeEventListener('storage', window[slot]); } window[slot] = (event) => { if (event.key === key) { window.location.reload(); } }; window.addEventListener('storage', window[slot]); })();");
     }
 
     protected function getHeaderActions(): array
