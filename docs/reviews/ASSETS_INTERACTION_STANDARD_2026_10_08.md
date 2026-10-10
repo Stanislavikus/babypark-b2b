@@ -302,3 +302,14 @@ listing when browser tab close is unavailable. Deletion safety checks remain
 unchanged. Warning Callout explanation uses Filament's standard description
 typography for both duplicate and unchanged-image messages; only the warning
 title receives stronger emphasis.
+
+The real browser regression matrix also exercised the exceptional unsaved
+temporary-upload case. Filament's built-in `beforeunload` dirty-hash check
+legitimately fires for transient FilePond state even **after** the merchant has
+confirmed the separate `Закрити без збереження?` action. The explicit confirmed
+exit therefore synchronizes Filament's client-side `savedDataHash` to the accepted
+current form state immediately before intentional tab close/fallback navigation,
+so the native Filament guard itself does not issue a second prompt. Normal accidental
+navigation retains Filament's native unsaved-changes protection. This is
+limited to explicit Asset/Brand close and guarded Asset Delete success; no
+global Filament override or new dependency is introduced.

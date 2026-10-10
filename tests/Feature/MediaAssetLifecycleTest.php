@@ -514,7 +514,7 @@ class MediaAssetLifecycleTest extends TestCase
         $asset = $this->managedAsset('close-page.png', 600, 400);
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "(() => { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         $editor = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()]);
@@ -614,7 +614,7 @@ class MediaAssetLifecycleTest extends TestCase
         [$productMedia] = $this->attachEveryUsage($asset);
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "(() => { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
@@ -654,7 +654,7 @@ class MediaAssetLifecycleTest extends TestCase
         $asset = $this->managedAsset('delete-and-refresh.png', 600, 400);
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "(() => { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
@@ -697,7 +697,7 @@ class MediaAssetLifecycleTest extends TestCase
 
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "(() => { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
@@ -764,7 +764,7 @@ class MediaAssetLifecycleTest extends TestCase
 
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "(() => { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
