@@ -46,6 +46,7 @@ class EditMediaAsset extends EditRecord
                 ->icon('heroicon-o-x-mark')
                 ->color('gray')
                 ->requiresConfirmation(fn (): bool => $this->hasUnsavedAssetChanges())
+                ->modalHidden(fn (): bool => ! $this->hasUnsavedAssetChanges())
                 ->modalHeading('Закрити без збереження?')
                 ->modalDescription('Незбережені зміни не буде збережено.')
                 ->modalSubmitActionLabel('Закрити')

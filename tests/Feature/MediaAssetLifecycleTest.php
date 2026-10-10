@@ -629,7 +629,8 @@ class MediaAssetLifecycleTest extends TestCase
         $this->assertNull(data_get($component->get('data'), 'replacement_upload'));
 
         $component
-            ->callAction('close_page')
+            ->mountAction('close_page')
+            ->assertActionNotMounted()
             ->assertJs($closeJs);
 
         $component
@@ -682,7 +683,8 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertNotNotified('Зображення замінено');
 
         $component
-            ->callAction('close_page')
+            ->mountAction('close_page')
+            ->assertActionNotMounted()
             ->assertJs($closeJs);
 
         $fresh = $asset->fresh();

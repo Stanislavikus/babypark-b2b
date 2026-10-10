@@ -350,7 +350,8 @@ final class BrandManagementTest extends TestCase
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
             ->assertActionVisible('close_page')
             ->assertSeeHtml('setUpUnsavedDataChangesAlert')
-            ->callAction('close_page')
+            ->mountAction('close_page')
+            ->assertActionNotMounted()
             ->assertJs($closeJs);
 
         $component
@@ -388,7 +389,8 @@ final class BrandManagementTest extends TestCase
         $this->assertSame((string) $fresh->logo_media_asset_id, (string) data_get($component->get('data'), 'logo_media_asset_id'));
 
         $component
-            ->callAction('close_page')
+            ->mountAction('close_page')
+            ->assertActionNotMounted()
             ->assertJs($closeJs);
     }
 

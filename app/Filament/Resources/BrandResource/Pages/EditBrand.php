@@ -35,6 +35,7 @@ class EditBrand extends EditRecord
                 ->icon('heroicon-o-x-mark')
                 ->color('gray')
                 ->requiresConfirmation(fn (): bool => $this->hasUnsavedBrandChanges())
+                ->modalHidden(fn (): bool => ! $this->hasUnsavedBrandChanges())
                 ->modalHeading('Закрити без збереження?')
                 ->modalDescription('Незбережені зміни бренду буде втрачено.')
                 ->modalSubmitActionLabel('Закрити')
@@ -135,6 +136,8 @@ class EditBrand extends EditRecord
                 );
             });
 
+            $this->record = $updatedRecord;
+            $this->record = $updatedRecord;
             data_set($this->data, 'logo_media_asset_id', $updatedRecord->logo_media_asset_id ? (string) $updatedRecord->logo_media_asset_id : null);
             data_set($this->data, 'logo_upload', null);
 
