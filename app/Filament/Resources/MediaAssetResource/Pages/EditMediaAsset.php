@@ -25,6 +25,8 @@ class EditMediaAsset extends EditRecord
 {
     protected static string $resource = MediaAssetResource::class;
 
+    protected ?bool $hasDatabaseTransactions = true;
+
     protected ?bool $hasUnsavedDataChangesAlert = true;
 
     protected bool $replacementWasApplied = false;

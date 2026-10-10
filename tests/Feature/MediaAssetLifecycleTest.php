@@ -27,6 +27,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -203,7 +204,7 @@ class MediaAssetLifecycleTest extends TestCase
 
         $this->assertFalse($result->replaced);
         $this->assertSame($path, (string) $asset->fresh()->storage_path);
-        Queue::assertNothingPushed();
+        $this->assertDatabaseCount('jobs', 0);
     }
 
     #[Test]
@@ -408,7 +409,7 @@ class MediaAssetLifecycleTest extends TestCase
         app(MediaAssetLifecycleService::class)->deleteUnusedOriginal($this->actor, $this->workspace, $asset);
 
         $this->assertDatabaseMissing('media_assets', ['id' => $asset->id]);
-        Queue::assertNothingPushed();
+        $this->assertDatabaseCount('jobs', 0);
     }
 
     #[Test]
@@ -513,8 +514,12 @@ class MediaAssetLifecycleTest extends TestCase
         $fallback = Js::from(MediaAssetResource::getUrl('index'));
         $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
-        Livewire::actingAs($this->actor)
-            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+        $editor = Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()]);
+
+        $this->assertTrue($editor->instance()->hasDatabaseTransactions());
+
+        $editor
             ->assertSee('Поточне зображення')
             ->assertSee('Нове зображення')
             ->assertSee('Розмір')
@@ -554,6 +559,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm([
                 'replacement_upload' => UploadedFile::fake()->image('replacement.png', 800, 600),
+                'internal_note' => 'Не повинно зберегтися',
             ])
             ->call('save')
             ->assertSet('replacementBusinessWarning', fn (?string $value): bool => str_contains((string) $value, 'похідних версій'))
@@ -563,6 +569,7 @@ class MediaAssetLifecycleTest extends TestCase
         $fresh = $asset->fresh();
         $this->assertSame($oldHash, (string) $fresh->content_sha256);
         $this->assertSame($oldPath, (string) $fresh->storage_path);
+        $this->assertNull($fresh->internal_note);
     }
 
     #[Test]
@@ -676,6 +683,42 @@ class MediaAssetLifecycleTest extends TestCase
     }
 
     #[Test]
+    public function asset_edit_outer_transaction_rolls_back_replace_and_note_when_save_fails_after_update(): void
+    {
+        Storage::fake('public');
+        config(['queue.default' => 'database']);
+        $asset = $this->managedAsset('atomic-old.png', 600, 400);
+        $asset->update(['internal_note' => 'До зміни']);
+        $asset->refresh();
+        $oldFilename = (string) $asset->original_filename;
+        $oldHash = (string) $asset->content_sha256;
+        $oldPath = (string) $asset->storage_path;
+        $beforeFiles = Storage::disk('public')->allFiles('media/originals/'.$this->workspace->id);
+
+        try {
+            Livewire::actingAs($this->actor)
+                ->test(FailingAfterMediaAssetUpdate::class, ['record' => $asset->getRouteKey()])
+                ->fillForm([
+                    'replacement_upload' => UploadedFile::fake()->image('atomic-new.png', 800, 600),
+                    'internal_note' => 'Після зміни',
+                ])
+                ->call('save');
+
+            $this->fail('Simulated post-update failure should escape EditRecord save.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('simulated post-update failure', $exception->getMessage());
+        }
+
+        $fresh = $asset->fresh();
+        $this->assertSame($oldFilename, (string) $fresh->original_filename);
+        $this->assertSame($oldHash, (string) $fresh->content_sha256);
+        $this->assertSame($oldPath, (string) $fresh->storage_path);
+        $this->assertSame('До зміни', $fresh->internal_note);
+        $this->assertSame($beforeFiles, Storage::disk('public')->allFiles('media/originals/'.$this->workspace->id));
+        $this->assertDatabaseCount('jobs', 0);
+    }
+
+    #[Test]
     public function viewer_keeps_read_only_asset_full_card_and_cannot_open_editor(): void
     {
         Storage::fake('public');
@@ -746,5 +789,15 @@ class MediaAssetLifecycleTest extends TestCase
         ]);
 
         return [$productMedia, $variantMedia, $brand];
+    }
+}
+
+final class FailingAfterMediaAssetUpdate extends EditMediaAsset
+{
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        parent::handleRecordUpdate($record, $data);
+
+        throw new \RuntimeException('simulated post-update failure');
     }
 }

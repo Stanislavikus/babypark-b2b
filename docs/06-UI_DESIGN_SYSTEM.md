@@ -1129,7 +1129,9 @@ the merchant's attention is anchored to the replacement field, so a business con
 leaves the Asset unchanged is rendered as a native Filament warning Callout directly beside
 the replacement control. Do not globally reposition the panel notification container and do
 not add a blocking modal merely to surface this warning. File validation errors remain inline.
-Successful saves continue to use the standard transient success notification.
+Successful saves continue to use the standard transient success notification. The Asset
+EditRecord save enables a page-local database transaction so same-identity replacement and
+`internal_note` persistence form one Save boundary; this must not enable transactions panel-wide.
 
 [Resolved 2026-10-10 — production feedback amendment] MediaAsset may store nullable
 `internal_note` merchant-team metadata, shown as `Коментар` in the editable Asset full card.
