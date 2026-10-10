@@ -113,7 +113,7 @@ class MediaAssetResource extends Resource
                         $livewire->replacementBusinessWarning = null;
                         $livewire->replacementPostSaveNotice = null;
                     }),
-                Callout::make('Зображення не змінено')
+                Callout::make(new HtmlString('<span class="font-semibold text-gray-950 dark:text-white">Зображення не змінено</span>'))
                     ->warning()
                     ->description(fn (EditMediaAsset $livewire): ?HtmlString => filled($livewire->replacementBusinessWarning)
                         ? new HtmlString('<span class="font-medium text-gray-950 dark:text-white">'.e($livewire->replacementBusinessWarning).'</span>')
@@ -391,6 +391,7 @@ class MediaAssetResource extends Resource
                             ->color('gray')
                             ->url(self::fullCardUrl($record))
                             ->openUrlInNewTab()
+                            ->extraAttributes(['rel' => 'opener'])
                             ->close(),
                     ]),
             ])

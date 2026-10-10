@@ -16,6 +16,7 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\BrandManager;
+use App\Services\Media\MediaAssetSourceResolver;
 use App\Services\Media\OriginalImageIngestService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -344,7 +345,7 @@ final class BrandManagementTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Close Brand');
         $fallback = Js::from(BrandResource::getUrl('index'));
-        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $closeJs = "try { if (window.opener && ! window.opener.closed && window.opener.location.origin === window.location.origin) { window.opener.location.reload(); } } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
@@ -360,6 +361,7 @@ final class BrandManagementTest extends TestCase
             ->assertMountedActionModalSee('Закрити без збереження?')
             ->assertMountedActionModalSee('Незбережені зміни бренду буде втрачено.')
             ->callMountedAction()
+            ->assertActionNotMounted()
             ->assertJs($closeJs);
     }
 
@@ -370,23 +372,41 @@ final class BrandManagementTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Quiet Save Brand');
         $fallback = Js::from(BrandResource::getUrl('index'));
-        $closeJs = "window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $closeJs = "try { if (window.opener && ! window.opener.closed && window.opener.location.origin === window.location.origin) { window.opener.location.reload(); } } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+
+        $oldLogo = app(OriginalImageIngestService::class)->ingestStandalone(
+            $this->actor,
+            $this->workspace,
+            UploadedFile::fake()->image('quiet-old-logo.png', 400, 120),
+        );
+        $oldLogoSource = app(MediaAssetSourceResolver::class)->sourceReference($oldLogo);
+        $this->assertNotNull($oldLogoSource);
+        $brand->update(['logo_media_asset_id' => $oldLogo->id]);
+        $brand->refresh();
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->assertSchemaComponentStateSet('logo_preview', $oldLogoSource, 'form')
             ->fillForm([
                 'short_description' => 'Публічний опис бренду',
                 'logo_upload' => UploadedFile::fake()->image('quiet-brand.png', 600, 200),
             ])
+            ->assertSchemaComponentStateSet('logo_preview', $oldLogoSource, 'form')
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertNotNotified();
+            ->assertNotNotified()
+            ->assertNoRedirect();
 
         $fresh = $brand->fresh();
         $this->assertSame('Публічний опис бренду', $fresh->short_description);
         $this->assertNotNull($fresh->logo_media_asset_id);
+        $this->assertNotSame((string) $oldLogo->id, (string) $fresh->logo_media_asset_id);
+        $newLogo = MediaAsset::withoutWorkspaceScope()->findOrFail($fresh->logo_media_asset_id);
         $this->assertNull(data_get($component->get('data'), 'logo_upload'));
         $this->assertSame((string) $fresh->logo_media_asset_id, (string) data_get($component->get('data'), 'logo_media_asset_id'));
+        $newLogoSource = app(MediaAssetSourceResolver::class)->sourceReference($newLogo);
+        $this->assertNotNull($newLogoSource);
+        $component->assertSchemaComponentStateSet('logo_preview', $newLogoSource, 'form');
 
         $component
             ->mountAction('close_page')
@@ -427,6 +447,8 @@ final class BrandManagementTest extends TestCase
         $openFullCard = $mountedInspect->getExtraModalFooterActions()['open_full_page_footer'];
         $this->assertTrue($openFullCard->shouldOpenUrlInNewTab());
         $this->assertTrue($openFullCard->shouldClose());
+        $this->assertSame('opener', $openFullCard->getExtraAttributes()['rel'] ?? null);
+        $this->assertStringContainsString('rel="opener"', $openFullCard->toHtml());
         $list->assertSee('Frame Brand');
 
         Livewire::actingAs($this->actor)

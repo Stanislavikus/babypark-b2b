@@ -271,3 +271,16 @@ unsaved state: a real temporary UploadedFile and/or a changed internal note. Gen
 toasts are suppressed on Asset edit; lifecycle-required post-save guidance remains local inline.
 The full-card media row is aligned with the quick-view pattern: heading above, image and primary
 file metadata aligned, secondary technical metadata below the merchant text field.
+
+
+## 2026-10-10 production-smoke follow-up — live visual state and close lifecycle
+
+Production smoke found three interaction defects that unit-level lifecycle correctness did not
+surface: a second browser-native `beforeunload` prompt after confirming the Filament close modal,
+a stale persisted-image view after same-ID replacement, and stale listing thumbnails when a
+full card was closed back to its originating tab. The accepted correction keeps Filament's
+unsaved protection but unmounts the confirmed close action before browser navigation, keeps the
+schema-bound model instance synchronized after Save, and refreshes the same-origin opener listing
+on explicit close. Brand edit now stays on the card after Save and keeps the persisted logo visible
+while a new upload is only pending. The existing Asset delete action moves from the header to a
+visually separated danger action in the form footer; delete semantics themselves are unchanged.

@@ -64,39 +64,54 @@ class BrandResource extends Resource
                     ->maxLength(255),
                 Text::make('Поточне зображення')
                     ->weight(FontWeight::SemiBold),
-                Group::make()
-                    ->schema(function (Get $get): array {
-                        $asset = self::selectedLogoAsset($get);
+                Group::make([
+                    MediaPreviewFrame::entry(
+                        ImageEntry::make('logo_preview')
+                            ->label('Поточне зображення')
+                            ->hiddenLabel()
+                            ->state(fn (Get $get, ?Brand $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference(self::formLogoAsset($get, $record)))
+                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
+                        MediaPreviewFrame::BRAND_FORM,
+                    ),
+                    Group::make([
+                        TextEntry::make('logo_file')
+                            ->label('Файл')
+                            ->state(function (Get $get, ?Brand $record): string {
+                                $asset = self::formLogoAsset($get, $record);
 
-                        return [
-                            MediaPreviewFrame::entry(
-                                ImageEntry::make('logo_preview')
-                                    ->label('Поточне зображення')
-                                    ->hiddenLabel()
-                                    ->state(app(MediaAssetSourceResolver::class)->sourceReference($asset))
-                                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
-                                MediaPreviewFrame::BRAND_FORM,
-                            ),
-                            Group::make([
-                                TextEntry::make('logo_file')
-                                    ->label('Файл')
-                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::displayName($asset) : '—')
-                                    ->columnSpanFull(),
-                                TextEntry::make('logo_dimensions')
-                                    ->label('Розмір')
-                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::dimensions($asset) : '—'),
-                                TextEntry::make('logo_megapixels')
-                                    ->label('Мегапікселі')
-                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::megapixels($asset) : '—'),
-                                TextEntry::make('logo_byte_size')
-                                    ->label('Вага')
-                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::formatBytes($asset->byte_size) : '—'),
-                                TextEntry::make('logo_mime_type')
-                                    ->label('Формат')
-                                    ->state($asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—'),
-                            ])->columns(2),
-                        ];
-                    })
+                                return $asset instanceof MediaAsset ? MediaAssetResource::displayName($asset) : '—';
+                            })
+                            ->columnSpanFull(),
+                        TextEntry::make('logo_dimensions')
+                            ->label('Розмір')
+                            ->state(function (Get $get, ?Brand $record): string {
+                                $asset = self::formLogoAsset($get, $record);
+
+                                return $asset instanceof MediaAsset ? MediaAssetResource::dimensions($asset) : '—';
+                            }),
+                        TextEntry::make('logo_megapixels')
+                            ->label('Мегапікселі')
+                            ->state(function (Get $get, ?Brand $record): string {
+                                $asset = self::formLogoAsset($get, $record);
+
+                                return $asset instanceof MediaAsset ? MediaAssetResource::megapixels($asset) : '—';
+                            }),
+                        TextEntry::make('logo_byte_size')
+                            ->label('Вага')
+                            ->state(function (Get $get, ?Brand $record): string {
+                                $asset = self::formLogoAsset($get, $record);
+
+                                return $asset instanceof MediaAsset ? MediaAssetResource::formatBytes($asset->byte_size) : '—';
+                            }),
+                        TextEntry::make('logo_mime_type')
+                            ->label('Формат')
+                            ->state(function (Get $get, ?Brand $record): string {
+                                $asset = self::formLogoAsset($get, $record);
+
+                                return $asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—';
+                            }),
+                    ])->columns(2),
+                ])
                     ->columns([
                         'default' => 1,
                         'md' => 2,
@@ -148,28 +163,39 @@ class BrandResource extends Resource
                     ->label('Короткий опис бренду')
                     ->rows(3)
                     ->maxLength(2000),
-                Group::make()
-                    ->schema(function (Get $get): array {
-                        $asset = self::selectedLogoAsset($get);
+                Group::make([
+                    TextEntry::make('logo_source_kind')
+                        ->label('Зберігання')
+                        ->state(function (Get $get, ?Brand $record): string {
+                            $asset = self::formLogoAsset($get, $record);
 
-                        return [
-                            TextEntry::make('logo_source_kind')
-                                ->label('Зберігання')
-                                ->state($asset instanceof MediaAsset ? MediaAssetResource::sourceLabel($asset) : '—')
-                                ->badge()
-                                ->color($asset instanceof MediaAsset ? MediaAssetResource::sourceColor($asset) : 'gray'),
-                            TextEntry::make('logo_diagnosis_status')
-                                ->label('Технічний стан')
-                                ->state($asset instanceof MediaAsset ? MediaAssetResource::diagnosisLabel($asset->diagnosis_status) : '—')
-                                ->badge()
-                                ->color($asset instanceof MediaAsset ? MediaAssetResource::diagnosisColor($asset) : 'gray'),
-                            TextEntry::make('logo_created_at')
-                                ->label('Додано')
-                                ->state($asset?->created_at)
-                                ->dateTime('d.m.Y H:i')
-                                ->placeholder('—'),
-                        ];
-                    })
+                            return $asset instanceof MediaAsset ? MediaAssetResource::sourceLabel($asset) : '—';
+                        })
+                        ->badge()
+                        ->color(function (Get $get, ?Brand $record): string {
+                            $asset = self::formLogoAsset($get, $record);
+
+                            return $asset instanceof MediaAsset ? MediaAssetResource::sourceColor($asset) : 'gray';
+                        }),
+                    TextEntry::make('logo_diagnosis_status')
+                        ->label('Технічний стан')
+                        ->state(function (Get $get, ?Brand $record): string {
+                            $asset = self::formLogoAsset($get, $record);
+
+                            return $asset instanceof MediaAsset ? MediaAssetResource::diagnosisLabel($asset->diagnosis_status) : '—';
+                        })
+                        ->badge()
+                        ->color(function (Get $get, ?Brand $record): string {
+                            $asset = self::formLogoAsset($get, $record);
+
+                            return $asset instanceof MediaAsset ? MediaAssetResource::diagnosisColor($asset) : 'gray';
+                        }),
+                    TextEntry::make('logo_created_at')
+                        ->label('Додано')
+                        ->state(fn (Get $get, ?Brand $record): mixed => self::formLogoAsset($get, $record)?->created_at)
+                        ->dateTime('d.m.Y H:i')
+                        ->placeholder('—'),
+                ])
                     ->columns([
                         'default' => 1,
                         'md' => 3,
@@ -271,6 +297,7 @@ class BrandResource extends Resource
                             ->color('gray')
                             ->url(self::getUrl('edit', ['record' => $record]))
                             ->openUrlInNewTab()
+                            ->extraAttributes(['rel' => 'opener'])
                             ->close(),
                     ]),
                 EditAction::make()
@@ -318,6 +345,15 @@ class BrandResource extends Resource
     public static function getDeleteAuthorizationResponse(Model $record): Response
     {
         return Response::deny();
+    }
+
+    private static function formLogoAsset(Get $get, ?Brand $record): ?MediaAsset
+    {
+        if ($record instanceof Brand) {
+            return $record->logo;
+        }
+
+        return self::selectedLogoAsset($get);
     }
 
     private static function selectedLogoAsset(Get $get): ?MediaAsset

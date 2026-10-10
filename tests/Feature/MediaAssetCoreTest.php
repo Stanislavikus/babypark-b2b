@@ -586,6 +586,8 @@ class MediaAssetCoreTest extends TestCase
         $openFullCard = $mountedView->getExtraModalFooterActions()['open_full_page_footer'];
         $this->assertTrue($openFullCard->shouldOpenUrlInNewTab());
         $this->assertTrue($openFullCard->shouldClose());
+        $this->assertSame('opener', $openFullCard->getExtraAttributes()['rel'] ?? null);
+        $this->assertStringContainsString('rel="opener"', $openFullCard->toHtml());
         $this->assertSame(MediaAssetResource::getUrl('edit', ['record' => $asset]), $openFullCard->getUrl());
 
         Livewire::actingAs($this->actor)

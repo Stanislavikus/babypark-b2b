@@ -55,7 +55,6 @@ class EditMediaAsset extends EditRecord
 
                     return $this->closeCurrentTab(MediaAssetResource::getUrl('index'));
                 }),
-            $this->deleteAssetAction(),
         ];
     }
 
@@ -63,6 +62,16 @@ class EditMediaAsset extends EditRecord
     {
         return parent::getSaveFormAction()
             ->label('Зберегти');
+    }
+
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getSaveFormAction(),
+            $this->getCancelFormAction(),
+            $this->deleteAssetAction()
+                ->extraAttributes(['class' => 'ms-auto']),
+        ];
     }
 
     protected function handleRecordUpdate(Model $record, array $data): Model
@@ -107,7 +116,9 @@ class EditMediaAsset extends EditRecord
                 default => null,
             };
             data_set($this->data, 'replacement_upload', null);
-            $updatedRecord = $result->asset;
+            $record->setRawAttributes($result->asset->getAttributes(), true);
+            $record->unsetRelations();
+            $updatedRecord = $record;
         }
 
         $updatedRecord->fill([
@@ -227,7 +238,8 @@ class EditMediaAsset extends EditRecord
     {
         $fallback = Js::from($fallbackUrl);
 
-        $this->js("window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
+        $this->unmountAction();
+        $this->js("try { if (window.opener && ! window.opener.closed && window.opener.location.origin === window.location.origin) { window.opener.location.reload(); } } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
 
         return null;
     }
