@@ -2574,3 +2574,21 @@ Anything that makes the user stop and ask “what is this system concept?” sho
 The best interface is not the one that shows how powerful the architecture is.
 
 The best interface is the one that lets a small business sell without learning the architecture.
+
+
+[Resolved 2026-10-10 — Media final production polish] Asset and Brand edit cards do not
+show a generic top-right success toast after an ordinary successful save. Validation and
+business failures remain visible at the relevant control. Any lifecycle-required post-save
+instruction (for example, Product-used Asset replacement requiring Preview re-verification)
+must remain visible as a local inline Callout rather than being discarded with the generic
+success toast. `Закрити` confirmation is based on semantic unsaved fields/uploads, not a raw
+serialized FileUpload hash, so browser normalization of empty upload state (`null` vs empty
+array) cannot produce a false dirty warning after Save.
+
+[Resolved 2026-10-10 — Media final production polish] Full Asset and Brand edit cards keep
+`Поточне зображення` as a heading above the media row. The image and primary file metadata
+(`Файл / Розмір / Мегапікселі / Вага / Формат`) start on the same visual row. Secondary
+technical Asset metadata (`Зберігання / Технічний стан / Додано`) is placed below the merchant
+text field instead of being mixed into the primary image metadata. Brand merchant-facing
+`short_description` is labelled `Короткий опис бренду`; Asset `Коментар` remains internal team
+metadata and is not the same semantic field.

@@ -10,6 +10,7 @@ use App\Services\Media\OriginalImageIngestService;
 use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,7 @@ class EditBrand extends EditRecord
                 ->icon('heroicon-o-x-mark')
                 ->color('gray')
                 ->requiresConfirmation(fn (): bool => $this->hasUnsavedBrandChanges())
+                ->modalHidden(fn (): bool => ! $this->hasUnsavedBrandChanges())
                 ->modalHeading('Закрити без збереження?')
                 ->modalDescription('Незбережені зміни бренду буде втрачено.')
                 ->modalSubmitActionLabel('Закрити')
@@ -47,9 +49,23 @@ class EditBrand extends EditRecord
 
     private function hasUnsavedBrandChanges(): bool
     {
-        $currentHash = md5((string) str(json_encode($this->data, JSON_UNESCAPED_UNICODE))->replace('\\', ''));
+        if ($this->logoUpload(data_get($this->data, 'logo_upload')) instanceof UploadedFile) {
+            return true;
+        }
 
-        return $currentHash !== $this->savedDataHash;
+        $name = trim((string) data_get($this->data, 'name', ''));
+        $description = filled(data_get($this->data, 'short_description'))
+            ? trim((string) data_get($this->data, 'short_description'))
+            : null;
+        $logoId = filled(data_get($this->data, 'logo_media_asset_id'))
+            ? (string) data_get($this->data, 'logo_media_asset_id')
+            : null;
+        $isActive = (bool) data_get($this->data, 'is_active', false);
+
+        return $name !== trim((string) $this->record->name)
+            || $description !== (filled($this->record->short_description) ? trim((string) $this->record->short_description) : null)
+            || $logoId !== ($this->record->logo_media_asset_id ? (string) $this->record->logo_media_asset_id : null)
+            || $isActive !== (bool) $this->record->is_active;
     }
 
     private function closeCurrentTab(string $fallbackUrl): null
@@ -87,7 +103,7 @@ class EditBrand extends EditRecord
         $storedPaths = [];
 
         try {
-            return DB::transaction(function () use (
+            $updatedRecord = DB::transaction(function () use (
                 $actor,
                 $workspace,
                 $record,
@@ -119,6 +135,13 @@ class EditBrand extends EditRecord
                     $data,
                 );
             });
+
+            $this->record = $updatedRecord;
+            $this->record = $updatedRecord;
+            data_set($this->data, 'logo_media_asset_id', $updatedRecord->logo_media_asset_id ? (string) $updatedRecord->logo_media_asset_id : null);
+            data_set($this->data, 'logo_upload', null);
+
+            return $updatedRecord;
         } catch (Throwable $exception) {
             foreach ($storedPaths as $storedPath) {
                 Storage::disk($storedPath['disk'])->delete($storedPath['path']);
@@ -132,6 +155,11 @@ class EditBrand extends EditRecord
 
             throw $exception;
         }
+    }
+
+    protected function getSavedNotification(): ?Notification
+    {
+        return null;
     }
 
     protected function getRedirectUrl(): string

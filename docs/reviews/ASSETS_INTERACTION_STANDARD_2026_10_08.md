@@ -261,3 +261,13 @@ MediaAsset `internal_note`, labelled `Коментар`, is added as internal me
 is excluded from identity/dedup/provenance/channel semantics. Brand full cards expose the same
 canonical logo-Asset storage/status/created metadata. Reuse of one Asset by multiple Brands is
 intentional and remains allowed.
+
+
+## 2026-10-10 final production polish — semantic close state and quiet success
+
+Production smoke after the internal-note rollout exposed a browser-only false dirty warning
+caused by comparing raw FileUpload serialization. Asset close confirmation now checks semantic
+unsaved state: a real temporary UploadedFile and/or a changed internal note. Generic success
+toasts are suppressed on Asset edit; lifecycle-required post-save guidance remains local inline.
+The full-card media row is aligned with the quick-view pattern: heading above, image and primary
+file metadata aligned, secondary technical metadata below the merchant text field.

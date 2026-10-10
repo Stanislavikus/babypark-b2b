@@ -29,13 +29,9 @@ class EditMediaAsset extends EditRecord
 
     protected ?bool $hasUnsavedDataChangesAlert = true;
 
-    protected bool $replacementWasApplied = false;
-
-    protected bool $replacementWasNoOp = false;
-
-    protected ?string $savedNotificationBody = null;
-
     public ?string $replacementBusinessWarning = null;
+
+    public ?string $replacementPostSaveNotice = null;
 
     public function getTitle(): string
     {
@@ -50,8 +46,9 @@ class EditMediaAsset extends EditRecord
                 ->icon('heroicon-o-x-mark')
                 ->color('gray')
                 ->requiresConfirmation(fn (): bool => $this->hasUnsavedAssetChanges())
+                ->modalHidden(fn (): bool => ! $this->hasUnsavedAssetChanges())
                 ->modalHeading('Закрити без збереження?')
-                ->modalDescription('Вибране нове зображення не буде збережено.')
+                ->modalDescription('Незбережені зміни не буде збережено.')
                 ->modalSubmitActionLabel('Закрити')
                 ->action(function (): mixed {
                     $this->rememberData();
@@ -76,10 +73,8 @@ class EditMediaAsset extends EditRecord
 
         $file = $this->replacementUpload($data['replacement_upload'] ?? null);
         $updatedRecord = $record;
-        $this->replacementWasApplied = false;
-        $this->replacementWasNoOp = false;
-        $this->savedNotificationBody = null;
         $this->replacementBusinessWarning = null;
+        $this->replacementPostSaveNotice = null;
 
         if ($file instanceof UploadedFile) {
             $actor = auth()->user();
@@ -105,12 +100,12 @@ class EditMediaAsset extends EditRecord
                 ]);
             }
 
-            $this->replacementWasApplied = $result->replaced;
-            $this->replacementWasNoOp = ! $result->replaced;
             $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($result->asset);
-            $this->savedNotificationBody = $usage['products'] > 0 && $result->replaced
-                ? 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.'
-                : null;
+            $this->replacementPostSaveNotice = match (true) {
+                ! $result->replaced => 'Зображення вже актуальне. Змін не внесено.',
+                $usage['products'] > 0 => 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.',
+                default => null,
+            };
             data_set($this->data, 'replacement_upload', null);
             $updatedRecord = $result->asset;
         }
@@ -128,14 +123,7 @@ class EditMediaAsset extends EditRecord
 
     protected function getSavedNotification(): ?Notification
     {
-        return Notification::make()
-            ->success()
-            ->title(match (true) {
-                $this->replacementWasApplied => 'Зображення замінено',
-                $this->replacementWasNoOp => 'Зображення вже актуальне',
-                default => 'Asset збережено',
-            })
-            ->body($this->savedNotificationBody);
+        return null;
     }
 
     protected function getRedirectUrl(): ?string
@@ -221,9 +209,18 @@ class EditMediaAsset extends EditRecord
 
     private function hasUnsavedAssetChanges(): bool
     {
-        $currentHash = md5((string) str(json_encode($this->data, JSON_UNESCAPED_UNICODE))->replace('\\', ''));
+        if ($this->replacementUpload() instanceof UploadedFile) {
+            return true;
+        }
 
-        return $currentHash !== $this->savedDataHash;
+        $currentNote = filled(data_get($this->data, 'internal_note'))
+            ? trim((string) data_get($this->data, 'internal_note'))
+            : null;
+        $savedNote = filled($this->record->internal_note)
+            ? trim((string) $this->record->internal_note)
+            : null;
+
+        return $currentNote !== $savedNote;
     }
 
     private function closeCurrentTab(string $fallbackUrl): null

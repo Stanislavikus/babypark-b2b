@@ -24,6 +24,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
@@ -38,6 +39,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 
 class MediaAssetResource extends Resource
 {
@@ -57,10 +59,13 @@ class MediaAssetResource extends Resource
     {
         return $schema->components([
             Section::make()->schema([
+                Text::make('Поточне зображення')
+                    ->weight(FontWeight::SemiBold),
                 Group::make([
                     MediaPreviewFrame::entry(
                         ImageEntry::make('current_preview')
                             ->label('Поточне зображення')
+                            ->hiddenLabel()
                             ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
                             ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
                         MediaPreviewFrame::DETAIL,
@@ -106,11 +111,18 @@ class MediaAssetResource extends Resource
                     ->live()
                     ->afterStateUpdated(function (EditMediaAsset $livewire): void {
                         $livewire->replacementBusinessWarning = null;
+                        $livewire->replacementPostSaveNotice = null;
                     }),
                 Callout::make('Зображення не змінено')
                     ->warning()
-                    ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementBusinessWarning)
+                    ->description(fn (EditMediaAsset $livewire): ?HtmlString => filled($livewire->replacementBusinessWarning)
+                        ? new HtmlString('<span class="font-medium text-gray-950 dark:text-white">'.e($livewire->replacementBusinessWarning).'</span>')
+                        : null)
                     ->visible(fn (EditMediaAsset $livewire): bool => filled($livewire->replacementBusinessWarning)),
+                Callout::make('Зверніть увагу')
+                    ->info()
+                    ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementPostSaveNotice)
+                    ->visible(fn (EditMediaAsset $livewire): bool => filled($livewire->replacementPostSaveNotice)),
                 Textarea::make('internal_note')
                     ->label('Коментар')
                     ->helperText('Внутрішня нотатка для команди. Не передається в канали та не змінює файл.')
