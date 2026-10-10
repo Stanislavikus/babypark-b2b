@@ -89,6 +89,21 @@ class BrandResource extends Resource
                                 TextEntry::make('logo_mime_type')
                                     ->label('Формат')
                                     ->state($asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—'),
+                                TextEntry::make('logo_source_kind')
+                                    ->label('Зберігання')
+                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::sourceLabel($asset) : '—')
+                                    ->badge()
+                                    ->color($asset instanceof MediaAsset ? MediaAssetResource::sourceColor($asset) : 'gray'),
+                                TextEntry::make('logo_diagnosis_status')
+                                    ->label('Технічний стан')
+                                    ->state($asset instanceof MediaAsset ? MediaAssetResource::diagnosisLabel($asset->diagnosis_status) : '—')
+                                    ->badge()
+                                    ->color($asset instanceof MediaAsset ? MediaAssetResource::diagnosisColor($asset) : 'gray'),
+                                TextEntry::make('logo_created_at')
+                                    ->label('Додано')
+                                    ->state($asset?->created_at)
+                                    ->dateTime('d.m.Y H:i')
+                                    ->placeholder('—'),
                             ])->columns(2),
                         ];
                     })

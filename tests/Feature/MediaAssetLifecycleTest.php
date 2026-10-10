@@ -521,6 +521,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertSee('Мегапікселі')
             ->assertSee('Вага')
             ->assertSee('Формат')
+            ->assertSee('Коментар')
             ->assertActionVisible('close_page')
             ->assertActionVisible('delete_asset')
             ->assertSeeHtml('setUpUnsavedDataChangesAlert')
@@ -555,7 +556,9 @@ class MediaAssetLifecycleTest extends TestCase
                 'replacement_upload' => UploadedFile::fake()->image('replacement.png', 800, 600),
             ])
             ->call('save')
-            ->assertNotified('Зображення не змінено');
+            ->assertSet('replacementBusinessWarning', fn (?string $value): bool => str_contains((string) $value, 'похідних версій'))
+            ->assertSee('Зображення не змінено')
+            ->assertSee('похідних версій');
 
         $fresh = $asset->fresh();
         $this->assertSame($oldHash, (string) $fresh->content_sha256);
@@ -584,7 +587,9 @@ class MediaAssetLifecycleTest extends TestCase
             ->test(EditMediaAsset::class, ['record' => $target->getRouteKey()])
             ->fillForm(['replacement_upload' => $collisionFile])
             ->call('save')
-            ->assertNotified('Зображення не змінено');
+            ->assertSet('replacementBusinessWarning', 'Це зображення вже є в Assets. Щоб не створювати дубль, поточний Asset не змінено. Оберіть інший файл.')
+            ->assertSee('Зображення не змінено')
+            ->assertSee('Це зображення вже є в Assets');
 
         $this->assertSame($oldHash, (string) $target->fresh()->content_sha256);
         $this->assertDatabaseCount('media_assets', 2);
@@ -622,6 +627,52 @@ class MediaAssetLifecycleTest extends TestCase
             ->callAction('delete_asset')
             ->assertNotified();
         $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+    }
+
+    #[Test]
+    public function asset_internal_note_can_be_saved_without_replacing_the_file(): void
+    {
+        Storage::fake('public');
+        $asset = $this->managedAsset('note-only.png', 600, 400);
+        $oldHash = (string) $asset->content_sha256;
+        $oldPath = (string) $asset->storage_path;
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm(['internal_note' => '  Внутрішня нотатка для команди  '])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified('Asset збережено');
+
+        $fresh = $asset->fresh();
+        $this->assertSame('Внутрішня нотатка для команди', $fresh->internal_note);
+        $this->assertSame($oldHash, (string) $fresh->content_sha256);
+        $this->assertSame($oldPath, (string) $fresh->storage_path);
+    }
+
+    #[Test]
+    public function asset_replace_preserves_and_updates_internal_note_on_same_identity(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $asset = $this->managedAsset('note-replace-old.png', 600, 400);
+        $asset->update(['internal_note' => 'Стара нотатка']);
+        $id = (string) $asset->id;
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm([
+                'replacement_upload' => UploadedFile::fake()->image('note-replace-new.png', 800, 600),
+                'internal_note' => 'Оновлена нотатка',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified('Зображення замінено');
+
+        $fresh = $asset->fresh();
+        $this->assertSame($id, (string) $fresh->id);
+        $this->assertSame('note-replace-new.png', $fresh->original_filename);
+        $this->assertSame('Оновлена нотатка', $fresh->internal_note);
     }
 
     #[Test]

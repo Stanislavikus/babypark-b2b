@@ -1123,6 +1123,23 @@ use a merchant-readable transient warning notification; field/file validation er
 remain inline. Notification placement is not globally changed for this resource-level
 campaign.
 
+[Resolved 2026-10-10 — production feedback amendment] The generic transient-warning rule
+above remains the platform default, but Asset replacement conflicts are a local exception:
+the merchant's attention is anchored to the replacement field, so a business conflict that
+leaves the Asset unchanged is rendered as a native Filament warning Callout directly beside
+the replacement control. Do not globally reposition the panel notification container and do
+not add a blocking modal merely to surface this warning. File validation errors remain inline.
+Successful saves continue to use the standard transient success notification.
+
+[Resolved 2026-10-10 — production feedback amendment] MediaAsset may store nullable
+`internal_note` merchant-team metadata, shown as `Коментар` in the editable Asset full card.
+It is internal platform metadata only: it is not identity, deduplication input, provenance,
+channel/export data or connector truth. Same-identity replacement preserves the field. Brand
+full cards show canonical logo-Asset metadata consistently with the Asset card, including
+storage source, technical state and added timestamp. Reusing one canonical Asset as the logo
+of multiple Brands is intentional and must remain allowed; Brand points to MediaAsset identity
+rather than owning a private copy.
+
 For Filament resource lists, quick inspection must be an explicit modal action,
 not inferred resource navigation. Use a dedicated non-routing action name such as
 `inspect`, force modal behavior, bind the neutral row to that action, and keep

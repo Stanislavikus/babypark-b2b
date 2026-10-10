@@ -248,3 +248,16 @@ opened from a separate modal. MediaAsset identity, replace/delete guards, dedupl
 retention, Brand association semantics and the shared preview-frame rules are unchanged.
 The drawer `Відкрити повну картку` action also closes the originating drawer through the
 native Filament action close primitive after opening the new tab.
+
+
+## 2026-10-10 production feedback amendment — warning visibility and internal note
+
+Production smoke of the unified EditRecord full card confirmed the lifecycle and drawer flow,
+but showed that the top-right transient replacement-conflict notification could be missed while
+the merchant's attention remained on the image control. The accepted local UX uses Filament's
+native warning Callout adjacent to the replacement field for unchanged business conflicts; it
+does not globally reposition notifications and does not add a blocking modal. A nullable
+MediaAsset `internal_note`, labelled `Коментар`, is added as internal merchant-team metadata and
+is excluded from identity/dedup/provenance/channel semantics. Brand full cards expose the same
+canonical logo-Asset storage/status/created metadata. Reuse of one Asset by multiple Brands is
+intentional and remains allowed.
