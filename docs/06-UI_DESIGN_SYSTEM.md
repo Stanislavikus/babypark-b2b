@@ -2607,13 +2607,14 @@ model instance that leaves read-only ImageEntry/TextEntry components stale. Bran
 on the full card after Save. During an unsaved Brand logo upload, `Поточне зображення` continues
 to show the persisted logo; the FileUpload itself represents the pending replacement.
 
-[Resolved 2026-10-10 — Media production-smoke follow-up] Full cards opened from the same-origin
-Asset/Brand inspection drawer intentionally retain a browser opener (`rel=opener`). On explicit
-`Закрити`, the originating listing is reloaded before the full-card tab closes, so the merchant
-returns to a current thumbnail/list state. The reload is allowed only when the opener origin
-matches the current admin origin. `rel=opener` is limited to these fixed, generated same-origin
-Resource URLs and must never be applied to external or user-controlled URLs. Directly opened cards
-retain the existing fresh-list fallback when no opener exists.
+[Resolved 2026-10-10 — Media production-smoke follow-up, security amendment] Full cards opened
+from Asset/Brand inspection drawers keep isolated browser `_blank` behavior and must not restore
+`window.opener` / `rel=opener`. On explicit `Закрити`, the full-card tab publishes a namespaced
+same-origin `localStorage` refresh signal and then closes. Only the matching Asset or Brand listing
+installs a `storage` listener for its own fixed key and reloads itself when that signal arrives;
+unrelated same-origin admin pages do not listen and therefore are not reloaded. Directly opened
+cards retain the existing fresh-list fallback when browser tab close is unavailable. Do not
+generalize the refresh channel to external or user-controlled keys/URLs.
 
 [Resolved 2026-10-10 — Media production-smoke follow-up] Asset `Видалити` is a secondary
 destructive action, not a peer of navigation `Закрити`. On the editable Asset full card, keep

@@ -43,6 +43,8 @@ use Illuminate\Support\HtmlString;
 
 class MediaAssetResource extends Resource
 {
+    public const LIST_REFRESH_STORAGE_KEY = 'babypark:admin:media-assets:refresh';
+
     protected static ?string $model = MediaAsset::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-photo';
@@ -391,7 +393,6 @@ class MediaAssetResource extends Resource
                             ->color('gray')
                             ->url(self::fullCardUrl($record))
                             ->openUrlInNewTab()
-                            ->extraAttributes(['rel' => 'opener'])
                             ->close(),
                     ]),
             ])

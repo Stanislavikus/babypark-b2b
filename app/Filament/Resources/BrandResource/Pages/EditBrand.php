@@ -71,9 +71,10 @@ class EditBrand extends EditRecord
     private function closeCurrentTab(string $fallbackUrl): null
     {
         $fallback = Js::from($fallbackUrl);
+        $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
 
         $this->unmountAction();
-        $this->js("try { if (window.opener && ! window.opener.closed && window.opener.location.origin === window.location.origin) { window.opener.location.reload(); } } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
+        $this->js("try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
 
         return null;
     }

@@ -42,6 +42,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class BrandResource extends Resource
 {
+    public const LIST_REFRESH_STORAGE_KEY = 'babypark:admin:brands:refresh';
+
     protected static ?string $model = Brand::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-swatch';
@@ -297,7 +299,6 @@ class BrandResource extends Resource
                             ->color('gray')
                             ->url(self::getUrl('edit', ['record' => $record]))
                             ->openUrlInNewTab()
-                            ->extraAttributes(['rel' => 'opener'])
                             ->close(),
                     ]),
                 EditAction::make()

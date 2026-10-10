@@ -280,7 +280,10 @@ surface: a second browser-native `beforeunload` prompt after confirming the Fila
 a stale persisted-image view after same-ID replacement, and stale listing thumbnails when a
 full card was closed back to its originating tab. The accepted correction keeps Filament's
 unsaved protection but unmounts the confirmed close action before browser navigation, keeps the
-schema-bound model instance synchronized after Save, and refreshes the same-origin opener listing
-on explicit close. Brand edit now stays on the card after Save and keeps the persisted logo visible
-while a new upload is only pending. The existing Asset delete action moves from the header to a
-visually separated danger action in the form footer; delete semantics themselves are unchanged.
+schema-bound model instance synchronized after Save. Exact-head security review rejected the
+initial same-origin `window.opener` refresh: full-card `_blank` links remain isolated and explicit
+close instead emits a namespaced `localStorage` storage signal. Only the matching Asset/Brand
+listing installs the corresponding listener and reloads; unrelated admin pages remain untouched.
+Brand edit stays on the card after Save and keeps the persisted logo visible while a new upload is
+only pending. The existing Asset delete action moves from the header to a visually separated danger
+action in the form footer; delete semantics themselves are unchanged.

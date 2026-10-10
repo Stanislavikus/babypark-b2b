@@ -345,7 +345,8 @@ final class BrandManagementTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Close Brand');
         $fallback = Js::from(BrandResource::getUrl('index'));
-        $closeJs = "try { if (window.opener && ! window.opener.closed && window.opener.location.origin === window.location.origin) { window.opener.location.reload(); } } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
@@ -372,7 +373,8 @@ final class BrandManagementTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Quiet Save Brand');
         $fallback = Js::from(BrandResource::getUrl('index'));
-        $closeJs = "try { if (window.opener && ! window.opener.closed && window.opener.location.origin === window.location.origin) { window.opener.location.reload(); } } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
 
         $oldLogo = app(OriginalImageIngestService::class)->ingestStandalone(
             $this->actor,
@@ -431,8 +433,12 @@ final class BrandManagementTest extends TestCase
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
             ->assertSeeHtml('bp-media-preview-frame--brand-form');
 
+        $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
+        $refreshJs = "(() => { const key = {$refreshKey}; const slot = '__babyparkBrandsRefreshHandler'; if (window[slot]) { window.removeEventListener('storage', window[slot]); } window[slot] = (event) => { if (event.key === key) { window.location.reload(); } }; window.addEventListener('storage', window[slot]); })();";
+
         $list = Livewire::actingAs($this->actor)
             ->test(ListBrands::class)
+            ->assertJs($refreshJs)
             ->assertCanSeeTableRecords([$brand])
             ->assertSeeHtml('bp-media-preview-frame--brand-list');
 
@@ -447,8 +453,9 @@ final class BrandManagementTest extends TestCase
         $openFullCard = $mountedInspect->getExtraModalFooterActions()['open_full_page_footer'];
         $this->assertTrue($openFullCard->shouldOpenUrlInNewTab());
         $this->assertTrue($openFullCard->shouldClose());
-        $this->assertSame('opener', $openFullCard->getExtraAttributes()['rel'] ?? null);
-        $this->assertStringContainsString('rel="opener"', $openFullCard->toHtml());
+        $this->assertNotSame('opener', $openFullCard->getExtraAttributes()['rel'] ?? null);
+        $this->assertStringNotContainsString('rel="opener"', $openFullCard->toHtml());
+        $this->assertStringContainsString('target="_blank"', $openFullCard->toHtml());
         $list->assertSee('Frame Brand');
 
         Livewire::actingAs($this->actor)
