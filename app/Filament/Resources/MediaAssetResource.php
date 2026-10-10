@@ -117,9 +117,7 @@ class MediaAssetResource extends Resource
                     }),
                 Callout::make(new HtmlString('<span class="font-semibold text-gray-950 dark:text-white">Зображення не змінено</span>'))
                     ->warning()
-                    ->description(fn (EditMediaAsset $livewire): ?HtmlString => filled($livewire->replacementBusinessWarning)
-                        ? new HtmlString('<span class="font-medium text-gray-950 dark:text-white">'.e($livewire->replacementBusinessWarning).'</span>')
-                        : null)
+                    ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementBusinessWarning)
                     ->visible(fn (EditMediaAsset $livewire): bool => filled($livewire->replacementBusinessWarning)),
                 Callout::make('Зверніть увагу')
                     ->info()

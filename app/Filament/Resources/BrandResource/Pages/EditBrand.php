@@ -74,7 +74,7 @@ class EditBrand extends EditRecord
         $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
 
         $this->unmountAction();
-        $this->js("try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
+        $this->js("(() => { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();");
 
         return null;
     }

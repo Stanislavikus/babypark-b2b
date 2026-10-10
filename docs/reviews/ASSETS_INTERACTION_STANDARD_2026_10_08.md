@@ -287,3 +287,18 @@ listing installs the corresponding listener and reloads; unrelated admin pages r
 Brand edit stays on the card after Save and keeps the persisted logo visible while a new upload is
 only pending. The existing Asset delete action moves from the header to a visually separated danger
 action in the form footer; delete semantics themselves are unchanged.
+
+
+## 2026-10-10 browser-exercised corrective follow-up
+
+Real Playwright Chromium reproduction after PR #280 confirmed that Livewire's JS
+evaluator rejects a raw multi-statement command starting with `try` as
+`Unexpected token 'try'`. Both Asset and Brand full-card close callbacks now
+dispatch a valid JavaScript expression (IIFE); the existing isolated cross-tab
+storage event and native unsaved-changes protection remain intact. Guarded deletion
+of an unused Asset uses the same explicit-close behavior: emit the Asset listing
+refresh event and close a script-opened full-card tab, or navigate to the fresh
+listing when browser tab close is unavailable. Deletion safety checks remain
+unchanged. Warning Callout explanation uses Filament's standard description
+typography for both duplicate and unchanged-image messages; only the warning
+title receives stronger emphasis.
