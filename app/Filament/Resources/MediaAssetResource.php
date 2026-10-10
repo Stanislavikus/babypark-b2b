@@ -17,9 +17,11 @@ use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -101,7 +103,19 @@ class MediaAssetResource extends Resource
                         'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                     ])
                     ->helperText('Перетягніть файл або виберіть його. Максимум 20 МіБ і 25 МП.')
-                    ->live(),
+                    ->live()
+                    ->afterStateUpdated(function (EditMediaAsset $livewire): void {
+                        $livewire->replacementBusinessWarning = null;
+                    }),
+                Callout::make('Зображення не змінено')
+                    ->warning()
+                    ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementBusinessWarning)
+                    ->visible(fn (EditMediaAsset $livewire): bool => filled($livewire->replacementBusinessWarning)),
+                Textarea::make('internal_note')
+                    ->label('Коментар')
+                    ->helperText('Внутрішня нотатка для команди. Не передається в канали та не змінює файл.')
+                    ->rows(3)
+                    ->maxLength(5000),
                 Group::make([
                     TextEntry::make('source_kind_edit')
                         ->label('Зберігання')
@@ -217,6 +231,10 @@ class MediaAssetResource extends Resource
                     ->state('Зовнішній URL може змінитися або стати недоступним. Відсутність попередження не означає, що посилання було нещодавно перевірено.')
                     ->color('warning')
                     ->visible(fn (MediaAsset $record): bool => app(MediaAssetSourceResolver::class)->sourceKind($record) === 'external')
+                    ->columnSpanFull(),
+                TextEntry::make('internal_note')
+                    ->label('Коментар')
+                    ->placeholder('—')
                     ->columnSpanFull(),
             ]),
             Section::make('Використовується в')->schema([
@@ -488,7 +506,7 @@ class MediaAssetResource extends Resource
         return $bytes.' Б';
     }
 
-    private static function sourceLabel(MediaAsset $asset): string
+    public static function sourceLabel(MediaAsset $asset): string
     {
         return match (app(MediaAssetSourceResolver::class)->sourceKind($asset)) {
             'managed' => 'У платформі',
@@ -497,7 +515,7 @@ class MediaAssetResource extends Resource
         };
     }
 
-    private static function sourceColor(MediaAsset $asset): string
+    public static function sourceColor(MediaAsset $asset): string
     {
         return match (app(MediaAssetSourceResolver::class)->sourceKind($asset)) {
             'managed' => 'success',
@@ -506,7 +524,7 @@ class MediaAssetResource extends Resource
         };
     }
 
-    private static function diagnosisLabel(mixed $state): string
+    public static function diagnosisLabel(mixed $state): string
     {
         $value = $state instanceof MediaDiagnosisStatus ? $state->value : (string) $state;
 
@@ -568,7 +586,7 @@ class MediaAssetResource extends Resource
         };
     }
 
-    private static function diagnosisColor(MediaAsset $asset): string
+    public static function diagnosisColor(MediaAsset $asset): string
     {
         return match ($asset->diagnosis_status) {
             MediaDiagnosisStatus::Ready => 'success',

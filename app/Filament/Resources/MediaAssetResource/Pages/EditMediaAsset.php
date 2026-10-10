@@ -25,6 +25,8 @@ class EditMediaAsset extends EditRecord
 {
     protected static string $resource = MediaAssetResource::class;
 
+    protected ?bool $hasDatabaseTransactions = true;
+
     protected ?bool $hasUnsavedDataChangesAlert = true;
 
     protected bool $replacementWasApplied = false;
@@ -32,6 +34,8 @@ class EditMediaAsset extends EditRecord
     protected bool $replacementWasNoOp = false;
 
     protected ?string $savedNotificationBody = null;
+
+    public ?string $replacementBusinessWarning = null;
 
     public function getTitle(): string
     {
@@ -61,8 +65,7 @@ class EditMediaAsset extends EditRecord
     protected function getSaveFormAction(): Action
     {
         return parent::getSaveFormAction()
-            ->label('Зберегти')
-            ->disabled(fn (): bool => ! $this->replacementUpload() instanceof UploadedFile);
+            ->label('Зберегти');
     }
 
     protected function handleRecordUpdate(Model $record, array $data): Model
@@ -72,60 +75,66 @@ class EditMediaAsset extends EditRecord
         }
 
         $file = $this->replacementUpload($data['replacement_upload'] ?? null);
+        $updatedRecord = $record;
+        $this->replacementWasApplied = false;
+        $this->replacementWasNoOp = false;
+        $this->savedNotificationBody = null;
+        $this->replacementBusinessWarning = null;
 
-        if (! $file instanceof UploadedFile) {
-            return $record;
+        if ($file instanceof UploadedFile) {
+            $actor = auth()->user();
+
+            if (! $actor instanceof User) {
+                throw new AuthorizationException('This action is unauthorized.');
+            }
+
+            try {
+                $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
+                    $actor,
+                    app(WorkspaceContext::class)->current(),
+                    $record,
+                    $file,
+                );
+            } catch (MediaAssetLifecycleException $exception) {
+                $this->replacementBusinessWarning = $exception->getMessage();
+
+                throw (new Halt)->rollBackDatabaseTransaction();
+            } catch (MediaIngestException $exception) {
+                throw ValidationException::withMessages([
+                    'data.replacement_upload' => $exception->getMessage(),
+                ]);
+            }
+
+            $this->replacementWasApplied = $result->replaced;
+            $this->replacementWasNoOp = ! $result->replaced;
+            $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($result->asset);
+            $this->savedNotificationBody = $usage['products'] > 0 && $result->replaced
+                ? 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.'
+                : null;
+            data_set($this->data, 'replacement_upload', null);
+            $updatedRecord = $result->asset;
         }
 
-        $actor = auth()->user();
+        $updatedRecord->fill([
+            'internal_note' => filled($data['internal_note'] ?? null)
+                ? trim((string) $data['internal_note'])
+                : null,
+        ])->save();
 
-        if (! $actor instanceof User) {
-            throw new AuthorizationException('This action is unauthorized.');
-        }
+        $this->record = $updatedRecord;
 
-        try {
-            $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
-                $actor,
-                app(WorkspaceContext::class)->current(),
-                $record,
-                $file,
-            );
-        } catch (MediaAssetLifecycleException $exception) {
-            Notification::make()
-                ->warning()
-                ->title('Зображення не змінено')
-                ->body($exception->getMessage())
-                ->duration(8000)
-                ->send();
-
-            throw (new Halt)->rollBackDatabaseTransaction();
-        } catch (MediaIngestException $exception) {
-            throw ValidationException::withMessages([
-                'data.replacement_upload' => $exception->getMessage(),
-            ]);
-        }
-
-        $this->replacementWasApplied = $result->replaced;
-        $this->replacementWasNoOp = ! $result->replaced;
-        $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($result->asset);
-        $this->savedNotificationBody = $usage['products'] > 0 && $result->replaced
-            ? 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.'
-            : null;
-        data_set($this->data, 'replacement_upload', null);
-        $this->record = $result->asset;
-
-        return $result->asset;
+        return $updatedRecord;
     }
 
     protected function getSavedNotification(): ?Notification
     {
-        if (! $this->replacementWasApplied && ! $this->replacementWasNoOp) {
-            return null;
-        }
-
         return Notification::make()
             ->success()
-            ->title($this->replacementWasApplied ? 'Зображення замінено' : 'Зображення вже актуальне')
+            ->title(match (true) {
+                $this->replacementWasApplied => 'Зображення замінено',
+                $this->replacementWasNoOp => 'Зображення вже актуальне',
+                default => 'Asset збережено',
+            })
             ->body($this->savedNotificationBody);
     }
 

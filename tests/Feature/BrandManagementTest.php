@@ -405,6 +405,9 @@ final class BrandManagementTest extends TestCase
             ->assertSee('Мегапікселі')
             ->assertSee('Вага')
             ->assertSee('Формат')
+            ->assertSee('Зберігання')
+            ->assertSee('Технічний стан')
+            ->assertSee('Додано')
             ->assertDontSee('Основне');
     }
 
@@ -458,6 +461,10 @@ final class BrandManagementTest extends TestCase
             ->sole();
 
         $this->assertSame($asset->id, $reusedBrand->logo_media_asset_id);
+        $this->assertSame(2, Brand::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('logo_media_asset_id', $asset->id)
+            ->count());
         $this->assertSame(1, MediaAsset::withoutWorkspaceScope()
             ->where('workspace_id', $this->workspace->id)
             ->where('content_sha256', $asset->content_sha256)

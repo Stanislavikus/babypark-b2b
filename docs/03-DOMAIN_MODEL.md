@@ -1830,6 +1830,14 @@ The first version may support:
 
 Media handling should not become a full DAM system in MVP.
 
+**[Resolved addendum — 2026-10-10 — MediaAsset internal note]** A MediaAsset may carry a
+nullable `internal_note` for merchant-team context. This value belongs to the canonical
+MediaAsset identity and survives same-identity Original replacement. It is explicitly not
+part of content deduplication, provider/channel projection, connector identity, provenance,
+or media diagnosis. It must not be exported merely because a Product/Variant/Brand references
+the Asset. Multiple Brands may reference the same canonical logo MediaAsset without cloning
+or rejecting that association.
+
 See **Platform Product Capability Baseline** for conceptual images, video, and
 document/instruction assets. Current runtime remains `products.images` JSON.
 

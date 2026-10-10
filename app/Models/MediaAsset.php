@@ -31,6 +31,7 @@ class MediaAsset extends Model
         'diagnosis_status',
         'diagnosis_json',
         'provenance_json',
+        'internal_note',
     ];
 
     protected function casts(): array
