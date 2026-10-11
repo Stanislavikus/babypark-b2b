@@ -64,3 +64,15 @@ The third supplied owner image is the authority for composition:
 
 No schema, media identity, dedup, new uploader implementation, Asset write
 semantics, permissions or production browser automation is authorized here.
+
+## Chromium evidence after correction
+
+The original `ModalTableSelect` action invokes `slideOver()` by default in
+official installed Filament 5.7.6. The full-height slide-over caused the
+reported enormous empty region in the picker. Override only this native action
+setting to `slideOver(false)` and keep a bounded native modal width. Desktop
+layout is two cards across. Real Chromium screenshots #23 and #25 showed the
+side-by-side uploader and the compact, centered picker respectively, while the
+browser regression was tightened to take screenshots of the visible modal
+window, not its invisible outer Alpine host. Final success screenshots remain
+required on one frozen verification HEAD.
