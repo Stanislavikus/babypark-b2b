@@ -93,7 +93,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
       'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-layout.png` });
-    const filtersButton = modalWindow.getByRole('button', { name: 'Фільтри' });
+    const filtersButton = modalWindow.getByRole('button', { name: /^Фільтри(?:\\s+\\d+)?$/ });
     await filtersButton.waitFor({ state: 'visible', timeout: 20_000 });
     await filtersButton.click();
     const filterDialog = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Відображення' }).last();
