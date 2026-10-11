@@ -98,7 +98,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await modalHeading.waitFor({ state: 'visible', timeout: 20_000 });
     await dialog.getByRole('button', { name: 'Замінити', exact: true }).click();
-    await page.getByText('Це зображення вже є в Assets. Оберіть інший файл.', { exact: true })
+    await page.getByText('Це зображення вже є в медіатеці. Оберіть інший файл.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
     await page.getByText('replacement.png', { exact: false }).first().waitFor({ state: 'visible' });
 
@@ -108,7 +108,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
 
     await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
-    await page.getByText('Зображення вже є в Assets. Використано існуючий файл без дублювання.', { exact: true })
+    await page.getByText('Зображення вже є в медіатеці. Використано файл з медіатеки.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
     await page.getByText('replacement.png', { exact: false }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
@@ -126,7 +126,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.waitForURL((url) => url.pathname === '/admin/brands', { timeout: 20_000 });
     assert.equal(await page.getByText('Закрити без збереження?', { exact: true }).isVisible(), false,
       'Brand Close after Save must not request unsaved-change confirmation.');
-    assert.equal(await page.getByText('Це зображення вже є в Assets. Оберіть інший файл.', { exact: true }).isVisible(), false,
+    assert.equal(await page.getByText('Це зображення вже є в медіатеці. Оберіть інший файл.', { exact: true }).isVisible(), false,
       'Brand Close must not show an unrelated Asset replace warning.');
 
     assert.deepEqual(browserErrors, [], 'No uncaught JS errors during media workflows.');

@@ -343,3 +343,13 @@ counts, warn that all references will change and offer `Замінити` / canc
 Uploading the exact same bytes does not prompt. Re-check usage via the existing
 workspace-scoped reader; the transactional domain lifecycle, derivative restrictions,
 shared Asset ID, retention and tenant constraints remain authoritative.
+
+## 2026-10-11 [Resolved] — Brand reused-image wording / library terminology
+
+The merchant approved simplification of the reused-image notice and localization of
+user-facing `Assets` as `Медіатека` (RU `Медиатека`, EN `Media library`), keeping
+`Медіа` for the authoring block. The exact previous `Використано існуючий файл
+без дублювання.` text in the preceding [Resolved] section is superseded for this
+one notice by `Зображення вже є в медіатеці. Використано файл з медіатеки.`.
+The SHA-based deduplication behavior and existing Asset/Brand transactional
+semantics are unchanged. See `docs/reviews/BRAND_MEDIA_UNIFIED_AUTHORING_2026_10_11.md`.

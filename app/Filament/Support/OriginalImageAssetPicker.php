@@ -20,10 +20,10 @@ final class OriginalImageAssetPicker
             ->getOptionLabelUsing(fn (?string $value): ?string => self::labelForId($value))
             ->selectAction(fn (Action $action): Action => $action
                 ->button()
-                ->label('Обрати з Assets')
+                ->label(__('media_ui.select_existing'))
                 ->icon('heroicon-o-photo')
                 ->color('gray')
-                ->modalHeading('Медіатека Assets')
+                ->modalHeading(__('media_ui.library'))
                 ->modalSubmitActionLabel('Підтвердити вибір'));
     }
 

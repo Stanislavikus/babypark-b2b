@@ -33,7 +33,7 @@ final class MediaAssetLifecycleException extends RuntimeException
 
     public static function duplicateContent(): self
     {
-        return new self('Це зображення вже є в Assets. Оберіть інший файл.');
+        return new self(__('media_ui.duplicate_notice'));
     }
 
     public static function derivativesBlockReplace(int $count): self

@@ -227,7 +227,7 @@ class MediaAssetLifecycleTest extends TestCase
         ]);
 
         $this->expectException(MediaAssetLifecycleException::class);
-        $this->expectExceptionMessage('вже є в Assets');
+        $this->expectExceptionMessage('вже є в медіатеці');
 
         app(MediaAssetLifecycleService::class)->replaceOriginal(
             $this->actor,
@@ -262,7 +262,7 @@ class MediaAssetLifecycleTest extends TestCase
         ]);
 
         $this->expectException(MediaAssetLifecycleException::class);
-        $this->expectExceptionMessage('вже є в Assets');
+        $this->expectExceptionMessage('вже є в медіатеці');
 
         app(MediaAssetLifecycleService::class)->replaceOriginal(
             $this->actor,
@@ -598,9 +598,9 @@ class MediaAssetLifecycleTest extends TestCase
             ->test(EditMediaAsset::class, ['record' => $target->getRouteKey()])
             ->fillForm(['replacement_upload' => $collisionFile])
             ->call('save')
-            ->assertSet('replacementBusinessWarning', 'Це зображення вже є в Assets. Оберіть інший файл.')
+            ->assertSet('replacementBusinessWarning', 'Це зображення вже є в медіатеці. Оберіть інший файл.')
             ->assertSee('Зображення не змінено')
-            ->assertSee('Це зображення вже є в Assets');
+            ->assertSee('Це зображення вже є в медіатеці');
 
         $this->assertSame($oldHash, (string) $target->fresh()->content_sha256);
         $this->assertDatabaseCount('media_assets', 2);
@@ -745,7 +745,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->fillForm(['internal_note' => '  Внутрішня нотатка для команди  '])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertNotNotified('Asset збережено');
+            ->assertNotNotified(__('media_ui.saved_one'));
 
         $fresh = $asset->fresh();
         $this->assertSame('Внутрішня нотатка для команди', $fresh->internal_note);

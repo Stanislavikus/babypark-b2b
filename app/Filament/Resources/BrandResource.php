@@ -66,118 +66,128 @@ class BrandResource extends Resource
                     ->label('Назва')
                     ->required()
                     ->maxLength(255),
-                Text::make('Поточне зображення')
-                    ->weight(FontWeight::SemiBold),
-                Group::make([
-                    MediaPreviewFrame::entry(
-                        ImageEntry::make('logo_preview')
-                            ->label('Поточне зображення')
-                            ->hiddenLabel()
-                            ->state(fn (Get $get, ?Brand $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference(self::formLogoAsset($get, $record)))
-                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
-                        MediaPreviewFrame::BRAND_FORM,
-                    ),
-                    Group::make([
-                        TextEntry::make('logo_file')
-                            ->label('Файл')
-                            ->state(function (Get $get, ?Brand $record): string {
-                                $asset = self::formLogoAsset($get, $record);
+                Section::make(__('media_ui.section'))
+                    ->schema([
+                        Text::make('Поточне зображення')
+                            ->weight(FontWeight::SemiBold),
+                        Group::make([
+                            MediaPreviewFrame::entry(
+                                ImageEntry::make('logo_preview')
+                                    ->label('Поточне зображення')
+                                    ->hiddenLabel()
+                                    ->state(fn (Get $get, ?Brand $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference(self::formLogoAsset($get, $record)))
+                                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
+                                MediaPreviewFrame::BRAND_FORM,
+                            ),
+                            Group::make([
+                                TextEntry::make('logo_file')
+                                    ->label('Файл')
+                                    ->state(function (Get $get, ?Brand $record): string {
+                                        $asset = self::formLogoAsset($get, $record);
 
-                                return $asset instanceof MediaAsset ? MediaAssetResource::displayName($asset) : '—';
-                            })
+                                        return $asset instanceof MediaAsset ? MediaAssetResource::displayName($asset) : '—';
+                                    })
+                                    ->columnSpanFull(),
+                                TextEntry::make('logo_dimensions')
+                                    ->label('Розмір')
+                                    ->state(function (Get $get, ?Brand $record): string {
+                                        $asset = self::formLogoAsset($get, $record);
+
+                                        return $asset instanceof MediaAsset ? MediaAssetResource::dimensions($asset) : '—';
+                                    }),
+                                TextEntry::make('logo_megapixels')
+                                    ->label('Мегапікселі')
+                                    ->state(function (Get $get, ?Brand $record): string {
+                                        $asset = self::formLogoAsset($get, $record);
+
+                                        return $asset instanceof MediaAsset ? MediaAssetResource::megapixels($asset) : '—';
+                                    }),
+                                TextEntry::make('logo_byte_size')
+                                    ->label('Вага')
+                                    ->state(function (Get $get, ?Brand $record): string {
+                                        $asset = self::formLogoAsset($get, $record);
+
+                                        return $asset instanceof MediaAsset ? MediaAssetResource::formatBytes($asset->byte_size) : '—';
+                                    }),
+                                TextEntry::make('logo_mime_type')
+                                    ->label('Формат')
+                                    ->state(function (Get $get, ?Brand $record): string {
+                                        $asset = self::formLogoAsset($get, $record);
+
+                                        return $asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—';
+                                    }),
+                            ])->columns(2),
+                        ])
+                            ->columns([
+                                'default' => 1,
+                                'md' => 2,
+                            ])
                             ->columnSpanFull(),
-                        TextEntry::make('logo_dimensions')
-                            ->label('Розмір')
-                            ->state(function (Get $get, ?Brand $record): string {
-                                $asset = self::formLogoAsset($get, $record);
+                        Group::make([
+                            FileUpload::make('logo_upload')
+                                ->label(__('media_ui.upload'))
+                                ->placeholder(__('media_ui.drop_label'))
+                                ->storeFiles(false)
+                                ->maxSize(20 * 1024)
+                                ->acceptedFileTypes([
+                                    'image/jpeg',
+                                    'image/png',
+                                    'image/gif',
+                                    'image/webp',
+                                    'image/avif',
+                                ])
+                                ->validationMessages([
+                                    'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
+                                    'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                                ])
+                                ->live()
+                                ->helperText(__('media_ui.upload_hint'))
+                                ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                                    if ($livewire instanceof EditBrand) {
+                                        $livewire->logoPostSaveNotice = null;
+                                    }
 
-                                return $asset instanceof MediaAsset ? MediaAssetResource::dimensions($asset) : '—';
-                            }),
-                        TextEntry::make('logo_megapixels')
-                            ->label('Мегапікселі')
-                            ->state(function (Get $get, ?Brand $record): string {
-                                $asset = self::formLogoAsset($get, $record);
+                                    if (filled($state)) {
+                                        $set('logo_media_asset_id', null);
+                                    }
+                                }),
+                            OriginalImageAssetPicker::make('logo_media_asset_id')
+                                ->label(__('media_ui.select_existing'))
+                                ->hiddenLabel()
+                                ->placeholder(__('media_ui.no_logo'))
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                                    if ($livewire instanceof EditBrand) {
+                                        $livewire->logoPostSaveNotice = null;
+                                    }
 
-                                return $asset instanceof MediaAsset ? MediaAssetResource::megapixels($asset) : '—';
-                            }),
-                        TextEntry::make('logo_byte_size')
-                            ->label('Вага')
-                            ->state(function (Get $get, ?Brand $record): string {
-                                $asset = self::formLogoAsset($get, $record);
-
-                                return $asset instanceof MediaAsset ? MediaAssetResource::formatBytes($asset->byte_size) : '—';
-                            }),
-                        TextEntry::make('logo_mime_type')
-                            ->label('Формат')
-                            ->state(function (Get $get, ?Brand $record): string {
-                                $asset = self::formLogoAsset($get, $record);
-
-                                return $asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—';
-                            }),
-                    ])->columns(2),
-                ])
-                    ->columns([
-                        'default' => 1,
-                        'md' => 2,
+                                    if (filled($state)) {
+                                        $set('logo_upload', null);
+                                    }
+                                })
+                                ->helperText(__('media_ui.library_hint')),
+                        ])
+                            ->extraAttributes(['class' => 'rounded-xl border border-dashed border-gray-300 p-4 dark:border-gray-600'])
+                            ->columnSpanFull(),
+                        Callout::make('Зверніть увагу')
+                            ->info()
+                            ->description(fn (Component $livewire): ?string => $livewire instanceof EditBrand
+                                ? $livewire->logoPostSaveNotice
+                                : null)
+                            ->visible(fn (Component $livewire): bool => $livewire instanceof EditBrand
+                                && filled($livewire->logoPostSaveNotice)),
+                        Actions::make([
+                            Action::make('remove_logo')
+                                ->label('Прибрати логотип')
+                                ->icon('heroicon-o-x-mark')
+                                ->color('gray')
+                                ->action(function (Set $set): void {
+                                    $set('logo_media_asset_id', null);
+                                    $set('logo_upload', null);
+                                }),
+                        ]),
                     ])
                     ->columnSpanFull(),
-                OriginalImageAssetPicker::make('logo_media_asset_id')
-                    ->label('Обрати з Assets')
-                    ->placeholder('Без логотипу')
-                    ->live()
-                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
-                        if ($livewire instanceof EditBrand) {
-                            $livewire->logoPostSaveNotice = null;
-                        }
-
-                        if (filled($state)) {
-                            $set('logo_upload', null);
-                        }
-                    })
-                    ->helperText('Оберіть існуюче зображення з Assets. Один файл можна повторно використовувати без дублювання.'),
-                FileUpload::make('logo_upload')
-                    ->label('Завантажити новий логотип')
-                    ->storeFiles(false)
-                    ->maxSize(20 * 1024)
-                    ->acceptedFileTypes([
-                        'image/jpeg',
-                        'image/png',
-                        'image/gif',
-                        'image/webp',
-                        'image/avif',
-                    ])
-                    ->validationMessages([
-                        'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
-                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
-                    ])
-                    ->live()
-                    ->helperText('Новий файл буде додано в Assets і використано як логотип. До 20 МіБ і 25 МП.')
-                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
-                        if ($livewire instanceof EditBrand) {
-                            $livewire->logoPostSaveNotice = null;
-                        }
-
-                        if (filled($state)) {
-                            $set('logo_media_asset_id', null);
-                        }
-                    }),
-                Callout::make('Зверніть увагу')
-                    ->info()
-                    ->description(fn (Component $livewire): ?string => $livewire instanceof EditBrand
-                        ? $livewire->logoPostSaveNotice
-                        : null)
-                    ->visible(fn (Component $livewire): bool => $livewire instanceof EditBrand
-                        && filled($livewire->logoPostSaveNotice)),
-                Actions::make([
-                    Action::make('remove_logo')
-                        ->label('Прибрати логотип')
-                        ->icon('heroicon-o-x-mark')
-                        ->color('gray')
-                        ->action(function (Set $set): void {
-                            $set('logo_media_asset_id', null);
-                            $set('logo_upload', null);
-                        }),
-                ]),
                 Textarea::make('short_description')
                     ->label('Короткий опис бренду')
                     ->rows(3)

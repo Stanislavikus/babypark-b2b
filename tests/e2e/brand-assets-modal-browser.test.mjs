@@ -28,8 +28,13 @@ test('Brand picks an existing Original image from the native Assets visual libra
 
     const result = await page.goto(new URL(brandPath, baseUrl).href);
     assert.equal(result?.status(), 200);
-    await page.getByRole('button', { name: 'Обрати з Assets' }).click();
-    const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека Assets' });
+    const mediaSection = page.locator('.fi-section').filter({ has: page.getByText('Медіа', { exact: true }) }).first();
+    await mediaSection.getByText('Перетягніть зображення сюди або виберіть файл', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    assert.ok(await mediaSection.locator('input[type="file"]').count() > 0, 'The native dropzone is inside the same Media section.');
+    await mkdir(root, { recursive: true });
+    await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
+    await mediaSection.getByRole('button', { name: 'Обрати з медіатеки' }).click();
+    const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
     await modal.locator('h2.fi-modal-heading').waitFor({ state: 'visible', timeout: 20_000 });
     const row = modal.locator('tr').filter({ hasText: 'other.png' }).first();
     await row.waitFor({ state: 'visible', timeout: 20_000 });
