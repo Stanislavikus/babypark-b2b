@@ -8,6 +8,7 @@ use App\Filament\Resources\BrandResource;
 use App\Filament\Resources\BrandResource\Pages\CreateBrand;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Filament\Resources\BrandResource\Pages\ListBrands;
+use App\Filament\Resources\MediaAssetResource;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Support\OriginalImageAssetPicker;
 use App\Filament\Support\OriginalImagesTable;
@@ -20,6 +21,8 @@ use App\Models\Workspace;
 use App\Services\Catalog\BrandManager;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Services\Media\OriginalImageIngestService;
+use App\Support\Media\Exceptions\MediaAssetLifecycleException;
+use App\Support\Media\MediaSaveNotice;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
@@ -339,12 +342,12 @@ final class BrandManagementTest extends TestCase
         foreach (['uk', 'ru', 'en'] as $locale) {
             app()->setLocale($locale);
 
-            $this->assertSame(__('media_ui.library'), \App\Filament\Resources\MediaAssetResource::getNavigationLabel());
-            $this->assertSame(__('media_ui.library'), \App\Filament\Resources\MediaAssetResource::getPluralModelLabel());
-            $this->assertSame(__('media_ui.reused_notice'), \App\Support\Media\MediaSaveNotice::reused());
-            $this->assertSame(__('media_ui.unchanged_no_changes'), \App\Support\Media\MediaSaveNotice::unchanged(false));
-            $this->assertSame(__('media_ui.unchanged_other_saved'), \App\Support\Media\MediaSaveNotice::unchanged(true));
-            $this->assertSame(__('media_ui.duplicate_notice'), \App\Support\Media\Exceptions\MediaAssetLifecycleException::duplicateContent()->getMessage());
+            $this->assertSame(__('media_ui.library'), MediaAssetResource::getNavigationLabel());
+            $this->assertSame(__('media_ui.library'), MediaAssetResource::getPluralModelLabel());
+            $this->assertSame(__('media_ui.reused_notice'), MediaSaveNotice::reused());
+            $this->assertSame(__('media_ui.unchanged_no_changes'), MediaSaveNotice::unchanged(false));
+            $this->assertSame(__('media_ui.unchanged_other_saved'), MediaSaveNotice::unchanged(true));
+            $this->assertSame(__('media_ui.duplicate_notice'), MediaAssetLifecycleException::duplicateContent()->getMessage());
         }
 
         app()->setLocale('uk');
