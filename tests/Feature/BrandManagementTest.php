@@ -346,7 +346,7 @@ final class BrandManagementTest extends TestCase
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Close Brand');
         $fallback = Js::from(BrandResource::getUrl('index'));
         $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
@@ -374,7 +374,7 @@ final class BrandManagementTest extends TestCase
         $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Quiet Save Brand');
         $fallback = Js::from(BrandResource::getUrl('index'));
         $refreshKey = Js::from(BrandResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
 
         $oldLogo = app(OriginalImageIngestService::class)->ingestStandalone(
             $this->actor,

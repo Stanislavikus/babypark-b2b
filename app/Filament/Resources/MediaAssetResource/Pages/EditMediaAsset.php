@@ -183,7 +183,7 @@ class EditMediaAsset extends EditRecord
                     ->title('Asset видалено')
                     ->send();
 
-                $this->redirect(MediaAssetResource::getUrl('index'));
+                $this->closeCurrentTab(MediaAssetResource::getUrl('index'));
             });
     }
 
@@ -240,7 +240,7 @@ class EditMediaAsset extends EditRecord
         $refreshKey = Js::from(MediaAssetResource::LIST_REFRESH_STORAGE_KEY);
 
         $this->unmountAction();
-        $this->js("try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100);");
+        $this->js("(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();");
 
         return null;
     }
