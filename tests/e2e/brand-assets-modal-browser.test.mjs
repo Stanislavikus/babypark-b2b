@@ -31,16 +31,24 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.getByRole('button', { name: 'Обрати з Assets' }).click();
     const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека Assets' });
     await modal.locator('h2.fi-modal-heading').waitFor({ state: 'visible', timeout: 20_000 });
-    const row = modal.locator('tr').filter({ hasText: 'shared.png' }).first();
+    const row = modal.locator('tr').filter({ hasText: 'other.png' }).first();
     await row.waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await row.locator('img').count(), 'Native Filament ImageColumn renders a preview in picker.');
     await row.locator('input[type="checkbox"]').first().check();
     await modal.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
     await modal.locator('h2.fi-modal-heading').waitFor({ state: 'hidden', timeout: 20_000 });
-    await page.getByText('shared.png', { exact: false }).first().waitFor({ state: 'visible' });
+    await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });
+    const saved = page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && response.url().includes('/livewire-')
+      && response.request().postData()?.includes('"method":"save"'),
+      { timeout: 20_000 },
+    );
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
+    const saveResponse = await saved;
+    assert.equal(saveResponse.status(), 200, 'Save must complete before navigating away.');
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.getByText('shared.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
     assert.deepEqual(jsErrors, []);
     succeeded = true;
   } finally {
