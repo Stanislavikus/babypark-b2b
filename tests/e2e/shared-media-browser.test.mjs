@@ -50,15 +50,31 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
 
     const dialog = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Змінити спільне зображення?' });
-    await dialog.waitFor({ state: 'visible', timeout: 20_000 });
+    const modalHeading = dialog.locator('h2.fi-modal-heading');
+    await modalHeading.waitFor({ state: 'attached', timeout: 20_000 });
+    const geometry = await dialog.evaluate((element) => {
+      const bounds = (node) => {
+        if (!node) return null;
+        const rect = node.getBoundingClientRect();
+        const style = window.getComputedStyle(node);
+        return { width: rect.width, height: rect.height, display: style.display, visibility: style.visibility };
+      };
+      return {
+        outer: bounds(element),
+        heading: bounds(element.querySelector('h2.fi-modal-heading')),
+        confirm: bounds([...element.querySelectorAll('button')].find((button) => button.textContent?.includes('Замінити'))),
+      };
+    });
+    console.log('FILAMENT_MODAL_GEOMETRY', JSON.stringify(geometry));
+    await modalHeading.waitFor({ state: 'visible', timeout: 20_000 });
     assert.match(await dialog.innerText(), /брендів:\s*2/, 'The modal must report two live Brand references.');
 
     await dialog.getByRole('button', { name: 'Скасувати' }).click();
-    await dialog.waitFor({ state: 'hidden' });
+    await modalHeading.waitFor({ state: 'hidden' });
     await page.getByText('shared.png', { exact: false }).first().waitFor({ state: 'visible' });
 
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
-    await dialog.waitFor({ state: 'visible', timeout: 20_000 });
+    await modalHeading.waitFor({ state: 'visible', timeout: 20_000 });
     await dialog.getByRole('button', { name: 'Замінити', exact: true }).click();
     await page.getByText('replacement.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
     assert.equal(new URL(page.url()).pathname, new URL(assetUrl).pathname, 'Save should remain on the Asset card.');
