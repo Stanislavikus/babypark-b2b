@@ -29,6 +29,7 @@ final class OriginalImagesTable
                         'list' => 'Список',
                     ])
                     ->default('grid')
+                    ->indicateUsing(fn (): array => [])
                     ->query(fn (Builder $query): Builder => $query),
             ], layout: FiltersLayout::Modal)
             ->deferFilters(false)
