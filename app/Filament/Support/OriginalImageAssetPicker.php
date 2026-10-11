@@ -9,6 +9,7 @@ use App\Services\Media\MediaAssetSourceResolver;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Forms\Components\ModalTableSelect;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 
 final class OriginalImageAssetPicker
@@ -20,7 +21,8 @@ final class OriginalImageAssetPicker
             ->getOptionLabelUsing(fn (?string $value): ?string => self::labelForId($value))
             ->selectAction(fn (Action $action): Action => $action
                 ->button()
-                ->label(__('media_ui.select_existing'))
+                ->label(__('media_ui.choose_assets'))
+                ->modalWidth(Width::FiveExtraLarge)
                 ->icon('heroicon-o-photo')
                 ->color('gray')
                 ->modalHeading(__('media_ui.library'))
