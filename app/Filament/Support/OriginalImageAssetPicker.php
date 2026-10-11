@@ -7,45 +7,33 @@ use App\Enums\MediaDiagnosisStatus;
 use App\Models\MediaAsset;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Support\Workspace\WorkspaceContext;
-use Filament\Forms\Components\Select;
+use Filament\Actions\Action;
+use Filament\Forms\Components\ModalTableSelect;
 use Illuminate\Database\Eloquent\Builder;
 
 final class OriginalImageAssetPicker
 {
-    public static function make(string $name): Select
+    public static function make(string $name): ModalTableSelect
     {
-        return Select::make($name)
-            ->options(fn (): array => self::search(''))
-            ->searchable()
-            ->preload()
-            ->getSearchResultsUsing(fn (?string $search): array => self::search($search ?? ''))
-            ->getOptionLabelUsing(fn (?string $value): ?string => self::labelForId($value));
+        return ModalTableSelect::make($name)
+            ->tableConfiguration(OriginalImagesTable::class)
+            ->getOptionLabelUsing(fn (?string $value): ?string => self::labelForId($value))
+            ->selectAction(fn (Action $action): Action => $action
+                ->button()
+                ->label('Обрати з Assets')
+                ->icon('heroicon-o-photo')
+                ->color('gray')
+                ->modalHeading('Медіатека Assets')
+                ->modalSubmitActionLabel('Підтвердити вибір'));
     }
 
-    /** @return array<string,string> */
-    private static function search(string $search): array
+    /** @return Builder<MediaAsset> */
+    public static function scopedOriginalImages(): Builder
     {
-        $query = self::query();
-
-        if (trim($search) !== '') {
-            $needle = '%'.trim($search).'%';
-
-            $query->where(function (Builder $nested) use ($needle): void {
-                $nested
-                    ->where('original_filename', 'like', $needle)
-                    ->orWhere('source_url', 'like', $needle);
-            });
-        }
-
-        return $query
-            ->orderBy('original_filename')
-            ->orderBy('id')
-            ->limit(50)
-            ->get()
-            ->mapWithKeys(fn (MediaAsset $asset): array => [
-                (string) $asset->id => self::label($asset),
-            ])
-            ->all();
+        return MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', app(WorkspaceContext::class)->id())
+            ->whereNull('parent_media_asset_id')
+            ->where('asset_type', MediaAssetType::Image->value);
     }
 
     private static function labelForId(?string $id): ?string
@@ -54,24 +42,18 @@ final class OriginalImageAssetPicker
             return null;
         }
 
-        $asset = self::query()->whereKey($id)->first();
+        $asset = self::scopedOriginalImages()->whereKey($id)->first();
 
-        return $asset instanceof MediaAsset ? self::label($asset) : null;
+        return $asset instanceof MediaAsset ? self::displayName($asset) : null;
     }
 
-    private static function query(): Builder
-    {
-        return MediaAsset::withoutWorkspaceScope()
-            ->where('workspace_id', app(WorkspaceContext::class)->id())
-            ->whereNull('parent_media_asset_id')
-            ->where('asset_type', MediaAssetType::Image->value);
-    }
-
-    private static function label(MediaAsset $asset): string
+    public static function displayName(MediaAsset $asset): string
     {
         $name = filled($asset->original_filename)
             ? (string) $asset->original_filename
-            : self::urlName($asset) ?? 'Image '.substr((string) $asset->id, 0, 8);
+            : (filled($asset->source_url)
+                ? basename(parse_url((string) $asset->source_url, PHP_URL_PATH) ?: (string) $asset->source_url)
+                : 'Image '.substr((string) $asset->id, 0, 8));
 
         $source = match (app(MediaAssetSourceResolver::class)->sourceKind($asset)) {
             'managed' => 'У платформі',
@@ -86,22 +68,5 @@ final class OriginalImageAssetPicker
         };
 
         return $name.' · '.$source.$attention;
-    }
-
-    private static function urlName(MediaAsset $asset): ?string
-    {
-        if (! filled($asset->source_url)) {
-            return null;
-        }
-
-        $path = parse_url((string) $asset->source_url, PHP_URL_PATH);
-
-        if (! is_string($path) || $path === '') {
-            return null;
-        }
-
-        $name = basename($path);
-
-        return $name !== '' ? $name : null;
     }
 }

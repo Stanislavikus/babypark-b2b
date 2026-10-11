@@ -77,6 +77,7 @@ $brands = app(BrandManager::class);
 $first = $brands->create($actor, $workspace, 'E2E Shared Brand One', logoMediaAssetId: $shared->id);
 $second = $brands->create($actor, $workspace, 'E2E Shared Brand Two', logoMediaAssetId: $shared->id);
 $third = $brands->create($actor, $workspace, 'E2E Different Brand', logoMediaAssetId: $other->id);
+$pickerBrand = $brands->create($actor, $workspace, 'E2E Visual Picker Brand');
 
 file_put_contents($dir.'/fixture.json', json_encode([
     'sharedAssetId' => $shared->id,
@@ -84,6 +85,7 @@ file_put_contents($dir.'/fixture.json', json_encode([
     'firstBrandId' => $first->id,
     'secondBrandId' => $second->id,
     'differentBrandId' => $third->id,
+    'pickerBrandId' => $pickerBrand->id,
 ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
 
 echo "Isolated shared-media fixture created.\n";

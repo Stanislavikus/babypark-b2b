@@ -8,6 +8,8 @@ use App\Filament\Resources\BrandResource;
 use App\Filament\Resources\BrandResource\Pages\CreateBrand;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Filament\Resources\BrandResource\Pages\ListBrands;
+use App\Filament\Support\OriginalImageAssetPicker;
+use App\Filament\Support\OriginalImagesTable;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\Brand;
 use App\Models\MediaAsset;
@@ -21,6 +23,7 @@ use App\Services\Media\OriginalImageIngestService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\ModalTableSelect;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -293,6 +296,35 @@ final class BrandManagementTest extends TestCase
         }
 
         $this->assertSame($original->id, $brand->fresh()->logo_media_asset_id);
+    }
+
+    #[Test]
+    public function brand_assets_picker_uses_native_modal_with_scoped_original_image_labels(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->actingAs($this->actor);
+        $selected = $this->imageAsset($this->workspace, 'visual-picker.png');
+        $selected->update(['source_url' => 'https://cdn.example.test/visual-picker.png']);
+        $derivative = $this->imageAsset($this->workspace, 'derivative.png', $selected);
+        $anotherWorkspace = Workspace::factory()->create();
+        $otherWorkspaceImage = $this->imageAsset($anotherWorkspace, 'not-visible.png');
+
+        $picker = OriginalImageAssetPicker::make('logo_media_asset_id');
+        $this->assertInstanceOf(ModalTableSelect::class, $picker);
+        $this->assertSame(OriginalImagesTable::class, $picker->getTableConfiguration());
+        $this->assertSame('visual-picker.png · Зовнішнє', OriginalImageAssetPicker::displayName($selected));
+        $this->assertFalse(OriginalImageAssetPicker::scopedOriginalImages()->whereKey($derivative->id)->exists());
+        $this->assertFalse(OriginalImageAssetPicker::scopedOriginalImages()->whereKey($otherWorkspaceImage->id)->exists());
+        $this->assertSame($selected->id, OriginalImageAssetPicker::scopedOriginalImages()->sole()->id);
+
+        Livewire::actingAs($this->actor)
+            ->test(CreateBrand::class)
+            ->assertFormFieldExists(
+                'logo_media_asset_id',
+                fn ($field): bool => $field instanceof ModalTableSelect
+                    && $field->getTableConfiguration() === OriginalImagesTable::class,
+            );
     }
 
     #[Test]
