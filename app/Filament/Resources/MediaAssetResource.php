@@ -394,7 +394,7 @@ class MediaAssetResource extends Resource
 
     public static function getEditAuthorizationResponse(Model $record): Response
     {
-        if (!$record instanceof MediaAsset
+        if (! $record instanceof MediaAsset
             || (string) $record->workspace_id !== app(WorkspaceContext::class)->id()
             || ! $record->isOriginal()
             || $record->asset_type !== MediaAssetType::Image
