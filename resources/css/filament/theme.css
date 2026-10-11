@@ -202,6 +202,19 @@ button.bp-category-tree-header-cell {
 
 /* Brand Media owner-approved composition. Only presentation of native Filament
    FileUpload (FilePond) and ModalTableSelect; no custom upload or select logic. */
+.bp-brand-media-section .fi-section-header-text-ctn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.bp-brand-media-section .fi-section-header-description {
+    margin: 0;
+}
+
 .bp-brand-media-dropzone {
     @apply rounded-xl border border-dashed border-gray-300 bg-white px-5 py-6 dark:border-white/20 dark:bg-gray-900;
     display: flex;
@@ -284,6 +297,9 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-actions .filepond--root {
     width: 172px;
     max-width: 100%;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
     min-height: 46px !important;
     height: 46px !important;
     margin-bottom: 0 !important;
