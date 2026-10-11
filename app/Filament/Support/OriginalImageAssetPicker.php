@@ -23,6 +23,7 @@ final class OriginalImageAssetPicker
                 ->button()
                 ->label(__('media_ui.choose_assets'))
                 ->modalWidth(Width::FiveExtraLarge)
+                ->slideOver(false)
                 ->icon('heroicon-o-photo')
                 ->color('gray')
                 ->modalHeading(__('media_ui.library'))
