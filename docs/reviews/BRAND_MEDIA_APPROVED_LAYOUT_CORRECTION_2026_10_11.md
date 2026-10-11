@@ -38,3 +38,29 @@ exclusive Brand writer, with existing workspace/Original validation and
 
 - Real isolated Chromium: assert native FilePond input and select action are **inside the same dashed area**, not merely within the parent `Медіа` section; assert picker has actual `.fi-ta-content-grid` with shared library cards rather than table rows; select, save, reload and shared-asset behavior must pass.
 - Targeted PHP regressions and `npm run build` then full MySQL/Pint plus relevant Playwright on the same frozen HEAD; no production browser tests. No merge/deploy without separate explicit owner authorization and, after deployment, owner visual acceptance.
+
+## Post-deploy visual rejection and corrective campaign (2026-10-11)
+
+Owner production screenshots of #292 are **FAIL** for visual acceptance even though
+Playwright geometry/selection and MySQL suite passed. Do not treat #292 as accepted UX.
+
+The third supplied owner image is the authority for composition:
+- In a single `Медіа` section: image count in heading; current logo preview when present.
+- Inside one dashed area: centered picture-plus icon, prominent centered line
+  `Перетягніть зображення сюди`, secondary guidance, a **horizontal single row**
+  of compact native upload and `Обрати з Assets` actions, and format hint below.
+- Brand accepts exactly one logo, Product gallery remains a separate issue.
+- A native FilePond nested oversized rectangle **inside** the dashed area is forbidden.
+  An isolated picker button **below** FilePond fails acceptance even when their
+  ancestor is the same dashed area.
+- Picker must preserve native Filament `ModalTableSelect` and reuse the canonical
+  `MediaAssetCardColumns`, but its grid is **two cards per row at desktop** within
+  available modal width, **one on narrow screens**, never screen-wide three
+  columns overflowing the dialog with horizontal scrolling.
+- Real Chromium screenshots of both Brand section and opened picker must be uploaded
+  as CI artifacts **on successful runs**, not only on failure. Layout assertions
+  verify relative alignment, compact uploader and card containment. Owner still
+  signs off the final visual result before acceptance.
+
+No schema, media identity, dedup, new uploader implementation, Asset write
+semantics, permissions or production browser automation is authorized here.
