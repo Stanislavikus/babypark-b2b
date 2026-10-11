@@ -14,6 +14,16 @@ const fixture = JSON.parse(await readFile(`${root}/fixture.json`, 'utf8'));
 const assetUrl = new URL(`/admin/media-assets/${fixture.sharedAssetId}/edit`, baseUrl).href;
 const brandUrl = new URL(`/admin/brands/${fixture.differentBrandId}/edit`, baseUrl).href;
 
+
+async function uploadViaInitializedFilePond(page, filename) {
+  // FilePond replaces the raw Alpine input; wait for its own browser input.
+  const input = page.locator('.filepond--root .filepond--browser').first();
+  await input.waitFor({ state: 'attached', timeout: 15_000 });
+  await input.setInputFiles(`${root}/${filename}`);
+  await page.locator('.filepond--item[data-filepond-item-state="processing-complete"]')
+    .first().waitFor({ state: 'visible', timeout: 20_000 });
+}
+
 test('shared Asset confirmation/cancellation and Brand dedup use real Chromium', { timeout: 160_000 }, async () => {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
@@ -36,9 +46,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     assert.equal(page.url(), assetUrl);
     await page.getByText('shared.png', { exact: false }).first().waitFor({ state: 'visible' });
 
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles(`${root}/replacement.png`);
-    await page.locator('.filepond--item').first().waitFor({ state: 'visible' });
+    await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
 
     const dialog = page.getByRole('dialog').filter({ hasText: 'Змінити спільне зображення?' });
@@ -60,8 +68,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.getByText('replacement.png', { exact: false }).first().waitFor({ state: 'visible' });
 
     // Content identity: saving the exact same bytes must not ask for confirmation.
-    await page.locator('input[type="file"]').first().setInputFiles(`${root}/replacement.png`);
-    await page.locator('.filepond--item').first().waitFor({ state: 'visible' });
+    await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже актуальне. Інших змін немає.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
@@ -71,14 +78,12 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     assert.equal(brandResponse?.status(), 200, 'Brand edit screen must open.');
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });
 
-    await page.locator('input[type="file"]').first().setInputFiles(`${root}/replacement.png`);
-    await page.locator('.filepond--item').first().waitFor({ state: 'visible' });
+    await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже є в Assets. Використано існуючий файл без дублювання.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
 
-    await page.locator('input[type="file"]').first().setInputFiles(`${root}/replacement.png`);
-    await page.locator('.filepond--item').first().waitFor({ state: 'visible' });
+    await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже актуальне. Інших змін немає.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
