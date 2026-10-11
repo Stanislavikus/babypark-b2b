@@ -90,7 +90,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже актуальне. Інших змін немає.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
-    assert.equal(await dialog.isVisible(), false, 'Identical bytes should not open shared replacement modal.');
+    assert.equal(await modalHeading.isVisible(), false, 'Identical bytes should not open shared replacement modal.');
 
     const brandResponse = await page.goto(brandUrl, { waitUntil: 'domcontentloaded' });
     assert.equal(brandResponse?.status(), 200, 'Brand edit screen must open.');
