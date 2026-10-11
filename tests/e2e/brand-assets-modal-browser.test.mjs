@@ -28,7 +28,9 @@ test('Brand picks an existing Original image from the native Assets visual libra
 
     const result = await page.goto(new URL(brandPath, baseUrl).href);
     assert.equal(result?.status(), 200);
-    const mediaSection = page.locator('.fi-section').filter({ has: page.getByText('Медіа', { exact: true }) }).first();
+    const mediaSection = page.locator('.fi-section').filter({
+      has: page.getByRole('heading', { name: 'Медіа', exact: true }),
+    }).last();
     const unifiedDropzone = mediaSection.locator('.bp-brand-media-dropzone');
     await unifiedDropzone.getByText('Перетягніть зображення сюди', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
@@ -90,7 +92,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     ));
     assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
       'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
-    await modal.screenshot({ path: `${root}/brand-media-picker-layout.png` });
+    await modalWindow.screenshot({ path: `${root}/brand-media-picker-layout.png` });
     const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
       nodes.slice(0, 2).map(node => {
         const { left, right, top, bottom } = node.getBoundingClientRect();
