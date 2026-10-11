@@ -213,6 +213,36 @@ button.bp-category-tree-header-cell {
     min-width: 0;
 }
 
+/* Filament Group renders an inner .fi-grid. Styling only the Group wrapper
+   leaves both actions in its default single-column grid (confirmed in trace #22). */
+.bp-brand-media-dropzone > .fi-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
+    width: 100%;
+    min-width: 0;
+}
+
+.bp-brand-media-actions > .fi-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.bp-brand-media-actions > .fi-grid > .fi-grid-col {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+}
+
 .bp-brand-media-icon {
     @apply text-gray-500 dark:text-gray-400;
     display: flex;
@@ -275,6 +305,9 @@ button.bp-category-tree-header-cell {
     min-height: 46px !important;
     height: 46px !important;
     cursor: pointer;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
 }
 
 .bp-brand-media-actions .filepond--drop-label label {
