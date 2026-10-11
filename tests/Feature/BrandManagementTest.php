@@ -307,7 +307,10 @@ final class BrandManagementTest extends TestCase
         $selected = $this->imageAsset($this->workspace, 'visual-picker.png');
         $selected->update(['source_url' => 'https://cdn.example.test/visual-picker.png']);
         $derivative = $this->imageAsset($this->workspace, 'derivative.png', $selected);
-        $anotherWorkspace = Workspace::factory()->create();
+        $anotherWorkspace = Workspace::query()->create([
+            'name' => 'Foreign visual picker workspace',
+            'is_default' => false,
+        ]);
         $otherWorkspaceImage = $this->imageAsset($anotherWorkspace, 'not-visible.png');
 
         $picker = OriginalImageAssetPicker::make('logo_media_asset_id');
