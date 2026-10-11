@@ -534,6 +534,67 @@ final class BrandManagementTest extends TestCase
     }
 
     #[Test]
+    public function identical_brand_logo_upload_explains_no_change_or_other_saved_changes(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $file = UploadedFile::fake()->image('same-brand-logo.png', 720, 420);
+        $logo = app(OriginalImageIngestService::class)->ingestStandalone($this->actor, $this->workspace, $file);
+        $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Same Logo', logoMediaAssetId: $logo->id);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->fillForm(['logo_upload' => $file])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('logoPostSaveNotice', 'Зображення вже актуальне. Інших змін немає.');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->fillForm(['logo_upload' => $file, 'short_description' => 'Новий опис'])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('logoPostSaveNotice', 'Зображення вже актуальне. Інші зміни збережено.');
+
+        $this->assertSame('Новий опис', $brand->fresh()->short_description);
+        $this->assertSame($logo->id, $brand->fresh()->logo_media_asset_id);
+        $this->assertDatabaseCount('media_assets', 1);
+    }
+
+    #[Test]
+    public function brand_reuses_existing_different_logo_but_same_name_with_new_bytes_creates_new_asset(): void
+    {
+        Storage::fake('public');
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $oldFile = UploadedFile::fake()->image('logo.png', 480, 320);
+        $otherFile = UploadedFile::fake()->image('already-used.png', 900, 420);
+        $old = app(OriginalImageIngestService::class)->ingestStandalone($this->actor, $this->workspace, $oldFile);
+        $other = app(OriginalImageIngestService::class)->ingestStandalone($this->actor, $this->workspace, $otherFile);
+        $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Switch Logo', logoMediaAssetId: $old->id);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->fillForm(['logo_upload' => $otherFile])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('logoPostSaveNotice', 'Зображення вже є в Assets. Використано існуючий файл без дублювання.');
+
+        $this->assertSame($other->id, $brand->fresh()->logo_media_asset_id);
+        $this->assertDatabaseCount('media_assets', 2);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->fillForm(['logo_upload' => UploadedFile::fake()->image('logo.png', 1024, 650)])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('logoPostSaveNotice', null);
+
+        $this->assertNotSame($old->id, $brand->fresh()->logo_media_asset_id);
+        $this->assertNotSame($other->id, $brand->fresh()->logo_media_asset_id);
+        $this->assertDatabaseCount('media_assets', 3);
+    }
+
+    #[Test]
     public function brand_logo_admission_failure_is_a_form_error_and_creates_nothing(): void
     {
         Storage::fake('public');

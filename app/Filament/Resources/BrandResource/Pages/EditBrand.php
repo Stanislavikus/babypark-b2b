@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use App\Services\Catalog\BrandManager;
 use App\Services\Media\OriginalImageIngestService;
 use App\Support\Media\Exceptions\MediaIngestException;
+use App\Support\Media\MediaSaveNotice;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -26,6 +27,8 @@ class EditBrand extends EditRecord
     protected static string $resource = BrandResource::class;
 
     protected ?bool $hasUnsavedDataChangesAlert = true;
+
+    public ?string $logoPostSaveNotice = null;
 
     protected function getHeaderActions(): array
     {
@@ -88,6 +91,13 @@ class EditBrand extends EditRecord
         }
 
         $workspace = app(WorkspaceContext::class)->current();
+        $this->logoPostSaveNotice = null;
+        $previousLogoId = $record->logo_media_asset_id ? (string) $record->logo_media_asset_id : null;
+        $previousOtherFields = [
+            'name' => trim((string) $record->name),
+            'description' => filled($record->short_description) ? trim((string) $record->short_description) : null,
+            'is_active' => (bool) $record->is_active,
+        ];
         $upload = $this->logoUpload($data['logo_upload'] ?? null);
         $imageIngest = app(OriginalImageIngestService::class);
         $prepared = null;
@@ -103,6 +113,7 @@ class EditBrand extends EditRecord
         }
 
         $storedPaths = [];
+        $reusedExistingAsset = false;
 
         try {
             $updatedRecord = DB::transaction(function () use (
@@ -113,6 +124,7 @@ class EditBrand extends EditRecord
                 $prepared,
                 $imageIngest,
                 &$storedPaths,
+                &$reusedExistingAsset,
             ): Model {
                 if ($prepared !== null) {
                     $lockedWorkspace = Workspace::query()
@@ -122,6 +134,7 @@ class EditBrand extends EditRecord
 
                     $ingested = $imageIngest->ingestPrepared($actor, $lockedWorkspace, $prepared);
                     $data['logo_media_asset_id'] = (string) $ingested->asset->id;
+                    $reusedExistingAsset = $ingested->newStoredPath === null;
 
                     if ($ingested->newStoredPath !== null) {
                         $storedPaths[] = $ingested->newStoredPath;
@@ -143,6 +156,19 @@ class EditBrand extends EditRecord
             $this->record = $record;
             data_set($this->data, 'logo_media_asset_id', $record->logo_media_asset_id ? (string) $record->logo_media_asset_id : null);
             data_set($this->data, 'logo_upload', null);
+
+            if ($prepared !== null && $reusedExistingAsset) {
+                $newLogoId = $record->logo_media_asset_id ? (string) $record->logo_media_asset_id : null;
+                $otherChangesSaved = $previousOtherFields !== [
+                    'name' => trim((string) $record->name),
+                    'description' => filled($record->short_description) ? trim((string) $record->short_description) : null,
+                    'is_active' => (bool) $record->is_active,
+                ];
+
+                $this->logoPostSaveNotice = $newLogoId === $previousLogoId
+                    ? MediaSaveNotice::unchanged($otherChangesSaved)
+                    : MediaSaveNotice::reused();
+            }
 
             return $record;
         } catch (Throwable $exception) {

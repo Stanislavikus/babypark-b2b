@@ -59,7 +59,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, xml, curl, sqlite3, pdo_sqlite, pdo_mysql, bcmath, intl
+          extensions: mbstring, xml, curl, sqlite3, pdo_sqlite, pdo_mysql, bcmath, intl, gd
           coverage: none
 
       - name: Install PHP dependencies
@@ -88,6 +88,9 @@ jobs:
           php artisan migrate:fresh --seed --force
           php artisan storage:link
 
+      - name: Seed isolated shared-media fixture
+        run: php tests/e2e/seed-shared-media.php
+
       - name: Start local application
         run: |
           set -euo pipefail
@@ -104,7 +107,7 @@ jobs:
           exit 1
 
       - name: Run real Chromium smoke tests
-        run: node --test tests/e2e/admin-browser-smoke.test.mjs
+        run: node --test --test-concurrency=1 tests/e2e/*.test.mjs
 
       - name: Upload failure evidence
         if: failure()
