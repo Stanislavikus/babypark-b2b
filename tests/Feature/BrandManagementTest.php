@@ -316,7 +316,10 @@ final class BrandManagementTest extends TestCase
         $picker = OriginalImageAssetPicker::make('logo_media_asset_id');
         $this->assertInstanceOf(ModalTableSelect::class, $picker);
         $this->assertSame(OriginalImagesTable::class, $picker->getTableConfiguration());
-        $this->assertSame('visual-picker.png · Зовнішнє', OriginalImageAssetPicker::displayName($selected));
+        $this->assertSame(
+            'visual-picker.png · Зовнішнє · Ще не перевірено',
+            OriginalImageAssetPicker::displayName($selected->fresh()),
+        );
         $this->assertFalse(OriginalImageAssetPicker::scopedOriginalImages()->whereKey($derivative->id)->exists());
         $this->assertFalse(OriginalImageAssetPicker::scopedOriginalImages()->whereKey($otherWorkspaceImage->id)->exists());
         $this->assertSame($selected->id, OriginalImageAssetPicker::scopedOriginalImages()->sole()->id);
