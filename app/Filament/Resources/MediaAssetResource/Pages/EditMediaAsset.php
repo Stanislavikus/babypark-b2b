@@ -9,6 +9,7 @@ use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetLifecycleService;
 use App\Support\Media\Exceptions\MediaAssetLifecycleException;
 use App\Support\Media\Exceptions\MediaIngestException;
+use App\Support\Media\MediaSaveNotice;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -61,7 +62,54 @@ class EditMediaAsset extends EditRecord
     protected function getSaveFormAction(): Action
     {
         return parent::getSaveFormAction()
-            ->label('Зберегти');
+            ->label('Зберегти')
+            ->submit(null)
+            ->action('save')
+            ->requiresConfirmation(fn (): bool => $this->requiresSharedImageConfirmation())
+            ->modalHidden(fn (): bool => ! $this->requiresSharedImageConfirmation())
+            ->modalHeading('Змінити спільне зображення?')
+            ->modalDescription(fn (): string => $this->sharedImageConfirmationDescription())
+            ->modalSubmitActionLabel('Замінити');
+    }
+
+    private function requiresSharedImageConfirmation(): bool
+    {
+        if (! $this->record instanceof MediaAsset) {
+            return false;
+        }
+
+        $upload = $this->replacementUpload(data_get($this->data, 'replacement_upload'));
+
+        if (! $upload instanceof UploadedFile) {
+            return false;
+        }
+
+        $currentHash = $this->record->content_sha256;
+        $path = $upload->getRealPath();
+
+        if (is_string($currentHash) && is_string($path) && $path !== ''
+            && hash_equals($currentHash, (string) hash_file('sha256', $path))) {
+            return false;
+        }
+
+        $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($this->record);
+
+        return $usage['products'] + $usage['variants'] + $usage['brands'] > 1;
+    }
+
+    private function sharedImageConfirmationDescription(): string
+    {
+        $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($this->record);
+        $parts = [];
+
+        foreach (['products' => 'товарів', 'variants' => 'варіантів', 'brands' => 'брендів'] as $key => $label) {
+            if ($usage[$key] > 0) {
+                $parts[] = $label.': '.$usage[$key];
+            }
+        }
+
+        return 'Це зображення використовується в кількох об’єктах ('.implode(' · ', $parts)
+            .'). Після заміни нове зображення відображатиметься в усіх цих об’єктах.';
     }
 
     protected function getFormActions(): array
@@ -81,7 +129,10 @@ class EditMediaAsset extends EditRecord
         }
 
         $file = $this->replacementUpload($data['replacement_upload'] ?? null);
+        $previousNote = filled($record->internal_note) ? trim((string) $record->internal_note) : null;
         $updatedRecord = $record;
+        $imageUnchanged = false;
+        $postSaveUsage = null;
         $this->replacementBusinessWarning = null;
         $this->replacementPostSaveNotice = null;
 
@@ -109,12 +160,8 @@ class EditMediaAsset extends EditRecord
                 ]);
             }
 
-            $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($result->asset);
-            $this->replacementPostSaveNotice = match (true) {
-                ! $result->replaced => 'Зображення вже актуальне. Змін не внесено.',
-                $usage['products'] > 0 => 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.',
-                default => null,
-            };
+            $postSaveUsage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($result->asset);
+            $imageUnchanged = ! $result->replaced;
             data_set($this->data, 'replacement_upload', null);
             $record->setRawAttributes($result->asset->getAttributes(), true);
             $record->unsetRelations();
@@ -126,6 +173,16 @@ class EditMediaAsset extends EditRecord
                 ? trim((string) $data['internal_note'])
                 : null,
         ])->save();
+
+        if ($file instanceof UploadedFile) {
+            $nextNote = filled($updatedRecord->internal_note) ? trim((string) $updatedRecord->internal_note) : null;
+
+            $this->replacementPostSaveNotice = match (true) {
+                $imageUnchanged => MediaSaveNotice::unchanged($previousNote !== $nextNote),
+                ($postSaveUsage['products'] ?? 0) > 0 => 'Asset використовується товарами. Запустіть Preview ще раз, щоб перевірити актуальне зображення перед передачею.',
+                default => null,
+            };
+        }
 
         $this->record = $updatedRecord;
 

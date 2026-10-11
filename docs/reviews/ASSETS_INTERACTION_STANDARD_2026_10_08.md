@@ -313,3 +313,33 @@ so the native Filament guard itself does not issue a second prompt. Normal accid
 navigation retains Filament's native unsaved-changes protection. This is
 limited to explicit Asset/Brand close and guarded Asset Delete success; no
 global Filament override or new dependency is introduced.
+
+
+## 2026-10-11 [Resolved] — Brand/Asset shared-image clarity
+
+Goal: reuse existing image bytes across Brands without duplicates while making
+Save outcomes truthful and shared Asset replacement consequences visible.
+
+Research First: Official Filament 5 `Callout` (already installed) is PASS for local
+status messages. Official Filament 5 `Action::requiresConfirmation()` with native
+`modalHeading`/`modalDescription` is PASS for confirmation. Licence, upgrade,
+integration and active-maintenance areas: PASS for existing framework primitives.
+Extra OSS package: unnecessary; no runtime dependency added. Domain identity stays
+SHA-256 by contents within workspace, never filename or byte count.
+
+For identical content on an existing Asset/Brand logo: render Filament's
+`Зверніть увагу` with one of two accurate messages:
+- `Зображення вже актуальне. Інших змін немає.` if no other field persisted changes;
+- `Зображення вже актуальне. Інші зміни збережено.` if other edits persisted.
+
+For a Brand upload whose bytes already exist in Assets but the Brand previously
+referenced a different Asset, reuse the existing Asset and show
+`Зображення вже є в Assets. Використано існуючий файл без дублювання.`.
+A modified file with the same filename is different content and may be uploaded.
+
+When replacing the bytes of an Asset referenced by **multiple** Product/Variant/Brand
+records, native Filament Save confirmation must list exact current distinct usage
+counts, warn that all references will change and offer `Замінити` / cancel.
+Uploading the exact same bytes does not prompt. Re-check usage via the existing
+workspace-scoped reader; the transactional domain lifecycle, derivative restrictions,
+shared Asset ID, retention and tenant constraints remain authoritative.

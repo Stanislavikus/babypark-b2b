@@ -24,6 +24,7 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
@@ -39,6 +40,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Component;
 
 class BrandResource extends Resource
 {
@@ -123,7 +125,11 @@ class BrandResource extends Resource
                     ->label('Обрати з Assets')
                     ->placeholder('Без логотипу')
                     ->live()
-                    ->afterStateUpdated(function (Set $set, mixed $state): void {
+                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                        if ($livewire instanceof EditBrand) {
+                            $livewire->logoPostSaveNotice = null;
+                        }
+
                         if (filled($state)) {
                             $set('logo_upload', null);
                         }
@@ -145,12 +151,23 @@ class BrandResource extends Resource
                         'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                     ])
                     ->live()
-                    ->afterStateUpdated(function (Set $set, mixed $state): void {
+                    ->helperText('Новий файл буде додано в Assets і використано як логотип. До 20 МіБ і 25 МП.')
+                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                        if ($livewire instanceof EditBrand) {
+                            $livewire->logoPostSaveNotice = null;
+                        }
+
                         if (filled($state)) {
                             $set('logo_media_asset_id', null);
                         }
-                    })
-                    ->helperText('Новий файл буде додано в Assets і використано як логотип. До 20 МіБ і 25 МП.'),
+                    }),
+                Callout::make('Зверніть увагу')
+                    ->info()
+                    ->description(fn (Component $livewire): ?string => $livewire instanceof EditBrand
+                        ? $livewire->logoPostSaveNotice
+                        : null)
+                    ->visible(fn (Component $livewire): bool => $livewire instanceof EditBrand
+                        && filled($livewire->logoPostSaveNotice)),
                 Actions::make([
                     Action::make('remove_logo')
                         ->label('Прибрати логотип')

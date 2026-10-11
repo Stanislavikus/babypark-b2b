@@ -18,6 +18,7 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\VariantMedia;
 use App\Models\Workspace;
+use App\Services\Catalog\BrandManager;
 use App\Services\Media\MediaAssetLifecycleService;
 use App\Services\Media\OriginalImageIngestService;
 use App\Services\Media\RetiredMediaPathRegistry;
@@ -663,6 +664,72 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertNotified('Asset видалено');
 
         $this->assertDatabaseMissing('media_assets', ['id' => $asset->id]);
+    }
+
+    #[Test]
+    public function identical_asset_file_distinguishes_note_changes_from_no_changes(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $file = UploadedFile::fake()->image('same-media.png', 720, 450);
+        $asset = app(OriginalImageIngestService::class)->ingestStandalone($this->actor, $this->workspace, $file);
+        $oldPath = (string) $asset->storage_path;
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm(['replacement_upload' => $file])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('replacementPostSaveNotice', 'Зображення вже актуальне. Інших змін немає.');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm(['replacement_upload' => $file, 'internal_note' => 'Збережений коментар'])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('replacementPostSaveNotice', 'Зображення вже актуальне. Інші зміни збережено.');
+
+        $this->assertSame('Збережений коментар', $asset->fresh()->internal_note);
+        $this->assertSame($oldPath, $asset->fresh()->storage_path);
+        $this->assertDatabaseCount('media_assets', 1);
+    }
+
+    #[Test]
+    public function shared_asset_save_requires_confirmation_for_new_bytes_but_not_same_bytes(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        $file = UploadedFile::fake()->image('shared-original.png', 710, 380);
+        $asset = app(OriginalImageIngestService::class)->ingestStandalone($this->actor, $this->workspace, $file);
+        app(BrandManager::class)->create(
+            $this->actor,
+            $this->workspace,
+            'Shared Brand First',
+            logoMediaAssetId: $asset->id,
+        );
+        app(BrandManager::class)->create(
+            $this->actor,
+            $this->workspace,
+            'Shared Brand Second',
+            logoMediaAssetId: $asset->id,
+        );
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm(['replacement_upload' => UploadedFile::fake()->image('shared-replace.png', 810, 460)]);
+        $component
+            ->mountAction(TestAction::make('save')->schemaComponent('form-actions', 'content'))
+            ->assertActionMounted(TestAction::make('save')->schemaComponent('form-actions', 'content'))
+            ->assertMountedActionModalSee(['Змінити спільне зображення?', 'брендів: 2']);
+
+        $this->assertSame($asset->content_sha256, $asset->fresh()->content_sha256);
+        $component->unmountAction();
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
+            ->fillForm(['replacement_upload' => $file])
+            ->mountAction(TestAction::make('save')->schemaComponent('form-actions', 'content'))
+            ->assertActionNotMounted();
     }
 
     #[Test]
