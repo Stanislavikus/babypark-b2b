@@ -30,11 +30,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.equal(result?.status(), 200);
     const mediaSection = page.locator('.fi-section').filter({ has: page.getByText('Медіа', { exact: true }) }).first();
     const unifiedDropzone = mediaSection.locator('.bp-brand-media-dropzone');
-    await unifiedDropzone.getByText('Перетягніть зображення сюди або завантажте файл', { exact: true })
+    await unifiedDropzone.getByText('Перетягніть зображення сюди', { exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await unifiedDropzone.getByText('або додайте його з комп’ютера чи Assets', { exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await unifiedDropzone.getByText('Завантажити', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await unifiedDropzone.locator('input[type="file"]').count() > 0,
       'The canonical FilePond uploader is inside the single dashed Media area.');
-    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з медіатеки' });
+    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з Assets' });
     await selectButton.waitFor({ state: 'visible', timeout: 20_000 });
     const geometry = await unifiedDropzone.evaluate(element => {
       const rect = node => {
@@ -44,12 +48,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
       const picker = element.querySelector('.bp-brand-media-picker button');
       const upload = element.querySelector('.filepond--root');
       const panel = element.querySelector('.filepond--panel-root');
+      const actions = element.querySelector('.bp-brand-media-actions');
       return {
         area: rect(element),
         picker: picker ? rect(picker) : null,
         upload: upload ? rect(upload) : null,
+        actions: actions ? rect(actions) : null,
         borderStyle: getComputedStyle(element).borderTopStyle,
         innerPanelShadow: panel ? getComputedStyle(panel).boxShadow : null,
+        innerPanelColor: panel ? getComputedStyle(panel).backgroundColor : null,
       };
     });
     assert.equal(geometry.borderStyle, 'dashed', 'One approved dashed Media area must contain both controls.');
@@ -60,6 +67,13 @@ test('Brand picks an existing Original image from the native Assets visual libra
       assert.ok(geometry[name].top >= geometry.area.top && geometry[name].bottom <= geometry.area.bottom,
         `${name} must be vertically inside the dashed area: ${JSON.stringify(geometry)}`);
     }
+    assert.ok(geometry.actions, 'The two native media actions must share a dedicated row.');
+    assert.ok(Math.abs((geometry.upload.top + geometry.upload.bottom) / 2
+      - (geometry.picker.top + geometry.picker.bottom) / 2) < 30,
+      `Upload and Assets selection must be side by side: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.upload.bottom - geometry.upload.top <= 70,
+      `Empty FilePond must be a compact action, not its own large rectangular upload panel: ${JSON.stringify(geometry)}`);
+    assert.equal(geometry.innerPanelShadow, 'none', 'FilePond must not render a second framed surface.');
     await mkdir(root, { recursive: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
     await selectButton.click();
@@ -69,6 +83,22 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
       'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
+    const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
+      nodes.slice(0, 2).map(node => {
+        const { left, right, top, bottom } = node.getBoundingClientRect();
+        return { left, right, top, bottom };
+      }));
+    const pickerBounds = await modal.evaluate(node => {
+      const { left, right } = node.getBoundingClientRect();
+      return { left, right };
+    });
+    assert.ok(Math.abs(cardBounds[0].top - cardBounds[1].top) < 15,
+      `At desktop size picker must show two cards per row: ${JSON.stringify(cardBounds)}`);
+    for (const cardBox of cardBounds) {
+      assert.ok(cardBox.left >= pickerBounds.left && cardBox.right <= pickerBounds.right,
+        `Card overflow causes the horizontal scrollbar rejected by owner: ${JSON.stringify({ pickerBounds, cardBounds })}`);
+    }
+    await modal.screenshot({ path: `${root}/brand-media-picker-layout.png` });
     const card = cardGrid.locator('.fi-ta-record').filter({ hasText: 'other.png' }).first();
     await card.waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await card.locator('img').count(), 'Shared Media card must contain original preview.');
