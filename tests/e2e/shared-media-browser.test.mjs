@@ -49,7 +49,7 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
 
-    const dialog = page.getByRole('alertdialog').filter({ hasText: 'Змінити спільне зображення?' });
+    const dialog = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Змінити спільне зображення?' });
     await dialog.waitFor({ state: 'visible', timeout: 20_000 });
     assert.match(await dialog.innerText(), /брендів:\s*2/, 'The modal must report two live Brand references.');
 
