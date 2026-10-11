@@ -29,17 +29,50 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const result = await page.goto(new URL(brandPath, baseUrl).href);
     assert.equal(result?.status(), 200);
     const mediaSection = page.locator('.fi-section').filter({ has: page.getByText('Медіа', { exact: true }) }).first();
-    await mediaSection.getByText('Перетягніть зображення сюди або виберіть файл', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
-    assert.ok(await mediaSection.locator('input[type="file"]').count() > 0, 'The native dropzone is inside the same Media section.');
+    const unifiedDropzone = mediaSection.locator('.bp-brand-media-dropzone');
+    await unifiedDropzone.getByText('Перетягніть зображення сюди або завантажте файл', { exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    assert.ok(await unifiedDropzone.locator('input[type="file"]').count() > 0,
+      'The canonical FilePond uploader is inside the single dashed Media area.');
+    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з медіатеки' });
+    await selectButton.waitFor({ state: 'visible', timeout: 20_000 });
+    const geometry = await unifiedDropzone.evaluate(element => {
+      const rect = node => {
+        const box = node.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+      };
+      const picker = element.querySelector('.bp-brand-media-picker button');
+      const upload = element.querySelector('.filepond--root');
+      const panel = element.querySelector('.filepond--panel-root');
+      return {
+        area: rect(element),
+        picker: picker ? rect(picker) : null,
+        upload: upload ? rect(upload) : null,
+        borderStyle: getComputedStyle(element).borderTopStyle,
+        innerPanelShadow: panel ? getComputedStyle(panel).boxShadow : null,
+      };
+    });
+    assert.equal(geometry.borderStyle, 'dashed', 'One approved dashed Media area must contain both controls.');
+    for (const name of ['picker', 'upload']) {
+      assert.ok(geometry[name], `Expected ${name} in Media area.`);
+      assert.ok(geometry[name].left >= geometry.area.left && geometry[name].right <= geometry.area.right,
+        `${name} must be horizontally inside the dashed area: ${JSON.stringify(geometry)}`);
+      assert.ok(geometry[name].top >= geometry.area.top && geometry[name].bottom <= geometry.area.bottom,
+        `${name} must be vertically inside the dashed area: ${JSON.stringify(geometry)}`);
+    }
     await mkdir(root, { recursive: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
-    await mediaSection.getByRole('button', { name: 'Обрати з медіатеки' }).click();
+    await selectButton.click();
     const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
     await modal.locator('h2.fi-modal-heading').waitFor({ state: 'visible', timeout: 20_000 });
-    const row = modal.locator('tr').filter({ hasText: 'other.png' }).first();
-    await row.waitFor({ state: 'visible', timeout: 20_000 });
-    assert.ok(await row.locator('img').count(), 'Native Filament ImageColumn renders a preview in picker.');
-    await row.locator('input[type="checkbox"]').first().check();
+    const cardGrid = modal.locator('.fi-ta-content-grid');
+    await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
+    assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
+      'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
+    const card = cardGrid.locator('.fi-ta-record').filter({ hasText: 'other.png' }).first();
+    await card.waitFor({ state: 'visible', timeout: 20_000 });
+    assert.ok(await card.locator('img').count(), 'Shared Media card must contain original preview.');
+    await card.locator('input[type="checkbox"]').first().check();
     await modal.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
     await modal.locator('h2.fi-modal-heading').waitFor({ state: 'hidden', timeout: 20_000 });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });

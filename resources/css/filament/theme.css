@@ -199,3 +199,34 @@ button.bp-category-tree-header-cell {
 .bp-category-tree-root-drop-zone {
     @apply min-h-10 border-b border-gray-200 dark:border-white/5;
 }
+
+/* Brand authoring: one drop area for upload and the existing Media library.
+   These are only visual wrappers around official Filament FileUpload and
+   ModalTableSelect: neither upload state nor picker/save behavior is replaced. */
+.bp-brand-media-dropzone {
+    @apply rounded-xl border border-dashed border-gray-300 bg-white px-4 py-5 dark:border-white/20 dark:bg-gray-900;
+}
+
+.bp-brand-media-dropzone .fi-fo-file-upload .filepond--panel-root {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.bp-brand-media-dropzone .fi-fo-file-upload .filepond--root {
+    margin-bottom: 0;
+}
+
+.bp-brand-media-dropzone .fi-fo-modal-table-select {
+    justify-content: center;
+}
+
+/* Current logo is already shown in the same Media section preview; do not
+   duplicate its filename in front of the select-library action. Keep it in
+   accessibility tree for assistive technology. */
+.bp-brand-media-picker.fi-fo-modal-table-select > div:first-child:not(:last-child) {
+    @apply sr-only;
+}
+
+.bp-brand-media-format {
+    @apply text-center text-sm text-gray-500 dark:text-gray-400;
+}

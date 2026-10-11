@@ -7,6 +7,7 @@ use App\Enums\MediaDiagnosisStatus;
 use App\Filament\Resources\MediaAssetResource\Pages\EditMediaAsset;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
+use App\Filament\Support\MediaAssetCardColumns;
 use App\Filament\Support\MediaPreviewFrame;
 use App\Models\MediaAsset;
 use App\Models\User;
@@ -29,8 +30,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
@@ -283,48 +282,7 @@ class MediaAssetResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                Split::make([
-                    MediaPreviewFrame::column(
-                        ImageColumn::make('asset_preview')
-                            ->label('')
-                            ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
-                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(88)))
-                            ->grow(false),
-                        MediaPreviewFrame::ASSET_CARD,
-                    ),
-                    Stack::make([
-                        TextColumn::make('asset_name')
-                            ->label('Файл')
-                            ->state(fn (MediaAsset $record): string => self::displayName($record))
-                            ->weight(FontWeight::SemiBold)
-                            ->searchable(['original_filename', 'source_url'])
-                            ->limit(70)
-                            ->tooltip(fn (MediaAsset $record): string => self::displayName($record)),
-                        TextColumn::make('asset_meta')
-                            ->label('Параметри')
-                            ->state(fn (MediaAsset $record): string => self::dimensions($record).' · '.self::formatBytes($record->byte_size)),
-                        TextColumn::make('asset_usage')
-                            ->label('Використання')
-                            ->state(fn (MediaAsset $record): string => app(MediaAssetLibraryReadService::class)->usageSummary($record))
-                            ->color(fn (MediaAsset $record): string => app(MediaAssetLibraryReadService::class)->isUsed($record) ? 'gray' : 'warning'),
-                    ])->space(1),
-                    Stack::make([
-                        TextColumn::make('asset_source')
-                            ->label('Зберігання')
-                            ->state(fn (MediaAsset $record): string => self::sourceLabel($record))
-                            ->badge()
-                            ->color(fn (MediaAsset $record): string => self::sourceColor($record))
-                            ->grow(false),
-                        TextColumn::make('asset_status')
-                            ->label('Технічний стан')
-                            ->state(fn (MediaAsset $record): ?string => self::diagnosisIssueLabel($record))
-                            ->badge()
-                            ->color(fn (MediaAsset $record): string => self::diagnosisColor($record))
-                            ->grow(false),
-                    ])->space(1)->grow(false),
-                ])->from('md'),
-            ])
+            ->columns(MediaAssetCardColumns::make())
             ->contentGrid(fn ($livewire): ?array => ($livewire->assetLayout ?? 'grid') === 'grid'
                 ? ['md' => 2, '2xl' => 3]
                 : null)

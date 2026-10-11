@@ -319,6 +319,8 @@ final class BrandManagementTest extends TestCase
         $picker = OriginalImageAssetPicker::make('logo_media_asset_id');
         $this->assertInstanceOf(ModalTableSelect::class, $picker);
         $this->assertSame(OriginalImagesTable::class, $picker->getTableConfiguration());
+        $this->assertSame('Медіатека', __('media_ui.library'));
+        $this->assertSame('Перетягніть зображення сюди або завантажте файл', __('media_ui.drop_short'));
         $this->assertSame(
             'visual-picker.png · Зовнішнє · Ще не перевірено',
             OriginalImageAssetPicker::displayName($selected->fresh()),

@@ -1116,6 +1116,17 @@ existing Asset because `brands.logo_media_asset_id` is an association, not Asset
 identity mutation. No new Asset metadata column is introduced by this UX alignment.
 
 
+[Resolved 2026-10-11 — Brand Media visual acceptance correction after PR #291]
+The owner-provided approved composition is a **single dashed control region** within
+`Медіа` with native upload/drop and `Обрати з медіатеки` *inside that same region*,
+not a standalone button below an independent FilePond rectangle or an extra filename
+summary next to the button. The picker itself must use the same existing Media
+library **card grid** as `/admin/media-assets`, with image, filename, dimensions,
+usage and source badges. It is selection-only (no `Завантажити` header action);
+Brand authoring remains responsible for new upload. Share the card presentation
+implementation, rather than rebuilding a look-alike. Product media remains a
+separate capability. See `docs/reviews/BRAND_MEDIA_APPROVED_LAYOUT_CORRECTION_2026_10_11.md`.
+
 [Resolved 2026-10-11 — Brand Media single surface / owner correction] Brand Create/Edit
 must expose one titled `Медіа` block with the current logo, native local
 FileUpload drop zone, and `Обрати з медіатеки` action that opens the existing
