@@ -285,31 +285,7 @@ class MediaAssetResource extends Resource
                 ? ['md' => 2, '2xl' => 3]
                 : null)
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                SelectFilter::make('source')
-                    ->label('Зберігання')
-                    ->options([
-                        'managed' => 'У платформі',
-                        'external' => 'Зовнішнє',
-                    ])
-                    ->query(fn (Builder $query, array $data): Builder => app(MediaAssetLibraryReadService::class)
-                        ->applySourceFilter($query, is_string($data['value'] ?? null) ? $data['value'] : null)),
-                SelectFilter::make('usage')
-                    ->label('Використання')
-                    ->options([
-                        'used' => 'Використовується',
-                        'unused' => 'Не використовується',
-                        'products' => 'Товари',
-                        'variants' => 'Варіанти',
-                        'brand_logos' => 'Логотипи брендів',
-                    ])
-                    ->query(fn (Builder $query, array $data): Builder => app(MediaAssetLibraryReadService::class)
-                        ->applyUsageFilter($query, is_string($data['value'] ?? null) ? $data['value'] : null)),
-                Filter::make('attention')
-                    ->label('Потребує уваги')
-                    ->query(fn (Builder $query): Builder => app(MediaAssetLibraryReadService::class)
-                        ->applyAttentionFilter($query, true)),
-            ], layout: FiltersLayout::Modal)
+            ->filters(self::libraryFilters(), layout: FiltersLayout::Modal)
             ->deferFilters()
             ->filtersFormWidth('md')
             ->filtersApplyAction(
@@ -362,6 +338,36 @@ class MediaAssetResource extends Resource
                     ]),
             ])
             ->toolbarActions([]);
+    }
+
+    /** @return array<\Filament\Tables\Filters\BaseFilter> */
+    public static function libraryFilters(): array
+    {
+        return [
+                SelectFilter::make('source')
+                    ->label('Зберігання')
+                    ->options([
+                        'managed' => 'У платформі',
+                        'external' => 'Зовнішнє',
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => app(MediaAssetLibraryReadService::class)
+                        ->applySourceFilter($query, is_string($data['value'] ?? null) ? $data['value'] : null)),
+                SelectFilter::make('usage')
+                    ->label('Використання')
+                    ->options([
+                        'used' => 'Використовується',
+                        'unused' => 'Не використовується',
+                        'products' => 'Товари',
+                        'variants' => 'Варіанти',
+                        'brand_logos' => 'Логотипи брендів',
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => app(MediaAssetLibraryReadService::class)
+                        ->applyUsageFilter($query, is_string($data['value'] ?? null) ? $data['value'] : null)),
+                Filter::make('attention')
+                    ->label('Потребує уваги')
+                    ->query(fn (Builder $query): Builder => app(MediaAssetLibraryReadService::class)
+                        ->applyAttentionFilter($query, true)),
+        ];
     }
 
     public static function getPages(): array
