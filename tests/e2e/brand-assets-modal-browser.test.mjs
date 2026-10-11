@@ -103,6 +103,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.screenshot({ path: `${root}/brand-media-picker-filters.png` });
     await filterDialog.getByLabel('Відображення').selectOption('list');
     await cardGrid.waitFor({ state: 'hidden', timeout: 20_000 });
+    await modalWindow.screenshot({ path: `${root}/brand-media-picker-list-layout.png` });
     await filterDialog.getByLabel('Відображення').selectOption('grid');
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
     await page.keyboard.press('Escape');
