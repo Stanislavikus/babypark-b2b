@@ -11,7 +11,7 @@ final class OriginalImagesTable
         return $table
             ->query(fn () => OriginalImageAssetPicker::scopedOriginalImages())
             ->columns(MediaAssetCardColumns::make())
-            ->contentGrid(['md' => 2, '2xl' => 3])
+            ->contentGrid(['default' => 1, 'lg' => 2])
             ->defaultSort('created_at', 'desc');
     }
 }
