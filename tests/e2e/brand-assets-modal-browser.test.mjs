@@ -93,6 +93,19 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
       'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-layout.png` });
+    const filtersButton = modalWindow.getByRole('button', { name: 'Фільтри' });
+    await filtersButton.waitFor({ state: 'visible', timeout: 20_000 });
+    await filtersButton.click();
+    const filterDialog = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Відображення' }).last();
+    await filterDialog.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    await filterDialog.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
+    await filterDialog.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
+    await page.screenshot({ path: `${root}/brand-media-picker-filters.png` });
+    await filterDialog.getByLabel('Відображення').selectOption('list');
+    await cardGrid.waitFor({ state: 'hidden', timeout: 20_000 });
+    await filterDialog.getByLabel('Відображення').selectOption('grid');
+    await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
+    await page.keyboard.press('Escape');
     const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
       nodes.slice(0, 2).map(node => {
         const { left, right, top, bottom } = node.getBoundingClientRect();
