@@ -19,6 +19,8 @@ async function uploadViaInitializedFilePond(page, filename) {
   // FilePond replaces the raw Alpine input; wait for its own browser input.
   const input = page.locator('.filepond--root .filepond--browser').first();
   await input.waitFor({ state: 'attached', timeout: 15_000 });
+  assert.equal(await page.locator('.filepond--item').count(), 0,
+    'The test must start with an empty FilePond to avoid counting a previously processed file.');
   await input.setInputFiles(`${root}/${filename}`);
   await page.locator('.filepond--item[data-filepond-item-state="processing-complete"]')
     .first().waitFor({ state: 'visible', timeout: 20_000 });
@@ -98,7 +100,12 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже є в Assets. Використано існуючий файл без дублювання.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByText('replacement.png', { exact: false }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
 
+    // A separate upload after navigation must not inherit FilePond's previously processed item.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('replacement.png', { exact: false }).first().waitFor({ state: 'visible' });
     await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже актуальне. Інших змін немає.', { exact: true })
