@@ -25,10 +25,9 @@ final class OriginalImagesTable
                 SelectFilter::make('picker_view')
                     ->label('Відображення')
                     ->options([
-                        'grid' => 'Сітка',
                         'list' => 'Список',
                     ])
-                    ->default('grid')
+                    ->placeholder('Сітка')
                     ->indicateUsing(fn (): array => [])
                     ->query(fn (Builder $query): Builder => $query),
             ], layout: FiltersLayout::Modal)
