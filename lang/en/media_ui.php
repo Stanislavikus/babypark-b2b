@@ -2,12 +2,15 @@
 
 return [
     'item' => 'Media file',
+    'one_image' => '1 image',
+    'zero_images' => '0 images',
+    'drop_short' => 'Drag an image here or upload a file',
     'section' => 'Media',
     'library' => 'Media library',
     'select_existing' => 'Choose from media library',
     'upload' => 'Upload',
     'drop_label' => 'Drag an image here or choose a file',
-    'upload_hint' => 'JPEG, PNG, GIF, WebP, AVIF · up to 20 MiB and 25 MP. New files are added to the media library.',
+    'upload_hint' => 'JPEG, PNG, GIF, WebP, AVIF · up to 20 MiB / 25 MP per file',
     'library_hint' => 'Choose an existing image from the library. Files can be reused.',
     'no_logo' => 'No logo',
     'reused_notice' => 'This image is already in the media library. The existing file was used.',

@@ -67,9 +67,11 @@ class BrandResource extends Resource
                     ->required()
                     ->maxLength(255),
                 Section::make(__('media_ui.section'))
+                    ->description(fn (Get $get, ?Brand $record): string => self::formLogoAsset($get, $record) instanceof MediaAsset ? __('media_ui.one_image') : __('media_ui.zero_images'))
                     ->schema([
                         Text::make('Поточне зображення')
-                            ->weight(FontWeight::SemiBold),
+                            ->weight(FontWeight::SemiBold)
+                            ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
                         Group::make([
                             MediaPreviewFrame::entry(
                                 ImageEntry::make('logo_preview')
@@ -122,11 +124,13 @@ class BrandResource extends Resource
                                 'default' => 1,
                                 'md' => 2,
                             ])
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
                         Group::make([
                             FileUpload::make('logo_upload')
                                 ->label(__('media_ui.upload'))
-                                ->placeholder(__('media_ui.drop_label'))
+                                ->hiddenLabel()
+                                ->placeholder(__('media_ui.drop_short'))
                                 ->storeFiles(false)
                                 ->maxSize(20 * 1024)
                                 ->acceptedFileTypes([
@@ -141,7 +145,6 @@ class BrandResource extends Resource
                                     'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                                 ])
                                 ->live()
-                                ->helperText(__('media_ui.upload_hint'))
                                 ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
                                     if ($livewire instanceof EditBrand) {
                                         $livewire->logoPostSaveNotice = null;
@@ -154,7 +157,7 @@ class BrandResource extends Resource
                             OriginalImageAssetPicker::make('logo_media_asset_id')
                                 ->label(__('media_ui.select_existing'))
                                 ->hiddenLabel()
-                                ->placeholder(__('media_ui.no_logo'))
+                                ->placeholder(null)
                                 ->live()
                                 ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
                                     if ($livewire instanceof EditBrand) {
@@ -165,9 +168,12 @@ class BrandResource extends Resource
                                         $set('logo_upload', null);
                                     }
                                 })
-                                ->helperText(__('media_ui.library_hint')),
+                                ->helperText(null)
+                                ->extraAttributes(['class' => 'bp-brand-media-picker']),
+                            Text::make(__('media_ui.upload_hint'))
+                                ->extraAttributes(['class' => 'bp-brand-media-format']),
                         ])
-                            ->extraAttributes(['class' => 'rounded-xl border border-dashed border-gray-300 p-4 dark:border-gray-600'])
+                            ->extraAttributes(['class' => 'bp-brand-media-dropzone'])
                             ->columnSpanFull(),
                         Callout::make('Зверніть увагу')
                             ->info()
