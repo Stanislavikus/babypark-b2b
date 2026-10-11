@@ -598,7 +598,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->test(EditMediaAsset::class, ['record' => $target->getRouteKey()])
             ->fillForm(['replacement_upload' => $collisionFile])
             ->call('save')
-            ->assertSet('replacementBusinessWarning', 'Це зображення вже є в Assets. Щоб не створювати дубль, поточний Asset не змінено. Оберіть інший файл.')
+            ->assertSet('replacementBusinessWarning', 'Це зображення вже є в Assets. Оберіть інший файл.')
             ->assertSee('Зображення не змінено')
             ->assertSee('Це зображення вже є в Assets');
 
