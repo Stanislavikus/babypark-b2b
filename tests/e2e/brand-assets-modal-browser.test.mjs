@@ -80,10 +80,10 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
     await selectButton.click();
     const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
-    await modal.locator('h2.fi-modal-heading').waitFor({ state: 'visible', timeout: 20_000 });
+    await modal.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
     const cardGrid = modal.locator('.fi-ta-content-grid');
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
-    const modalWindow = modal.locator('.fi-modal-window');
+    const modalWindow = modal.locator('.fi-modal-window').first();
     await modalWindow.evaluate(element => Promise.all(
       element.getAnimations({ subtree: true })
         .filter(animation => animation.playState === 'running'
@@ -126,7 +126,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(await card.locator('img').count(), 'Shared Media card must contain original preview.');
     await card.locator('input[type="checkbox"]').first().check();
     await modal.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
-    await modal.locator('h2.fi-modal-heading').waitFor({ state: 'hidden', timeout: 20_000 });
+    await modal.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'hidden', timeout: 20_000 });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });
     const saved = page.waitForResponse(response =>
       response.request().method() === 'POST'
