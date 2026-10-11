@@ -100,11 +100,21 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await filterDialog.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
     await filterDialog.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
     await filterDialog.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
+    const filterWindow = filterDialog.locator('.fi-modal-window').last();
+    await filterWindow.evaluate(element => Promise.all(
+      element.getAnimations({ subtree: true })
+        .filter(animation => animation.playState === 'running'
+          && animation.effect?.getTiming().iterations !== Infinity)
+        .map(animation => animation.finished.catch(() => {})),
+    ));
+    const filterBox = await filterWindow.boundingBox();
+    assert.ok(filterBox && filterBox.left >= -2 && filterBox.right <= 1442,
+      `Filament filters drawer must fit viewport after transition: ${JSON.stringify(filterBox)}`);
     await page.screenshot({ path: `${root}/brand-media-picker-filters.png` });
     await filterDialog.getByLabel('Відображення').selectOption('list');
     await cardGrid.waitFor({ state: 'hidden', timeout: 20_000 });
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-list-layout.png` });
-    await filterDialog.getByLabel('Відображення').selectOption('grid');
+    await filterDialog.getByLabel('Відображення').selectOption('');
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
     await page.keyboard.press('Escape');
     const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
