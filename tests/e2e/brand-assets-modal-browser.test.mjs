@@ -34,7 +34,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       .waitFor({ state: 'visible', timeout: 20_000 });
     await unifiedDropzone.getByText('або додайте його з комп’ютера чи Assets', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
-    await unifiedDropzone.getByText('Завантажити', { exact: true })
+    await unifiedDropzone.getByText('Завантажити', { exact: true }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await unifiedDropzone.locator('input[type="file"]').count() > 0,
       'The canonical FilePond uploader is inside the single dashed Media area.');
