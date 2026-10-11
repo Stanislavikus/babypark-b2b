@@ -138,48 +138,48 @@ class BrandResource extends Resource
                                 ->extraAttributes(['class' => 'bp-brand-media-subheading']),
                             Group::make([
                                 FileUpload::make('logo_upload')
-                                ->label(__('media_ui.upload'))
-                                ->hiddenLabel()
-                                ->placeholder(__('media_ui.upload'))
-                                ->storeFiles(false)
-                                ->maxSize(20 * 1024)
-                                ->acceptedFileTypes([
-                                    'image/jpeg',
-                                    'image/png',
-                                    'image/gif',
-                                    'image/webp',
-                                    'image/avif',
-                                ])
-                                ->validationMessages([
-                                    'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
-                                    'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
-                                ])
-                                ->live()
-                                ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
-                                    if ($livewire instanceof EditBrand) {
-                                        $livewire->logoPostSaveNotice = null;
-                                    }
+                                    ->label(__('media_ui.upload'))
+                                    ->hiddenLabel()
+                                    ->placeholder(__('media_ui.upload'))
+                                    ->storeFiles(false)
+                                    ->maxSize(20 * 1024)
+                                    ->acceptedFileTypes([
+                                        'image/jpeg',
+                                        'image/png',
+                                        'image/gif',
+                                        'image/webp',
+                                        'image/avif',
+                                    ])
+                                    ->validationMessages([
+                                        'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
+                                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                                    ])
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                                        if ($livewire instanceof EditBrand) {
+                                            $livewire->logoPostSaveNotice = null;
+                                        }
 
-                                    if (filled($state)) {
-                                        $set('logo_media_asset_id', null);
-                                    }
-                                }),
+                                        if (filled($state)) {
+                                            $set('logo_media_asset_id', null);
+                                        }
+                                    }),
                                 OriginalImageAssetPicker::make('logo_media_asset_id')
-                                ->label(__('media_ui.select_existing'))
-                                ->hiddenLabel()
-                                ->placeholder(null)
-                                ->live()
-                                ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
-                                    if ($livewire instanceof EditBrand) {
-                                        $livewire->logoPostSaveNotice = null;
-                                    }
+                                    ->label(__('media_ui.select_existing'))
+                                    ->hiddenLabel()
+                                    ->placeholder(null)
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                                        if ($livewire instanceof EditBrand) {
+                                            $livewire->logoPostSaveNotice = null;
+                                        }
 
-                                    if (filled($state)) {
-                                        $set('logo_upload', null);
-                                    }
-                                })
-                                ->helperText(null)
-                                ->extraAttributes(['class' => 'bp-brand-media-picker']),
+                                        if (filled($state)) {
+                                            $set('logo_upload', null);
+                                        }
+                                    })
+                                    ->helperText(null)
+                                    ->extraAttributes(['class' => 'bp-brand-media-picker']),
                             ])
                                 ->extraAttributes(['class' => 'bp-brand-media-actions']),
                             Text::make(__('media_ui.upload_hint'))
