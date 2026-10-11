@@ -81,14 +81,22 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await modal.locator('h2.fi-modal-heading').waitFor({ state: 'visible', timeout: 20_000 });
     const cardGrid = modal.locator('.fi-ta-content-grid');
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
+    const modalWindow = modal.locator('.fi-modal-window');
+    await modalWindow.evaluate(element => Promise.all(
+      element.getAnimations({ subtree: true })
+        .filter(animation => animation.playState === 'running'
+          && animation.effect?.getTiming().iterations !== Infinity)
+        .map(animation => animation.finished.catch(() => {})),
+    ));
     assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
       'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
+    await modal.screenshot({ path: `${root}/brand-media-picker-layout.png` });
     const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
       nodes.slice(0, 2).map(node => {
         const { left, right, top, bottom } = node.getBoundingClientRect();
         return { left, right, top, bottom };
       }));
-    const pickerBounds = await modal.evaluate(node => {
+    const pickerBounds = await modalWindow.evaluate(node => {
       const { left, right } = node.getBoundingClientRect();
       return { left, right };
     });
@@ -98,7 +106,6 @@ test('Brand picks an existing Original image from the native Assets visual libra
       assert.ok(cardBox.left >= pickerBounds.left && cardBox.right <= pickerBounds.right,
         `Card overflow causes the horizontal scrollbar rejected by owner: ${JSON.stringify({ pickerBounds, cardBounds })}`);
     }
-    await modal.screenshot({ path: `${root}/brand-media-picker-layout.png` });
     const card = cardGrid.locator('.fi-ta-record').filter({ hasText: 'other.png' }).first();
     await card.waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await card.locator('img').count(), 'Shared Media card must contain original preview.');
