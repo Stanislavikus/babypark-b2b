@@ -29,8 +29,6 @@ use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -396,7 +394,7 @@ class MediaAssetResource extends Resource
 
     public static function getEditAuthorizationResponse(Model $record): Response
     {
-        if (! $record instanceof MediaAsset
+        if (!$record instanceof MediaAsset
             || (string) $record->workspace_id !== app(WorkspaceContext::class)->id()
             || ! $record->isOriginal()
             || $record->asset_type !== MediaAssetType::Image
