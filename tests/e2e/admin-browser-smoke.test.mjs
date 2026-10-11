@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const baseUrl = new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:18767');
@@ -48,6 +49,18 @@ test('seeded administrator can open Assets and Brands in Chromium', { timeout: 9
 
     assert.deepEqual(errors, [], 'No uncaught browser JavaScript errors.');
     passed = true;
+  } catch (error) {
+    // CI-only root-cause evidence: distinguish PHP-server death/OOM from a UI defect.
+    try {
+      const processes = execFileSync('ps', ['-eo', 'pid,ppid,rss,stat,comm,args'], { encoding: 'utf8' });
+      console.error('LOCAL_SERVER_DIAGNOSTIC_PROCESSES', processes.split('\n').filter(line => /artisan serve|php -S|PID|node --test/.test(line)).join('\n'));
+      console.error('LOCAL_SERVER_DIAGNOSTIC_FREE', execFileSync('free', ['-m'], { encoding: 'utf8' }));
+      console.error('LOCAL_SERVER_DIAGNOSTIC_MEMORY_EVENTS', await readFile('/sys/fs/cgroup/memory.events', 'utf8').catch(() => 'unavailable'));
+      console.error('LOCAL_SERVER_DIAGNOSTIC_PHP_LOG', (await readFile('/tmp/babypark-browser-smoke-server.log', 'utf8')).slice(-2500));
+    } catch (diagnosticError) {
+      console.error('LOCAL_SERVER_DIAGNOSTIC_ERROR', diagnosticError.message);
+    }
+    throw error;
   } finally {
     const artifactDir = 'test-results/browser-smoke';
     if (!passed) {
