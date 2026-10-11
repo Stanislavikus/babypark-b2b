@@ -40,6 +40,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Livewire\Component;
 
 class BrandResource extends Resource
@@ -127,10 +128,18 @@ class BrandResource extends Resource
                             ->columnSpanFull()
                             ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
                         Group::make([
-                            FileUpload::make('logo_upload')
+                            Text::make(new HtmlString('<svg aria-hidden="true" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="16" height="16" rx="2"/><circle cx="8" cy="10" r="1.3"/><path d="m5 18 4.5-5 3.5 3 2.5-3 2.5 3"/><path d="M20 1v8m-4-4h8"/></svg>'))
+                                ->extraAttributes(['class' => 'bp-brand-media-icon']),
+                            Text::make(__('media_ui.drop_heading'))
+                                ->weight(FontWeight::SemiBold)
+                                ->extraAttributes(['class' => 'bp-brand-media-heading']),
+                            Text::make(__('media_ui.drop_subheading'))
+                                ->extraAttributes(['class' => 'bp-brand-media-subheading']),
+                            Group::make([
+                                FileUpload::make('logo_upload')
                                 ->label(__('media_ui.upload'))
                                 ->hiddenLabel()
-                                ->placeholder(__('media_ui.drop_short'))
+                                ->placeholder(__('media_ui.upload'))
                                 ->storeFiles(false)
                                 ->maxSize(20 * 1024)
                                 ->acceptedFileTypes([
@@ -154,7 +163,7 @@ class BrandResource extends Resource
                                         $set('logo_media_asset_id', null);
                                     }
                                 }),
-                            OriginalImageAssetPicker::make('logo_media_asset_id')
+                                OriginalImageAssetPicker::make('logo_media_asset_id')
                                 ->label(__('media_ui.select_existing'))
                                 ->hiddenLabel()
                                 ->placeholder(null)
@@ -170,6 +179,8 @@ class BrandResource extends Resource
                                 })
                                 ->helperText(null)
                                 ->extraAttributes(['class' => 'bp-brand-media-picker']),
+                            ])
+                                ->extraAttributes(['class' => 'bp-brand-media-actions']),
                             Text::make(__('media_ui.upload_hint'))
                                 ->extraAttributes(['class' => 'bp-brand-media-format']),
                         ])
