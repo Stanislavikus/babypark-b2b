@@ -68,6 +68,7 @@ class BrandResource extends Resource
                     ->required()
                     ->maxLength(255),
                 Section::make(__('media_ui.section'))
+                    ->extraAttributes(['class' => 'bp-brand-media-section'])
                     ->description(fn (Get $get, ?Brand $record): string => self::formLogoAsset($get, $record) instanceof MediaAsset ? __('media_ui.one_image') : __('media_ui.zero_images'))
                     ->schema([
                         Text::make('Поточне зображення')
