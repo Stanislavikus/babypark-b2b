@@ -117,6 +117,7 @@ jobs:
           path: |
             test-results/browser-smoke/brand-media-layout.png
             test-results/browser-smoke/brand-media-picker-layout.png
+            test-results/browser-smoke/brand-media-picker-filters.png
           if-no-files-found: ignore
           retention-days: 7
 
