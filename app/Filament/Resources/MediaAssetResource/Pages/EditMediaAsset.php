@@ -61,10 +61,10 @@ class EditMediaAsset extends EditRecord
 
     protected function getSaveFormAction(): Action
     {
-        return parent::getSaveFormAction()
+        return Action::make('save_media_with_confirmation')
             ->label('Зберегти')
-            ->submit(null)
-            ->action('save')
+            ->action(fn () => $this->save())
+            ->keyBindings(['mod+s'])
             ->requiresConfirmation(fn (): bool => $this->requiresSharedImageConfirmation())
             ->modalHidden(fn (): bool => ! $this->requiresSharedImageConfirmation())
             ->modalHeading('Змінити спільне зображення?')

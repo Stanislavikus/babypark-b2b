@@ -718,8 +718,8 @@ class MediaAssetLifecycleTest extends TestCase
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm(['replacement_upload' => UploadedFile::fake()->image('shared-replace.png', 810, 460)]);
         $component
-            ->mountAction(TestAction::make('save')->schemaComponent('form-actions', 'content'))
-            ->assertActionMounted(TestAction::make('save')->schemaComponent('form-actions', 'content'))
+            ->mountAction(TestAction::make('save_media_with_confirmation')->schemaComponent('form-actions', 'content'))
+            ->assertActionMounted(TestAction::make('save_media_with_confirmation')->schemaComponent('form-actions', 'content'))
             ->assertMountedActionModalSee(['Змінити спільне зображення?', 'брендів: 2']);
 
         $this->assertSame($asset->content_sha256, $asset->fresh()->content_sha256);
@@ -728,7 +728,7 @@ class MediaAssetLifecycleTest extends TestCase
         Livewire::actingAs($this->actor)
             ->test(EditMediaAsset::class, ['record' => $asset->getRouteKey()])
             ->fillForm(['replacement_upload' => $file])
-            ->mountAction(TestAction::make('save')->schemaComponent('form-actions', 'content'))
+            ->mountAction(TestAction::make('save_media_with_confirmation')->schemaComponent('form-actions', 'content'))
             ->assertActionNotMounted();
     }
 
