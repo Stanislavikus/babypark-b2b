@@ -51,9 +51,20 @@ class MediaAssetResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
-    protected static ?string $modelLabel = 'asset';
+    public static function getModelLabel(): string
+    {
+        return __('media_ui.item');
+    }
 
-    protected static ?string $pluralModelLabel = 'Assets';
+    public static function getPluralModelLabel(): string
+    {
+        return __('media_ui.library');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('media_ui.library');
+    }
 
     protected static ?int $navigationSort = 6;
 

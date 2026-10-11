@@ -334,6 +334,23 @@ final class BrandManagementTest extends TestCase
     }
 
     #[Test]
+    public function brand_and_media_library_have_localized_labels_and_clear_reuse_notice(): void
+    {
+        foreach (['uk', 'ru', 'en'] as $locale) {
+            app()->setLocale($locale);
+
+            $this->assertSame(__('media_ui.library'), \App\Filament\Resources\MediaAssetResource::getNavigationLabel());
+            $this->assertSame(__('media_ui.library'), \App\Filament\Resources\MediaAssetResource::getPluralModelLabel());
+            $this->assertSame(__('media_ui.reused_notice'), \App\Support\Media\MediaSaveNotice::reused());
+            $this->assertSame(__('media_ui.unchanged_no_changes'), \App\Support\Media\MediaSaveNotice::unchanged(false));
+            $this->assertSame(__('media_ui.unchanged_other_saved'), \App\Support\Media\MediaSaveNotice::unchanged(true));
+            $this->assertSame(__('media_ui.duplicate_notice'), \App\Support\Media\Exceptions\MediaAssetLifecycleException::duplicateContent()->getMessage());
+        }
+
+        app()->setLocale('uk');
+    }
+
+    #[Test]
     public function brand_resource_create_and_edit_use_governed_writer(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -615,7 +632,7 @@ final class BrandManagementTest extends TestCase
             ->fillForm(['logo_upload' => $otherFile])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertSet('logoPostSaveNotice', 'Зображення вже є в Assets. Використано існуючий файл без дублювання.');
+            ->assertSet('logoPostSaveNotice', 'Зображення вже є в медіатеці. Використано файл з медіатеки.');
 
         $this->assertSame($other->id, $brand->fresh()->logo_media_asset_id);
         $this->assertDatabaseCount('media_assets', 2);

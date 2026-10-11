@@ -1115,6 +1115,19 @@ merging one Asset identity into another is not replacement. Brand may still sele
 existing Asset because `brands.logo_media_asset_id` is an association, not Asset
 identity mutation. No new Asset metadata column is introduced by this UX alignment.
 
+
+[Resolved 2026-10-11 — Brand Media single surface / owner correction] Brand Create/Edit
+must expose one titled `Медіа` block with the current logo, native local
+FileUpload drop zone, and `Обрати з медіатеки` action that opens the existing
+media-library picker **from that same block**, not as an unrelated field lower
+on the card. The one-logo Brand association still uses `BrandManager`; `MediaAsset`
+Original identity, SHA-256 and lifecycle are unchanged. `Медіа` means a card's
+media section, `Медіатека` means the reusable image library. Merchant labels and
+messages on these Brand/Media surfaces are localized in UK/RU/EN without renaming
+technical APIs, models or `/admin/media-assets`. This is an explicit merchant UX
+correction superseding the separate picker placement of PR #290; see
+`docs/reviews/BRAND_MEDIA_UNIFIED_AUTHORING_2026_10_11.md`.
+
 [Resolved 2026-10-10] Opening a full card from an Asset or Brand inspection drawer opens
 the full card in a new browser tab and closes that drawer using Filament's native action
 close behavior. The original list state remains in place. Successful mutations use the

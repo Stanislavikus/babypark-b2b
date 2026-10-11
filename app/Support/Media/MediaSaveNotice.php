@@ -7,12 +7,12 @@ final class MediaSaveNotice
     public static function unchanged(bool $otherChangesSaved): string
     {
         return $otherChangesSaved
-            ? 'Зображення вже актуальне. Інші зміни збережено.'
-            : 'Зображення вже актуальне. Інших змін немає.';
+            ? __('media_ui.unchanged_other_saved')
+            : __('media_ui.unchanged_no_changes');
     }
 
     public static function reused(): string
     {
-        return 'Зображення вже є в Assets. Використано існуючий файл без дублювання.';
+        return __('media_ui.reused_notice');
     }
 }

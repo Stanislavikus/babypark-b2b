@@ -116,7 +116,7 @@ class ListMediaAssets extends ListRecords
 
                     Notification::make()
                         ->success()
-                        ->title(count($assets) === 1 ? 'Asset збережено' : 'Assets збережено')
+                        ->title(count($assets) === 1 ? __('media_ui.saved_one') : __('media_ui.saved_many'))
                         ->body('Додано або повторно використано: '.count($assets))
                         ->send();
                 }),
