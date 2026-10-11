@@ -5,6 +5,7 @@ namespace App\Filament\Support;
 use App\Enums\MediaAssetType;
 use App\Enums\MediaDiagnosisStatus;
 use App\Models\MediaAsset;
+use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
@@ -33,9 +34,8 @@ final class OriginalImageAssetPicker
     /** @return Builder<MediaAsset> */
     public static function scopedOriginalImages(): Builder
     {
-        return MediaAsset::withoutWorkspaceScope()
-            ->where('workspace_id', app(WorkspaceContext::class)->id())
-            ->whereNull('parent_media_asset_id')
+        return app(MediaAssetLibraryReadService::class)
+            ->originalsQuery(app(WorkspaceContext::class)->current())
             ->where('asset_type', MediaAssetType::Image->value);
     }
 
