@@ -92,6 +92,16 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
       .waitFor({ state: 'visible', timeout: 20_000 });
     assert.equal(await modalHeading.isVisible(), false, 'Identical bytes should not open shared replacement modal.');
 
+    // A different existing Asset must fail closed, with concise merchant-facing wording.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await uploadViaInitializedFilePond(page, 'other.png');
+    await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
+    await modalHeading.waitFor({ state: 'visible', timeout: 20_000 });
+    await dialog.getByRole('button', { name: 'Замінити', exact: true }).click();
+    await page.getByText('Це зображення вже є в Assets. Оберіть інший файл.', { exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByText('replacement.png', { exact: false }).first().waitFor({ state: 'visible' });
+
     const brandResponse = await page.goto(brandUrl, { waitUntil: 'domcontentloaded' });
     assert.equal(brandResponse?.status(), 200, 'Brand edit screen must open.');
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });
@@ -110,6 +120,14 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже актуальне. Інших змін немає.', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Saved Brand must close without a second duplicate notice or an unsaved-data prompt.
+    await page.getByRole('button', { name: 'Закрити', exact: true }).first().click();
+    await page.waitForURL((url) => url.pathname === '/admin/brands', { timeout: 20_000 });
+    assert.equal(await page.getByText('Закрити без збереження?', { exact: true }).isVisible(), false,
+      'Brand Close after Save must not request unsaved-change confirmation.');
+    assert.equal(await page.getByText('Це зображення вже є в Assets. Оберіть інший файл.', { exact: true }).isVisible(), false,
+      'Brand Close must not show an unrelated Asset replace warning.');
 
     assert.deepEqual(browserErrors, [], 'No uncaught JS errors during media workflows.');
     success = true;
