@@ -108,7 +108,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
         .map(animation => animation.finished.catch(() => {})),
     ));
     const filterBox = await filterWindow.boundingBox();
-    assert.ok(filterBox && filterBox.left >= -2 && filterBox.right <= 1442,
+    assert.ok(filterBox && filterBox.x >= -2 && (filterBox.x + filterBox.width) <= 1442,
       `Filament filters drawer must fit viewport after transition: ${JSON.stringify(filterBox)}`);
     await page.screenshot({ path: `${root}/brand-media-picker-filters.png` });
     await filterDialog.getByLabel('Відображення').selectOption('list');
