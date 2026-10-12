@@ -70,6 +70,23 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       console.log('NATIVE_FILEPOND_DROP_EVIDENCE', JSON.stringify({ hit, events }));
       throw error;
     }
+    const processed = await area.evaluate(element => {
+      const rect = selector => {
+        const node = element.querySelector(selector);
+        if (!node) return null;
+        const r = node.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      };
+      return {
+        heading: rect('.bp-brand-media-heading'),
+        preview: rect('.filepond--root'),
+        picker: rect('.bp-brand-media-picker button'),
+      };
+    });
+    assert.ok(processed.heading && processed.preview && processed.picker
+      && processed.preview.y >= processed.heading.y + processed.heading.height + 4
+      && processed.preview.y + processed.preview.height + 4 <= processed.picker.y,
+      'Completed native FilePond preview must not cover heading or subsequent actions: ' + JSON.stringify(processed));
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
@@ -230,6 +247,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(searchBox && buttonBox && buttonBox.x >= searchBox.x + searchBox.width - 2
       && Math.abs(buttonBox.y - searchBox.y) < 45,
       `Filter button must stay next to search in the same toolbar: ${JSON.stringify({ searchBox, buttonBox })}`);
+    const unfilteredMainWidth = await modalWindow.locator('.fi-ta-main').first()
+      .evaluate(element => element.getBoundingClientRect().width);
     await filtersButton.click();
     const filtersPanel = modalWindow.locator('.fi-ta-filters-after-content-ctn');
     await filtersPanel.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
@@ -241,9 +260,12 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const modalBox = await modalWindow.boundingBox();
     const filtersBox = await filtersPanel.boundingBox();
     const mainBox = await modalWindow.locator('.fi-ta-main').first().boundingBox();
-    assert.ok(modalBox && filtersBox && mainBox && filtersBox.x >= mainBox.x + mainBox.width - 2
-      && filtersBox.x >= modalBox.x - 2 && (filtersBox.x + filtersBox.width) <= modalBox.x + modalBox.width + 2,
-      `Native filters must occupy the right edge inside the Media picker: ${JSON.stringify({ modalBox, filtersBox, mainBox })}`);
+    assert.ok(modalBox && filtersBox && mainBox
+      && Math.abs(mainBox.width - unfilteredMainWidth) <= 2
+      && filtersBox.x > mainBox.x + mainBox.width * 0.45
+      && filtersBox.x < mainBox.x + mainBox.width - 20
+      && filtersBox.x >= modalBox.x - 2 && filtersBox.x + filtersBox.width <= modalBox.x + modalBox.width + 2,
+      `Native filters must overlay the right of Media grid WITHOUT shrinking cards: ${JSON.stringify({ modalBox, filtersBox, mainBox, unfilteredMainWidth })}`);
     assert.ok(filtersBox.width <= 280,
       `The sidebar must stay compact instead of consuming half of the Media picker: ${JSON.stringify(filtersBox)}`);
     const visibleCards = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
