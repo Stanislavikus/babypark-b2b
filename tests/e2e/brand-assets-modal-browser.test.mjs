@@ -89,7 +89,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     });
     assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5 && processed.item.width <= 300
       && processed.headingDisplay === 'none'
-      && processed.root && processed.root.width >= 100 && processed.root.width <= 300
+      && processed.root && Math.abs(processed.root.width - processed.zone.width) <= 8
       && processed.picker && (
         processed.item.x + processed.item.width + 5 <= processed.picker.x
         || processed.picker.x + processed.picker.width + 5 <= processed.item.x
