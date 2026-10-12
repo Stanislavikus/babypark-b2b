@@ -143,6 +143,8 @@ class BrandResource extends Resource
                             Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
+                                    ->panelLayout('compact')
+                                    ->imagePreviewHeight('96')
                                     ->hiddenLabel()
                                     ->placeholder(__('media_ui.upload'))
                                     ->storeFiles(false)
