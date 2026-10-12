@@ -116,6 +116,17 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(modalBox && filtersBox && mainBox && filtersBox.x >= mainBox.x + mainBox.width - 2
       && filtersBox.x >= modalBox.x - 2 && (filtersBox.x + filtersBox.width) <= modalBox.x + modalBox.width + 2,
       `Native filters must occupy the right edge inside the Media picker: ${JSON.stringify({ modalBox, filtersBox, mainBox })}`);
+    assert.ok(filtersBox.width <= 280,
+      `The sidebar must stay compact instead of consuming half of the Media picker: ${JSON.stringify(filtersBox)}`);
+    const visibleCards = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
+      nodes.map(node => {
+        const bounds = node.getBoundingClientRect();
+        return { x: bounds.x, right: bounds.right, width: bounds.width };
+      }));
+    for (const cardBounds of visibleCards) {
+      assert.ok(cardBounds.width >= 275 && cardBounds.right <= mainBox.x + mainBox.width + 2,
+        `Media card must remain readable with the right filter panel open: ${JSON.stringify({ mainBox, cardBounds })}`);
+    }
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-filters.png` });
     await filtersPanel.getByLabel('Відображення').selectOption('list');
     await cardGrid.waitFor({ state: 'hidden', timeout: 20_000 });
