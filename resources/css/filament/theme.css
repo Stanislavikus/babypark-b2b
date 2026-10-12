@@ -308,7 +308,7 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-actions .filepond--drop-label label {
     @apply rounded-lg border border-gray-300 bg-white px-3 font-semibold text-gray-950 shadow-sm dark:border-white/20 dark:bg-gray-900 dark:text-white;
     position: absolute;
-    left: max(0px, calc(50% - 18rem));
+    left: max(0px, calc(50% - 19.75rem));
     top: calc(50% + 1.25rem);
     transform: none !important;
     width: 172px;
