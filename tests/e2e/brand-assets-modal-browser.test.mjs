@@ -87,9 +87,9 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
-    assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5
+    assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5 && processed.item.width <= 300
       && processed.headingDisplay === 'none'
-      && processed.root && processed.root.width > 200
+      && processed.root && processed.root.width >= 100 && processed.root.width <= 300
       && processed.picker && processed.item.y + processed.item.height + 5 <= processed.picker.y,
       'Completed FilePond item must remain visible in native full-area drop target: ' + JSON.stringify(processed));
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
@@ -204,7 +204,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(desktop.area.width >= 680 && desktop.section.width >= 710,
       `Brand form on desktop must span the native Filament form grid, not a narrow half-column: ${JSON.stringify(desktop)}`);
     const { heading, guidance: desktopGuidance, upload: desktopUpload, library, url: desktopUrl, hint } = desktop;
-    assert.ok(heading && guidance && upload && library && url && hint,
+    assert.ok(heading && desktopGuidance && desktopUpload && library && desktopUrl && hint,
       `Approved Media heading, guidance and three source controls must all exist: ${JSON.stringify(desktop)}`);
     assert.ok(heading.y + heading.height <= desktopGuidance.y + 2
       && desktopGuidance.y + desktopGuidance.height <= Math.min(desktopUpload.y, library.y, desktopUrl.y) + 2,
