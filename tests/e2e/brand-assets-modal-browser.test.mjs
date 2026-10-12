@@ -203,18 +203,18 @@ test('Brand picks an existing Original image from the native Assets visual libra
     });
     assert.ok(desktop.area.width >= 680 && desktop.section.width >= 710,
       `Brand form on desktop must span the native Filament form grid, not a narrow half-column: ${JSON.stringify(desktop)}`);
-    const { heading, guidance, upload, library, url, hint } = desktop;
+    const { heading, guidance: desktopGuidance, upload: desktopUpload, library, url: desktopUrl, hint } = desktop;
     assert.ok(heading && guidance && upload && library && url && hint,
       `Approved Media heading, guidance and three source controls must all exist: ${JSON.stringify(desktop)}`);
-    assert.ok(heading.y + heading.height <= guidance.y + 2
-      && guidance.y + guidance.height <= Math.min(upload.y, library.y, url.y) + 2,
+    assert.ok(heading.y + heading.height <= desktopGuidance.y + 2
+      && desktopGuidance.y + desktopGuidance.height <= Math.min(desktopUpload.y, library.y, desktopUrl.y) + 2,
       `Approved desktop hierarchy: icon, heading, guidance, actions: ${JSON.stringify(desktop)}`);
-    assert.ok(Math.abs(upload.y - library.y) <= 12 && Math.abs(library.y - url.y) <= 12
-      && upload.x + upload.width <= library.x + 4
-      && library.x + library.width <= url.x + 4
-      && url.y + url.height <= hint.y + 2,
+    assert.ok(Math.abs(desktopUpload.y - library.y) <= 12 && Math.abs(library.y - desktopUrl.y) <= 12
+      && desktopUpload.x + desktopUpload.width <= library.x + 4
+      && library.x + library.width <= desktopUrl.x + 4
+      && desktopUrl.y + desktopUrl.height <= hint.y + 2,
       `Desktop Media source actions must form ONE ordered horizontal row: ${JSON.stringify(desktop)}`);
-    for (const action of [upload, library, url]) {
+    for (const action of [desktopUpload, library, desktopUrl]) {
       assert.ok(action.height >= 36 && action.height <= 58 && action.width >= 110,
         `Approved Media controls need consistent button-sized bounds: ${JSON.stringify(desktop)}`);
     }
