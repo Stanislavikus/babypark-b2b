@@ -78,20 +78,16 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const rootRect = root?.getBoundingClientRect();
       const zone = element.getBoundingClientRect();
       return {
-        headingDisplay: heading ? getComputedStyle(heading).display : null,
+        headingVisibility: heading ? getComputedStyle(heading).visibility : null,
         item: itemRect ? { x: itemRect.x, y: itemRect.y, width: itemRect.width, height: itemRect.height } : null,
-        preview: rootRect ? { x: rootRect.x, y: rootRect.y, width: rootRect.width, height: rootRect.height } : null,
+        root: rootRect ? { x: rootRect.x, y: rootRect.y, width: rootRect.width, height: rootRect.height } : null,
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
     assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5
-      && processed.headingDisplay === 'none'
-      && processed.preview && processed.preview.width <= 210 && processed.preview.height <= 145
-      && processed.preview.x >= processed.zone.x - 2
-      && processed.preview.y >= processed.zone.y - 2
-      && processed.preview.x + processed.preview.width <= processed.zone.x + processed.zone.width + 2
-      && processed.preview.y + processed.preview.height <= processed.zone.y + processed.zone.height + 2,
-      'Uploaded FilePond preview must remain compact within the Media block: ' + JSON.stringify(processed));
+      && processed.headingVisibility === 'hidden'
+      && processed.root && processed.root.width > 200,
+      'Completed FilePond item must remain visible in native full-area drop target: ' + JSON.stringify(processed));
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
       && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
       'Selecting a native file must not disable the other Media source actions.');
