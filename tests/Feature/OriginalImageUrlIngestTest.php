@@ -130,7 +130,7 @@ final class OriginalImageUrlIngestTest extends TestCase
     /** @param list<ConnectorHttpResult> $responses */
     private function fakeTransport(array $responses): ConnectorHttpTransport
     {
-        $transport = new class ($responses) implements ConnectorHttpTransport {
+        $transport = new class($responses) implements ConnectorHttpTransport {
             /** @var list<ConnectorOutboundRequest> */
             public array $requests = [];
 
