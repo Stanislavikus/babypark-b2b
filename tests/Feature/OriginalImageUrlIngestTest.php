@@ -144,9 +144,9 @@ final class OriginalImageUrlIngestTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
-            ->callAction(TestAction::make('import_logo_from_url')->schemaComponent('brand_media_url_actions'), [
-                'url' => 'https://cdn.example.net/remote-logo.png',
-            ])
+            ->mountAction(TestAction::make('import_logo_from_url')->schemaComponent('brand_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/remote-logo.png')
+            ->callMountedAction()
             ->assertHasNoActionErrors()
             ->call('save')
             ->assertHasNoFormErrors();
