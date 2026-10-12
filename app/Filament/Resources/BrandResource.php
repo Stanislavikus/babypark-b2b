@@ -10,7 +10,9 @@ use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\MediaAsset;
 use App\Models\User;
+use App\Support\Media\Exceptions\MediaIngestException;
 use App\Services\Media\MediaAssetSourceResolver;
+use App\Services\Media\OriginalImageUrlIngestService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
@@ -37,10 +39,12 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class BrandResource extends Resource
@@ -180,6 +184,47 @@ class BrandResource extends Resource
                                     })
                                     ->helperText(null)
                                     ->extraAttributes(['class' => 'bp-brand-media-picker']),
+                                Actions::make([
+                                    Action::make('import_logo_from_url')
+                                        ->label(__('media_ui.add_from_url'))
+                                        ->icon('heroicon-o-link')
+                                        ->color('gray')
+                                        ->outlined()
+                                        ->modalHeading(__('media_ui.add_from_url'))
+                                        ->modalSubmitActionLabel(__('media_ui.add_from_url'))
+                                        ->schema([
+                                            TextInput::make('url')
+                                                ->label(__('media_ui.image_url'))
+                                                ->placeholder('https://example.com/photo.jpg')
+                                                ->url()
+                                                ->required()
+                                                ->maxLength(2048),
+                                        ])
+                                        ->action(function (array $data, Set $set, Component $livewire): void {
+                                            $actor = auth()->user();
+                                            if (! $actor instanceof User) {
+                                                throw new AuthorizationException('This action is unauthorized.');
+                                            }
+
+                                            try {
+                                                $asset = app(OriginalImageUrlIngestService::class)->ingest(
+                                                    $actor,
+                                                    app(WorkspaceContext::class)->current(),
+                                                    (string) $data['url'],
+                                                );
+                                            } catch (MediaIngestException $e) {
+                                                throw ValidationException::withMessages(['url' => $e->getMessage()]);
+                                            }
+
+                                            if ($livewire instanceof EditBrand) {
+                                                $livewire->logoPostSaveNotice = null;
+                                            }
+
+                                            $set('logo_upload', null);
+                                            $set('logo_media_asset_id', (string) $asset->id);
+                                        }),
+                                ])
+                                    ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                             ])
                                 ->extraAttributes(['class' => 'bp-brand-media-actions']),
                             Text::make(__('media_ui.upload_hint'))
