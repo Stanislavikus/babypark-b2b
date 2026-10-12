@@ -384,7 +384,7 @@ button.bp-category-tree-header-cell {
     display: none;
 }
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
-    padding-top: 7.5rem;
+    padding-top: 1rem;
 }
 
 /* Filament itself uses an absolutely positioned, closable filter panel on
