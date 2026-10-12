@@ -10,6 +10,7 @@ use App\Services\Media\OriginalImageUrlIngestService;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -17,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
@@ -120,7 +122,7 @@ final class OriginalImageUrlIngestTest extends TestCase
     {
         $this->fakeTransport([new ConnectorHttpResult(200, ['content-type' => ['image/png']], '<html>not an image</html>')]);
 
-        $this->expectException(\App\Support\Media\Exceptions\MediaIngestException::class);
+        $this->expectException(MediaIngestException::class);
         app(OriginalImageUrlIngestService::class)
             ->ingest($this->actor, $this->workspace, 'https://example.net/not-image.png');
     }
@@ -128,7 +130,7 @@ final class OriginalImageUrlIngestTest extends TestCase
     /** @param list<ConnectorHttpResult> $responses */
     private function fakeTransport(array $responses): ConnectorHttpTransport
     {
-        $transport = new class($responses) implements ConnectorHttpTransport
+        $transport = new class ($responses) implements ConnectorHttpTransport
         {
             /** @var list<ConnectorOutboundRequest> */
             public array $requests = [];
@@ -141,7 +143,7 @@ final class OriginalImageUrlIngestTest extends TestCase
                 $this->requests[] = $request;
 
                 return array_shift($this->responses)
-                    ?? throw new \LogicException('Unexpected outbound request.');
+                    ?? throw new LogicException('Unexpected outbound request.');
             }
         };
 
