@@ -241,6 +241,9 @@ button.bp-category-tree-header-cell {
     pointer-events: none;
 }
 .bp-brand-media-dropzone > .fi-grid > .fi-grid-col:has(.bp-brand-media-actions) {
+    /* FilePond's absolute root must anchor to the outer dashed Media area,
+       not to this inner Filament grid column. */
+    position: static;
     z-index: auto;
 }
 .bp-brand-media-icon {
