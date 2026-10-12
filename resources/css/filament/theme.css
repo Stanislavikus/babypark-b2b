@@ -369,24 +369,12 @@ button.bp-category-tree-header-cell {
     }
 }
 
-/* FilePond switches from a full-area drag target to its native contained
-   uploaded-file preview. It must never cover the title or other media actions. */
-.bp-brand-media-actions .fi-fo-file-upload:has(.filepond--item) {
-    width: min(100%, 19rem);
-    min-height: 11rem;
-}
-.bp-brand-media-actions .filepond--root:has(.filepond--item) {
-    position: relative !important;
-    inset: auto !important;
-    z-index: 2;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 11rem !important;
-    min-height: 11rem !important;
-    overflow: hidden;
-}
-.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label {
-    display: none;
+/* Native FilePond retains its stable full-area geometry after upload.
+   Decorative empty-state copy disappears while FilePond displays a file. */
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-icon,
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-heading,
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-subheading {
+    visibility: hidden;
 }
 
 /* Filament itself uses an absolutely positioned, closable filter panel on
@@ -394,6 +382,11 @@ button.bp-category-tree-header-cell {
    overlay its own card grid instead of shrinking grid cards and badges. */
 .bp-original-images-picker .fi-ta-ctn {
     position: relative;
+}
+@media (min-width: 64rem) {
+    .bp-original-images-picker:has(.fi-ta-filters-after-content-ctn.fi-open) .fi-ta-ctn {
+        min-height: 34rem;
+    }
 }
 .bp-original-images-picker .fi-ta-filters-after-content-ctn {
     position: absolute !important;
