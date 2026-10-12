@@ -63,6 +63,8 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     }
     try {
       await area.locator('.filepond--item').first().waitFor({ state: 'visible', timeout: 15_000 });
+    await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
     } catch (error) {
       const events = await page.evaluate(() => window.__babyparkDropEvents);
       console.log('NATIVE_FILEPOND_DROP_EVIDENCE', JSON.stringify({ hit, events }));
