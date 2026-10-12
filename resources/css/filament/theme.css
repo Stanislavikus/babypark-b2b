@@ -387,10 +387,11 @@ button.bp-category-tree-header-cell {
     }
     .bp-brand-media-actions > .fi-grid > .fi-grid-col > *,
     .bp-brand-media-actions .bp-brand-media-picker,
+    .bp-brand-media-actions .bp-brand-media-picker > *,
     .bp-brand-media-actions .bp-brand-media-url-action,
     .bp-brand-media-actions .bp-brand-media-url-action :is(.fi-ac, .fi-ac-action),
-    .bp-brand-media-actions .bp-brand-media-picker .fi-btn,
-    .bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    .bp-brand-media-actions .bp-brand-media-picker button,
+    .bp-brand-media-actions .bp-brand-media-url-action button {
         box-sizing: border-box;
         width: 100% !important;
         min-width: 0 !important;
@@ -406,13 +407,14 @@ button.bp-category-tree-header-cell {
         top: calc(50% - 1.65rem);
     }
     .bp-brand-media-actions .bp-brand-media-picker,
+    .bp-brand-media-actions .bp-brand-media-picker > *,
     .bp-brand-media-actions .bp-brand-media-url-action,
-    .bp-brand-media-actions .bp-brand-media-picker .fi-btn,
-    .bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    .bp-brand-media-actions .bp-brand-media-picker button,
+    .bp-brand-media-actions .bp-brand-media-url-action button {
         width: 100%;
     }
-    .bp-brand-media-actions .bp-brand-media-picker .fi-btn,
-    .bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    .bp-brand-media-actions .bp-brand-media-picker button,
+    .bp-brand-media-actions .bp-brand-media-url-action button {
         height: 46px;
         padding-inline: 0.5rem;
         font-size: 0.875rem;
