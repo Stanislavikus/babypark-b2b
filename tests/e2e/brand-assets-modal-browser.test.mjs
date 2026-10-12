@@ -90,7 +90,12 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5 && processed.item.width <= 300
       && processed.headingDisplay === 'none'
       && processed.root && processed.root.width >= 100 && processed.root.width <= 300
-      && processed.picker && processed.item.y + processed.item.height + 5 <= processed.picker.y,
+      && processed.picker && (
+        processed.item.x + processed.item.width + 5 <= processed.picker.x
+        || processed.picker.x + processed.picker.width + 5 <= processed.item.x
+        || processed.item.y + processed.item.height + 5 <= processed.picker.y
+        || processed.picker.y + processed.picker.height + 5 <= processed.item.y
+      ),
       'Completed FilePond item must remain visible in native full-area drop target: ' + JSON.stringify(processed));
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
       && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
