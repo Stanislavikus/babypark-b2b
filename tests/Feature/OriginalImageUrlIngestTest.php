@@ -130,24 +130,28 @@ final class OriginalImageUrlIngestTest extends TestCase
     /** @param list<ConnectorHttpResult> $responses */
     private function fakeTransport(array $responses): ConnectorHttpTransport
     {
-        $transport = new class($responses) implements ConnectorHttpTransport {
-            /** @var list<ConnectorOutboundRequest> */
-            public array $requests = [];
-
-            /** @param list<ConnectorHttpResult> $responses */
-            public function __construct(private array $responses) {}
-
-            public function send(ConnectorOutboundRequest $request): ConnectorHttpResult
-            {
-                $this->requests[] = $request;
-
-                return array_shift($this->responses)
-                    ?? throw new LogicException('Unexpected outbound request.');
-            }
-        };
+        $transport = new MediaUrlFakeTransport($responses);
 
         $this->app->instance(ConnectorHttpTransport::class, $transport);
 
         return $transport;
+    }
+}
+
+/** Isolated response queue; no real network calls in URL ingest tests. */
+final class MediaUrlFakeTransport implements ConnectorHttpTransport
+{
+    /** @var list<ConnectorOutboundRequest> */
+    public array $requests = [];
+
+    /** @param list<ConnectorHttpResult> $responses */
+    public function __construct(private array $responses) {}
+
+    public function send(ConnectorOutboundRequest $request): ConnectorHttpResult
+    {
+        $this->requests[] = $request;
+
+        return array_shift($this->responses)
+            ?? throw new LogicException('Unexpected outbound request.');
     }
 }
