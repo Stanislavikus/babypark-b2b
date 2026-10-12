@@ -299,7 +299,7 @@ class BrandResource extends Resource
                     ->label('Активний')
                     ->helperText('Неактивний бренд залишається у Master і на існуючих товарах, але не пропонується для нового призначення.')
                     ->default(true),
-            ]),
+            ])->columnSpanFull(),
         ]);
     }
 
