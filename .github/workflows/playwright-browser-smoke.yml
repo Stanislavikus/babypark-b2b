@@ -90,8 +90,20 @@ jobs:
 
       - name: Focused URL Media ingest regressions
         run: |
+          set -euo pipefail
+          STYLE_FILES=(
+            app/Services/Media/OriginalImageUrlIngestService.php
+            app/Filament/Resources/BrandResource.php
+            app/Filament/Resources/MediaAssetResource/Pages/ListMediaAssets.php
+            tests/Feature/OriginalImageUrlIngestTest.php
+          )
+          if ! vendor/bin/pint --test "${STYLE_FILES[@]}"; then
+            echo "::error::Pint formatting failed; exact isolated-runner diff follows."
+            vendor/bin/pint "${STYLE_FILES[@]}"
+            git diff -- "${STYLE_FILES[@]}"
+            exit 1
+          fi
           php artisan test tests/Feature/OriginalImageUrlIngestTest.php --no-ansi
-          vendor/bin/pint --test app/Services/Media/OriginalImageUrlIngestService.php app/Filament/Resources/BrandResource.php app/Filament/Resources/MediaAssetResource/Pages/ListMediaAssets.php tests/Feature/OriginalImageUrlIngestTest.php
 
       - name: Restore isolated browser fixtures after RefreshDatabase tests
         run: |
