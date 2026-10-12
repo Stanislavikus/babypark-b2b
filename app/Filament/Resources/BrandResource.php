@@ -226,6 +226,7 @@ class BrandResource extends Resource
                                             $set('logo_media_asset_id', (string) $asset->id);
                                         }),
                                 ])
+                                    ->key('brand_media_url_actions')
                                     ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                             ])
                                 ->extraAttributes(['class' => 'bp-brand-media-actions']),
@@ -244,6 +245,7 @@ class BrandResource extends Resource
                         Actions::make([
                             Action::make('remove_logo')
                                 ->label('Прибрати логотип')
+                                ->visible(fn (Get $get, ?Brand $record): bool => filled($get('logo_upload')) || self::formLogoAsset($get, $record) instanceof MediaAsset)
                                 ->icon('heroicon-o-x-mark')
                                 ->color('gray')
                                 ->action(function (Set $set): void {
