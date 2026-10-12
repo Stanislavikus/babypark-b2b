@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
@@ -28,16 +28,30 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     const area = page.locator('.bp-brand-media-dropzone');
     await area.waitFor({ state: 'visible' });
     await mkdir(root, { recursive: true });
-    const png = Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/VuoAAAAASUVORK5CYII=',
-      'base64',
-    );
-    const filePath = resolve(root, 'synthetic-drop-image.png');
-    await writeFile(filePath, png);
+    // Seed fixture is a valid actual PNG, unlike an unvalidated tiny base64 stub.
+    const filePath = resolve(root, 'other.png');
     const bounds = await area.boundingBox();
     assert.ok(bounds && bounds.width > 200 && bounds.height > 180);
     const x = Math.round(bounds.x + 12);
     const y = Math.round(bounds.y + 12);
+    await area.evaluate(node => {
+      window.__babyparkDropEvents = [];
+      for (const name of ['dragenter', 'dragover', 'drop']) {
+        node.addEventListener(name, event => {
+          window.__babyparkDropEvents.push({
+            name,
+            targetClass: event.target?.className,
+            fileCount: event.dataTransfer?.files.length,
+            types: Array.from(event.dataTransfer?.types ?? []),
+          });
+        }, true);
+      }
+    });
+    const hit = await page.evaluate(([px, py]) => ({
+      target: document.elementFromPoint(px, py)?.className,
+      root: !!document.elementFromPoint(px, py)?.closest('.filepond--root'),
+    }), [x, y]);
+    assert.ok(hit.root, 'True dashed drop target must be the native FilePond surface: ' + JSON.stringify(hit));
     const cdp = await context.newCDPSession(page);
     const data = {
       items: [{ mimeType: 'image/png', data: '', title: 'synthetic-drop-image.png', baseURL: '' }],
@@ -47,11 +61,17 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     for (const type of ['dragEnter', 'dragOver', 'drop']) {
       await cdp.send('Input.dispatchDragEvent', { type, x, y, data });
     }
-    await area.locator('.filepond--item').first().waitFor({ state: 'visible', timeout: 15_000 });
+    try {
+      await area.locator('.filepond--item').first().waitFor({ state: 'visible', timeout: 15_000 });
+    } catch (error) {
+      const events = await page.evaluate(() => window.__babyparkDropEvents);
+      console.log('NATIVE_FILEPOND_DROP_EVIDENCE', JSON.stringify({ hit, events }));
+      throw error;
+    }
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
-    await page.locator('.bp-brand-media-dropzone .filepond--label-action').click();
+    await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
     const chooser = await fileChooser;
     await chooser.setFiles(filePath);
     await page.locator('.bp-brand-media-dropzone .filepond--item').first()
@@ -128,9 +148,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
     }
     assert.ok(geometry.actions, 'The three native media actions must share a dedicated row.');
     await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).waitFor({ state: 'visible' });
-    assert.ok(Math.abs((geometry.upload.top + geometry.upload.bottom) / 2
-      - (geometry.picker.top + geometry.picker.bottom) / 2) < 30,
-      `Upload and Assets selection must be side by side: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.picker.top >= geometry.actions.top && geometry.picker.bottom <= geometry.actions.bottom,
+      `Library button must remain inside the three-source actions region: ${JSON.stringify(geometry)}`);
     assert.ok(Math.abs((geometry.upload.right - geometry.upload.left) - (geometry.area.right - geometry.area.left)) < 8
       && Math.abs((geometry.upload.bottom - geometry.upload.top) - (geometry.area.bottom - geometry.area.top)) < 8,
       `Native FilePond must cover the ENTIRE advertised dashed dropzone: ${JSON.stringify(geometry)}`);
