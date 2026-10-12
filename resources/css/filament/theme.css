@@ -347,7 +347,7 @@ button.bp-category-tree-header-cell {
     order: -1;
 }
 .bp-brand-media-actions .filepond--drop-label label:hover,
-.bp-brand-media-dropzone:focus-within .filepond--drop-label label {
+.bp-brand-media-actions .filepond--drop-label:focus-within label {
     @apply border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:bg-primary-500/10;
 }
 .bp-brand-media-actions .filepond--label-action {
@@ -379,8 +379,21 @@ button.bp-category-tree-header-cell {
     .bp-brand-media-actions > .fi-grid > .fi-grid-col { width: min(100%, 18rem); }
     .bp-brand-media-actions .fi-fo-file-upload { width: 100%; }
     .bp-brand-media-actions .filepond--drop-label label {
-        left: calc(50% - 86px);
+        left: 50%;
+        transform: translateX(-50%) !important;
+        width: min(18rem, calc(100% - 2rem));
         top: calc(50% - 1.65rem);
+    }
+    .bp-brand-media-actions .bp-brand-media-picker,
+    .bp-brand-media-actions .bp-brand-media-url-action,
+    .bp-brand-media-actions .bp-brand-media-picker .fi-btn,
+    .bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+        width: 100%;
+    }
+    .bp-brand-media-actions .bp-brand-media-picker .fi-btn,
+    .bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+        height: 46px;
+        white-space: nowrap;
     }
     .bp-brand-media-dropzone .bp-brand-media-heading { font-size: clamp(1rem, 5cqw, 1.25rem); }
 }
@@ -415,16 +428,27 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
     padding-top: 0;
 }
-/* Keep FilePond's proven full-size root, including after a selection.
-   Changing root position/height dynamically caused hidden processed items.
-   Constrain ONLY the selected native FilePond item within the existing full
-   drop target; the three actions remain below the image, never over it. */
+/* Keep the native full-area drop target after selection. The preview card
+   occupies the Media area (rather than a fixed 15rem centered thumbnail),
+   leaving the three actions in their separate row underneath. */
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
     padding-top: 5rem;
 }
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
-    width: min(15rem, 80%) !important;
-    margin-inline-start: max(0px, calc(50% - 7.5rem));
+    width: calc(100% - 1.5rem) !important;
+    margin-inline-start: 0.75rem;
+}
+/* FilePond hides its browse label after selecting one file. With single-file
+   replace enabled, retain the SAME native browse label as the Upload button;
+   do not inject a fake button or a second input. */
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    pointer-events: none;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label label {
+    pointer-events: auto;
 }
 
 /* FilePond paints a green processing-complete status panel on top of

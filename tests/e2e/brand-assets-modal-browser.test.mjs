@@ -75,6 +75,9 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const heading = element.querySelector('.bp-brand-media-heading');
       const root = element.querySelector('.filepond--root');
       const pickButton = element.querySelector('.bp-brand-media-picker button');
+      const uploadLabel = element.querySelector('.filepond--drop-label label');
+      const uploadParent = uploadLabel?.closest('.filepond--drop-label');
+      const uploadRect = uploadLabel?.getBoundingClientRect();
       const pickRect = pickButton?.getBoundingClientRect();
       const itemRect = item?.getBoundingClientRect();
       const rootRect = root?.getBoundingClientRect();
@@ -82,15 +85,23 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       return {
         headingDisplay: heading ? getComputedStyle(heading).display : null,
         picker: pickRect ? { x: pickRect.x, y: pickRect.y, width: pickRect.width, height: pickRect.height } : null,
+        upload: uploadRect ? { x: uploadRect.x, y: uploadRect.y, width: uploadRect.width, height: uploadRect.height } : null,
+        uploadOpacity: uploadParent ? getComputedStyle(uploadParent).opacity : null,
+        uploadVisibility: uploadParent ? getComputedStyle(uploadParent).visibility : null,
         item: itemRect ? { x: itemRect.x, y: itemRect.y, width: itemRect.width, height: itemRect.height } : null,
         root: rootRect ? { x: rootRect.x, y: rootRect.y, width: rootRect.width, height: rootRect.height } : null,
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
-    assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5 && processed.item.width <= 300
+    assert.ok(processed.item && processed.item.width >= processed.zone.width * 0.85
+      && processed.item.width <= processed.zone.width && processed.item.height > 5
       && processed.headingDisplay === 'none'
       && processed.root && Math.abs(processed.root.width - processed.zone.width) <= 8
-      && processed.picker && (
+      && processed.picker && processed.upload
+      && processed.uploadOpacity === '1' && processed.uploadVisibility === 'visible'
+      && Math.abs(processed.upload.y - processed.picker.y) <= 15
+      && processed.upload.y >= processed.item.y + processed.item.height + 5
+      && (
         processed.item.x + processed.item.width + 5 <= processed.picker.x
         || processed.picker.x + processed.picker.width + 5 <= processed.item.x
         || processed.item.y + processed.item.height + 5 <= processed.picker.y
@@ -121,6 +132,12 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       && realPreview.removePresent,
       'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
+    // Upload must remain a working native chooser after the file was dropped.
+    const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await area.locator('.filepond--drop-label label').click();
+    await (await replacementChooser).setFiles(filePath);
+    await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
@@ -284,6 +301,10 @@ test('Brand picks an existing Original image from the native Assets visual libra
       assert.ok(Math.abs(action.x + action.width / 2 - zone.x - zone.width / 2) <= 20,
         `Responsive Media actions must be centered: ${JSON.stringify(mobileRects)}`);
     }
+    assert.ok(Math.max(upload.width, choose.width, url.width) - Math.min(upload.width, choose.width, url.width) <= 3
+      && Math.max(upload.height, choose.height, url.height) - Math.min(upload.height, choose.height, url.height) <= 3,
+      `Mobile Media buttons must share exactly one width and height: ${JSON.stringify(mobileRects)}`);
+    await page.evaluate(() => document.activeElement?.blur());
     await mediaSection.screenshot({ path: `${root}/brand-media-mobile.png` });
     const mobileGeometry = await unifiedDropzone.evaluate(element => ({
       scrollWidth: element.scrollWidth,
