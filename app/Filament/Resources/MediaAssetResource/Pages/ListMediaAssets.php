@@ -5,12 +5,14 @@ namespace App\Filament\Resources\MediaAssetResource\Pages;
 use App\Filament\Resources\MediaAssetResource;
 use App\Models\User;
 use App\Services\Media\OriginalImageIngestService;
+use App\Services\Media\OriginalImageUrlIngestService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -55,6 +57,42 @@ class ListMediaAssets extends ListRecords
                 ->color('gray')
                 ->action(function (): void {
                     $this->assetLayout = $this->assetLayout === 'grid' ? 'list' : 'grid';
+                }),
+            Action::make('import_asset_url')
+                ->label(__('media_ui.add_from_url'))
+                ->icon('heroicon-o-link')
+                ->color('gray')
+                ->visible(fn (): bool => $this->canManageProducts())
+                ->modalHeading(__('media_ui.add_from_url'))
+                ->modalSubmitActionLabel(__('media_ui.add_from_url'))
+                ->schema([
+                    TextInput::make('url')
+                        ->label(__('media_ui.image_url'))
+                        ->placeholder('https://example.com/photo.jpg')
+                        ->url()
+                        ->required()
+                        ->maxLength(2048),
+                ])
+                ->action(function (array $data): void {
+                    $actor = auth()->user();
+                    if (! $actor instanceof User) {
+                        throw new AuthorizationException('This action is unauthorized.');
+                    }
+
+                    try {
+                        app(OriginalImageUrlIngestService::class)->ingest(
+                            $actor,
+                            app(WorkspaceContext::class)->current(),
+                            (string) $data['url'],
+                        );
+                    } catch (MediaIngestException $e) {
+                        throw ValidationException::withMessages(['url' => $e->getMessage()]);
+                    }
+
+                    Notification::make()
+                        ->success()
+                        ->title(__('media_ui.saved_one'))
+                        ->send();
                 }),
             Action::make('upload_assets')
                 ->label('Завантажити')
