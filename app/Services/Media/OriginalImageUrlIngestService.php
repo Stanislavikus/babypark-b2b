@@ -41,7 +41,12 @@ final class OriginalImageUrlIngestService
             $this->invalidUrl();
         }
 
-        $original = new Uri(trim($url));
+        try {
+            $original = new Uri(trim($url));
+        } catch (\Throwable) {
+            $this->invalidUrl();
+        }
+
         $this->validateUrl($original);
         $current = $original;
 
