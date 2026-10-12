@@ -368,3 +368,49 @@ button.bp-category-tree-header-cell {
         top: 50%;
     }
 }
+
+/* FilePond switches from a full-area drag target to its native contained
+   uploaded-file preview. It must never cover the title or other media actions. */
+.bp-brand-media-actions .fi-fo-file-upload:has(.filepond--item) {
+    width: min(100%, 19rem);
+    min-height: 11rem;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) {
+    position: relative !important;
+    inset: auto !important;
+    z-index: 2;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 11rem !important;
+    min-height: 11rem !important;
+    overflow: hidden;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label {
+    display: none;
+}
+
+/* Filament itself uses an absolutely positioned, closable filter panel on
+   narrow screens. Keep that native interaction when the picker is on desktop:
+   overlay its own card grid instead of shrinking grid cards and badges. */
+.bp-original-images-picker .fi-ta-ctn {
+    position: relative;
+}
+.bp-original-images-picker .fi-ta-filters-after-content-ctn {
+    position: absolute !important;
+    inset-inline-end: 0;
+    top: 3.65rem;
+    bottom: 0;
+    z-index: 30 !important;
+    width: min(17rem, 78%) !important;
+    max-width: 17rem !important;
+    overflow-y: auto;
+    border-inline-start: 1px solid var(--color-gray-200);
+    background: white;
+    box-shadow: -0.5rem 0 1.25rem rgb(0 0 0 / 0.09) !important;
+}
+@media (prefers-color-scheme: dark) {
+    .bp-original-images-picker .fi-ta-filters-after-content-ctn {
+        border-inline-start-color: rgb(255 255 255 / 0.12);
+        background: var(--color-gray-900);
+    }
+}
