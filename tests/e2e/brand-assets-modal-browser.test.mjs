@@ -74,19 +74,23 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const item = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const heading = element.querySelector('.bp-brand-media-heading');
       const root = element.querySelector('.filepond--root');
+      const pickButton = element.querySelector('.bp-brand-media-picker button');
+      const pickRect = pickButton?.getBoundingClientRect();
       const itemRect = item?.getBoundingClientRect();
       const rootRect = root?.getBoundingClientRect();
       const zone = element.getBoundingClientRect();
       return {
-        headingVisibility: heading ? getComputedStyle(heading).visibility : null,
+        headingDisplay: heading ? getComputedStyle(heading).display : null,
+        picker: pickRect ? { x: pickRect.x, y: pickRect.y, width: pickRect.width, height: pickRect.height } : null,
         item: itemRect ? { x: itemRect.x, y: itemRect.y, width: itemRect.width, height: itemRect.height } : null,
         root: rootRect ? { x: rootRect.x, y: rootRect.y, width: rootRect.width, height: rootRect.height } : null,
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
     assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5
-      && processed.headingVisibility === 'hidden'
-      && processed.root && processed.root.width > 200,
+      && processed.headingDisplay === 'none'
+      && processed.root && processed.root.width > 200
+      && processed.picker && processed.item.y + processed.item.height + 5 <= processed.picker.y,
       'Completed FilePond item must remain visible in native full-area drop target: ' + JSON.stringify(processed));
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
       && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
