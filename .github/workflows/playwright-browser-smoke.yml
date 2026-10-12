@@ -93,8 +93,12 @@ jobs:
           php artisan test tests/Feature/OriginalImageUrlIngestTest.php --no-ansi
           vendor/bin/pint --test app/Services/Media/OriginalImageUrlIngestService.php app/Filament/Resources/BrandResource.php app/Filament/Resources/MediaAssetResource/Pages/ListMediaAssets.php tests/Feature/OriginalImageUrlIngestTest.php
 
-      - name: Seed isolated shared-media fixture
-        run: php tests/e2e/seed-shared-media.php
+      - name: Restore isolated browser fixtures after RefreshDatabase tests
+        run: |
+          set -euo pipefail
+          php artisan migrate:fresh --seed --force
+          php tests/e2e/seed-shared-media.php
+          test -s test-results/browser-smoke/fixture.json
 
       - name: Start local application
         run: |
