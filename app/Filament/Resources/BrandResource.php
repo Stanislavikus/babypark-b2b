@@ -10,10 +10,10 @@ use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\MediaAsset;
 use App\Models\User;
-use App\Support\Media\Exceptions\MediaIngestException;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Services\Media\OriginalImageUrlIngestService;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
@@ -202,7 +202,7 @@ class BrandResource extends Resource
                                         ])
                                         ->action(function (array $data, Set $set, Component $livewire): void {
                                             $actor = auth()->user();
-                                            if (! $actor instanceof User) {
+                                            if (($actor instanceof User) === false) {
                                                 throw new AuthorizationException('This action is unauthorized.');
                                             }
 
