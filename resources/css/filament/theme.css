@@ -384,7 +384,26 @@ button.bp-category-tree-header-cell {
     display: none;
 }
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
-    padding-top: 1rem;
+    padding-top: 0;
+}
+/* FilePond can use its native auto height and 96px image preview only after
+   file selection. The empty state alone needs an absolute full-area drop target.
+   Never force a smaller root height / overflow hidden: that clipped FilePond. */
+.bp-brand-media-actions .fi-fo-file-upload:has(.filepond--item) {
+    width: min(100%, 14rem);
+    min-height: 0;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label {
+    display: none;
 }
 
 /* Filament itself uses an absolutely positioned, closable filter panel on
