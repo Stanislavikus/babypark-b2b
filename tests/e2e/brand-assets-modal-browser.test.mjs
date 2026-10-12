@@ -93,21 +93,29 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(await cardGrid.locator('.fi-ta-record').count() >= 2,
       'Picker must reuse canonical Media library card grid, not an ad hoc row table.');
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-layout.png` });
+    const searchInput = modalWindow.locator('.fi-ta-search-field input[type="search"]');
+    await searchInput.waitFor({ state: 'visible', timeout: 20_000 });
     const filtersButton = modalWindow.getByRole('button', { name: /^Фільтри/ }).first();
     await filtersButton.waitFor({ state: 'visible', timeout: 20_000 });
+    const searchBox = await searchInput.boundingBox();
+    const buttonBox = await filtersButton.boundingBox();
+    assert.ok(searchBox && buttonBox && buttonBox.x >= searchBox.x + searchBox.width - 2
+      && Math.abs(buttonBox.y - searchBox.y) < 45,
+      `Filter button must stay next to search in the same toolbar: ${JSON.stringify({ searchBox, buttonBox })}`);
     await filtersButton.click();
-    const filtersPanel = modalWindow.locator('.fi-ta-filters-above-content-ctn');
+    const filtersPanel = modalWindow.locator('.fi-ta-filters-after-content-ctn');
     await filtersPanel.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
     await filtersPanel.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
     await filtersPanel.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
     await filtersPanel.getByLabel('Відображення').waitFor({ state: 'visible' });
     assert.equal(await page.locator('.fi-modal.fi-modal-open').count(), 1,
-      'Opening picker filters must not create a second window outside the Media picker.');
+      'Opening picker filters must not create a second modal over the workspace.');
     const modalBox = await modalWindow.boundingBox();
     const filtersBox = await filtersPanel.boundingBox();
-    assert.ok(modalBox && filtersBox && filtersBox.x >= modalBox.x - 2
-      && (filtersBox.x + filtersBox.width) <= (modalBox.x + modalBox.width + 2),
-      `Native filters must remain within the Media picker: ${JSON.stringify({ modalBox, filtersBox })}`);
+    const mainBox = await modalWindow.locator('.fi-ta-main').first().boundingBox();
+    assert.ok(modalBox && filtersBox && mainBox && filtersBox.x >= mainBox.x + mainBox.width - 2
+      && filtersBox.x >= modalBox.x - 2 && (filtersBox.x + filtersBox.width) <= modalBox.x + modalBox.width + 2,
+      `Native filters must occupy the right edge inside the Media picker: ${JSON.stringify({ modalBox, filtersBox, mainBox })}`);
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-filters.png` });
     await filtersPanel.getByLabel('Відображення').selectOption('list');
     await cardGrid.waitFor({ state: 'hidden', timeout: 20_000 });
@@ -115,6 +123,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await filtersPanel.getByLabel('Відображення').selectOption('');
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
     await filtersButton.click();
+    await filtersPanel.waitFor({ state: 'hidden', timeout: 20_000 });
     const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
       nodes.slice(0, 2).map(node => {
         const { left, right, top, bottom } = node.getBoundingClientRect();
