@@ -142,8 +142,10 @@ test('Brand picks an existing Original image from the native Assets visual libra
       .waitFor({ state: 'visible', timeout: 20_000 });
     await unifiedDropzone.getByText('Завантажити', { exact: true }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
-    assert.ok(await unifiedDropzone.locator('input[type="file"]').count() > 0,
-      'The canonical FilePond uploader is inside the single dashed Media area.');
+    await unifiedDropzone.locator('input[type="file"]').first()
+      .waitFor({ state: 'attached', timeout: 20_000 });
+    assert.ok(await unifiedDropzone.locator('.filepond--root').count() > 0,
+      'The canonical FilePond uploader must initialize inside the dashed Media area.');
     const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з медіатеки' });
     await selectButton.waitFor({ state: 'visible', timeout: 20_000 });
     const geometry = await unifiedDropzone.evaluate(element => {
