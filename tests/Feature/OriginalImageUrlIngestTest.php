@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Models\MediaAsset;
+use App\Services\Catalog\BrandManager;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Media\OriginalImageUrlIngestService;
@@ -13,11 +15,14 @@ use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
@@ -125,6 +130,33 @@ final class OriginalImageUrlIngestTest extends TestCase
         $this->expectException(MediaIngestException::class);
         app(OriginalImageUrlIngestService::class)
             ->ingest($this->actor, $this->workspace, 'https://example.net/not-image.png');
+    }
+
+    #[Test]
+    public function brand_url_action_imports_and_persists_a_managed_logo(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $file = UploadedFile::fake()->image('remote-logo.png', 400, 300);
+        $transport = $this->fakeTransport([
+            new ConnectorHttpResult(200, ['content-type' => ['image/png']], file_get_contents($file->getRealPath())),
+        ]);
+        $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Imported Logo Brand');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->callAction(TestAction::make('import_logo_from_url')->schemaComponent('brand_media_url_actions'), [
+                'url' => 'https://cdn.example.net/remote-logo.png',
+            ])
+            ->assertHasNoActionErrors()
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $brand->refresh();
+        $this->assertNotNull($brand->logo_media_asset_id);
+        $asset = MediaAsset::withoutWorkspaceScope()->findOrFail($brand->logo_media_asset_id);
+        $this->assertSame($this->workspace->id, $asset->workspace_id);
+        $this->assertNull($asset->source_url);
+        $this->assertCount(1, $transport->requests);
     }
 
     /** @param list<ConnectorHttpResult> $responses */
