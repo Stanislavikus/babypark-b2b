@@ -263,7 +263,10 @@ button.bp-category-tree-header-cell {
     gap: 0.75rem;
 }
 .bp-brand-media-actions > .fi-grid > .fi-grid-col {
+    display: flex;
     flex: 0 1 auto;
+    align-items: center;
+    justify-content: center;
     width: auto;
     min-width: 0;
 }
@@ -354,3 +357,14 @@ button.bp-category-tree-header-cell {
 }
 
 
+
+/* Small Brand drawers use multi-line guidance. Reserve a real action row
+   before the absolute native FilePond browse label to avoid text overlap. */
+@container (max-width: 23rem) {
+    .bp-brand-media-actions > .fi-grid {
+        padding-top: 2.15rem;
+    }
+    .bp-brand-media-actions .filepond--drop-label label {
+        top: 50%;
+    }
+}
