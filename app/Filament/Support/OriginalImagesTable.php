@@ -14,6 +14,7 @@ final class OriginalImagesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->extraAttributes(['class' => 'bp-original-images-picker'])
             ->query(fn () => OriginalImageAssetPicker::scopedOriginalImages())
             ->columns(MediaAssetCardColumns::make())
             ->contentGrid(fn ($livewire): ?array => ($livewire->getTableFilterState('picker_view')['value'] ?? 'grid') === 'list'
