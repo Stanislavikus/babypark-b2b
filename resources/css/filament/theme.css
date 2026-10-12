@@ -234,9 +234,14 @@ button.bp-category-tree-header-cell {
     width: 100%;
 }
 .bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
+    position: relative;
+    z-index: 2;
     min-width: 0;
     width: 100%;
     pointer-events: none;
+}
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col:has(.bp-brand-media-actions) {
+    z-index: auto;
 }
 .bp-brand-media-icon {
     @apply text-gray-500 dark:text-gray-400;
@@ -277,7 +282,11 @@ button.bp-category-tree-header-cell {
     pointer-events: auto;
     overflow: hidden;
 }
-.bp-brand-media-actions .filepond--panel-root {
+.bp-brand-media-actions .filepond--panel-root,
+.bp-brand-media-actions .filepond--panel,
+.bp-brand-media-actions .filepond--panel-top,
+.bp-brand-media-actions .filepond--panel-center,
+.bp-brand-media-actions .filepond--panel-bottom {
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
