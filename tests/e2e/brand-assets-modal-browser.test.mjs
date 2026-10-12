@@ -100,6 +100,26 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
       && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
       'Selecting a native file must not disable the other Media source actions.');
+    const realPreview = await area.evaluate(element => {
+      const completed = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const image = completed?.querySelector('.filepond--image-preview');
+      const panel = completed?.querySelector('.filepond--item-panel');
+      const status = completed?.querySelector('.filepond--file-status');
+      const remove = completed?.querySelector('.filepond--action-remove-item');
+      const imgBox = image?.getBoundingClientRect();
+      return {
+        image: image ? { width: imgBox.width, height: imgBox.height, display: getComputedStyle(image).display } : null,
+        panelOpacity: panel ? getComputedStyle(panel).opacity : null,
+        statusOpacity: status ? getComputedStyle(status).opacity : null,
+        removePresent: !!remove,
+      };
+    });
+    assert.ok(realPreview.image && realPreview.image.width > 20 && realPreview.image.height > 20
+      && realPreview.image.display !== 'none'
+      && realPreview.panelOpacity === '0'
+      && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
+      && realPreview.removePresent,
+      'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
