@@ -200,8 +200,9 @@ button.bp-category-tree-header-cell {
     @apply min-h-10 border-b border-gray-200 dark:border-white/5;
 }
 
-/* Brand Media owner-approved composition. Only presentation of native Filament
-   FileUpload (FilePond) and ModalTableSelect; no custom upload or select logic. */
+/* Brand Media: native FilePond is the complete dashed area's input/drop target.
+   The Filament picker and URL Action are ordinary clickable controls over it.
+   This is presentation only: no extra file handlers or upload transports. */
 .bp-brand-media-section .fi-section-header-text-ctn {
     display: flex;
     align-items: center;
@@ -210,138 +211,134 @@ button.bp-category-tree-header-cell {
     gap: 0.5rem;
     width: 100%;
 }
-
-.bp-brand-media-section .fi-section-header-description {
-    margin: 0;
-}
+.bp-brand-media-section .fi-section-header-description { margin: 0; }
 
 .bp-brand-media-dropzone {
-    @apply rounded-xl border border-dashed border-gray-300 bg-white px-5 py-6 dark:border-white/20 dark:bg-gray-900;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    text-align: center;
+    @apply rounded-xl border border-dashed border-gray-300 bg-white dark:border-white/20 dark:bg-gray-900;
+    position: relative;
+    isolation: isolate;
+    container-type: inline-size;
     min-width: 0;
+    min-height: 15rem;
+    padding: clamp(1rem, 3%, 1.75rem);
+    text-align: center;
 }
 
-/* Filament Group renders an inner .fi-grid. Styling only the Group wrapper
-   leaves both actions in its default single-column grid (confirmed in trace #22). */
 .bp-brand-media-dropzone > .fi-grid {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.6rem;
-}
-
-.bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
+    gap: 0.55rem;
+    min-height: 12rem;
     width: 100%;
-    min-width: 0;
 }
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
+    min-width: 0;
+    width: 100%;
+    pointer-events: none;
+}
+.bp-brand-media-icon {
+    @apply text-gray-500 dark:text-gray-400;
+    display: flex;
+    justify-content: center;
+}
+.bp-brand-media-heading { @apply text-xl font-semibold text-gray-950 dark:text-white; }
+.bp-brand-media-subheading { @apply text-base text-gray-500 dark:text-gray-400; }
 
+.bp-brand-media-actions { width: 100%; min-width: 0; }
 .bp-brand-media-actions > .fi-grid {
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
     justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 0.75rem;
 }
-
 .bp-brand-media-actions > .fi-grid > .fi-grid-col {
     flex: 0 1 auto;
     width: auto;
     min-width: 0;
 }
-
-.bp-brand-media-icon {
-    @apply text-gray-500 dark:text-gray-400;
-    display: flex;
-    justify-content: center;
-    margin-bottom: 0.15rem;
-}
-
-.bp-brand-media-heading {
-    @apply text-xl font-semibold text-gray-950 dark:text-white;
-}
-
-.bp-brand-media-subheading {
-    @apply text-base text-gray-500 dark:text-gray-400;
-}
-
-.bp-brand-media-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    width: auto;
-    min-width: 0;
-    margin: 0.15rem auto;
-}
-
-.bp-brand-media-actions > * {
-    flex: 0 1 auto;
-    min-width: 0;
-}
-
 .bp-brand-media-actions .fi-fo-file-upload {
     width: 172px;
-    max-width: 100%;
+    min-height: 46px;
 }
-
-/* Empty FilePond renders as a compact upload action beside Assets selection;
-   when a file is selected FilePond regains enough room for progress/preview. */
 .bp-brand-media-actions .filepond--root {
-    width: 172px;
-    max-width: 100%;
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    min-height: 46px !important;
-    height: 46px !important;
-    margin-bottom: 0 !important;
+    /* Expand the native FilePond drop target to the exact visible dashed area.
+       No fake drag handlers, no duplicate input, no page-wide drop capture. */
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    pointer-events: auto;
+    overflow: hidden;
 }
-
-.bp-brand-media-actions .filepond--root:has(.filepond--item) {
-    min-height: 105px !important;
-    height: 105px !important;
-    width: 220px;
-}
-
 .bp-brand-media-actions .filepond--panel-root {
     background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.bp-brand-media-actions .filepond--drop-label {
-    min-height: 46px !important;
-    height: 46px !important;
-    cursor: pointer;
     border: 0 !important;
     box-shadow: none !important;
-    background: transparent !important;
 }
-
-.bp-brand-media-actions .filepond--drop-label label {
-    @apply font-semibold text-gray-950 dark:text-white;
+.bp-brand-media-actions .filepond--drop-label {
+    position: absolute !important;
+    inset: 0;
+    width: 100%;
+    height: 100% !important;
+    min-height: 100% !important;
     cursor: pointer;
 }
-
-.bp-brand-media-actions .fi-fo-modal-table-select {
-    justify-content: center;
+.bp-brand-media-actions .filepond--drop-label label {
+    @apply rounded-lg border border-gray-300 bg-white px-3 font-semibold text-gray-950 shadow-sm dark:border-white/20 dark:bg-gray-900 dark:text-white;
+    position: absolute;
+    left: max(0px, calc(50% - 18rem));
+    top: calc(50% + 1.25rem);
+    transform: none !important;
+    width: 172px;
+    height: 46px;
+    line-height: 44px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 150ms, background-color 150ms, box-shadow 150ms;
 }
-
-/* Selected filename remains accessible but the only visible result is the
-   canonical current-logo preview above. */
+.bp-brand-media-actions .filepond--drop-label label:hover,
+.bp-brand-media-dropzone:focus-within .filepond--drop-label label {
+    @apply border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:bg-primary-500/10;
+}
+.bp-brand-media-actions .filepond--label-action {
+    @apply font-semibold text-gray-950 no-underline dark:text-white;
+    cursor: pointer;
+}
+.bp-brand-media-actions .fi-fo-modal-table-select,
+.bp-brand-media-actions .bp-brand-media-url-action {
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+}
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    @apply border border-gray-300 bg-white text-gray-950 shadow-sm hover:border-primary-500 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-gray-900 dark:text-white;
+}
+.bp-brand-media-actions .fi-fo-modal-table-select .fi-btn {
+    @apply hover:border-primary-500 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500;
+}
 .bp-brand-media-picker.fi-fo-modal-table-select > div:first-child:not(:last-child) {
     @apply sr-only;
 }
-
 .bp-brand-media-format {
     @apply text-center text-sm text-gray-500 dark:text-gray-400;
 }
+
+@container (max-width: 38rem) {
+    .bp-brand-media-actions > .fi-grid { flex-direction: column; }
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col { width: min(100%, 18rem); }
+    .bp-brand-media-actions .fi-fo-file-upload { width: 100%; }
+    .bp-brand-media-actions .filepond--drop-label label {
+        left: calc(50% - 86px);
+        top: calc(50% - 1.65rem);
+    }
+    .bp-brand-media-dropzone .bp-brand-media-heading { font-size: clamp(1rem, 5cqw, 1.25rem); }
+}
+
 
