@@ -30,7 +30,7 @@ final class OriginalImagesTable
                     ->placeholder('Сітка')
                     ->indicateUsing(fn (): array => [])
                     ->query(fn (Builder $query): Builder => $query),
-            ], layout: FiltersLayout::Modal)
+            ], layout: FiltersLayout::AboveContentCollapsible)
             ->deferFilters(false)
             ->filtersFormWidth('md')
             ->filtersTriggerAction(fn (Action $action): Action => $action
@@ -38,7 +38,6 @@ final class OriginalImagesTable
                 ->outlined()
                 ->color('gray')
                 ->label('Фільтри')
-                ->tooltip('Фільтри')
-                ->slideOver());
+                ->tooltip('Фільтри'));
     }
 }
