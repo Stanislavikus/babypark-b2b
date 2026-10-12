@@ -97,3 +97,31 @@ Official implementation evidence:
 - https://github.com/filamentphp/filament/blob/v5.7.6/packages/tables/resources/js/components/table.js
 - https://github.com/filamentphp/filament/blob/v5.7.6/packages/tables/resources/views/index.blade.php
 - https://filamentphp.com/docs/5.x/tables/filters/layout
+
+## Owner correction 2026-10-12 — right side panel, same toolbar row
+
+Owner rejected `AboveContentCollapsible`: it separates the filters control
+from the search row and displays a form above the media cards. This is **not**
+the accepted layout. Keep the existing Media library card format and
+native single selection unchanged.
+
+Research of installed official Filament 5.7.6:
+- `FiltersLayout::AfterContentCollapsible` is a built-in native layout.
+- Filament's `tables/resources/views/index.blade.php` puts the filter trigger
+  alongside `<x-filament-tables::search-field />` in the same toolbar; it places
+  `.fi-ta-filters-after-content-ctn` **after** `.fi-ta-main`, inside
+  `.fi-ta-ctn` and the parent picker window.
+- Official `tables/resources/css/container.css` renders the right-side
+  collapsible pane as part of the table container, not a viewport-wide
+  slide-over/modal. It can reduce the card grid's available width.
+- The picker retains a native Filter button (including mobile responsive
+  behaviour). This is a **sidebar inside the picker**, which may differ from a
+  floating overlay panel. Verify screenshot rather than claiming equivalence.
+
+PR #293 uses the official right-side collapsible layout; no custom panel
+controller or JS. Browser acceptance tests verify the filter button is
+adjacent to search, the panel is **to the right** of table contents and within
+the parent picker bounds, there is exactly one open Filament modal, and
+grid/list switching and single selection still work. If the official sidebar
+fails visually, STOP and investigate the GAP before adding custom UI. The
+screenshots must be reviewed before owner merge approval.
