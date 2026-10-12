@@ -96,27 +96,25 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const filtersButton = modalWindow.getByRole('button', { name: /^Фільтри/ }).first();
     await filtersButton.waitFor({ state: 'visible', timeout: 20_000 });
     await filtersButton.click();
-    const filterDialog = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Відображення' }).last();
-    await filterDialog.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
-    await filterDialog.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
-    await filterDialog.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
-    const filterWindow = filterDialog.locator('.fi-modal-window').last();
-    await filterWindow.evaluate(element => Promise.all(
-      element.getAnimations({ subtree: true })
-        .filter(animation => animation.playState === 'running'
-          && animation.effect?.getTiming().iterations !== Infinity)
-        .map(animation => animation.finished.catch(() => {})),
-    ));
-    const filterBox = await filterWindow.boundingBox();
-    assert.ok(filterBox && filterBox.x >= -2 && (filterBox.x + filterBox.width) <= 1442,
-      `Filament filters drawer must fit viewport after transition: ${JSON.stringify(filterBox)}`);
-    await page.screenshot({ path: `${root}/brand-media-picker-filters.png` });
-    await filterDialog.getByLabel('Відображення').selectOption('list');
+    const filtersPanel = modalWindow.locator('.fi-ta-filters-above-content-ctn');
+    await filtersPanel.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    await filtersPanel.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
+    await filtersPanel.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
+    await filtersPanel.getByLabel('Відображення').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.fi-modal.fi-modal-open').count(), 1,
+      'Opening picker filters must not create a second window outside the Media picker.');
+    const modalBox = await modalWindow.boundingBox();
+    const filtersBox = await filtersPanel.boundingBox();
+    assert.ok(modalBox && filtersBox && filtersBox.x >= modalBox.x - 2
+      && (filtersBox.x + filtersBox.width) <= (modalBox.x + modalBox.width + 2),
+      `Native filters must remain within the Media picker: ${JSON.stringify({ modalBox, filtersBox })}`);
+    await modalWindow.screenshot({ path: `${root}/brand-media-picker-filters.png` });
+    await filtersPanel.getByLabel('Відображення').selectOption('list');
     await cardGrid.waitFor({ state: 'hidden', timeout: 20_000 });
     await modalWindow.screenshot({ path: `${root}/brand-media-picker-list-layout.png` });
-    await filterDialog.getByLabel('Відображення').selectOption('');
+    await filtersPanel.getByLabel('Відображення').selectOption('');
     await cardGrid.waitFor({ state: 'visible', timeout: 20_000 });
-    await page.keyboard.press('Escape');
+    await filtersButton.click();
     const cardBounds = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
       nodes.slice(0, 2).map(node => {
         const { left, right, top, bottom } = node.getBoundingClientRect();
@@ -132,6 +130,21 @@ test('Brand picks an existing Original image from the native Assets visual libra
       assert.ok(cardBox.left >= pickerBounds.left && cardBox.right <= pickerBounds.right,
         `Card overflow causes the horizontal scrollbar rejected by owner: ${JSON.stringify({ pickerBounds, cardBounds })}`);
     }
+    // Official Filament single-select semantics: selecting a second asset replaces
+    // the first and never permits two checked records or a late validation error.
+    const firstCard = cardGrid.locator('.fi-ta-record').filter({ hasText: 'shared.png' }).first();
+    const firstChoice = firstCard.locator('input[type="checkbox"]').first();
+    await firstChoice.check();
+    assert.equal(await firstChoice.isChecked(), true);
+    const secondCard = cardGrid.locator('.fi-ta-record').filter({ hasText: 'other.png' }).first();
+    await secondCard.locator('input[type="checkbox"]').first().check();
+    assert.equal(await firstChoice.isChecked(), false,
+      'Brand single image mode must automatically replace an earlier selection.');
+    assert.equal(await cardGrid.locator('input[type="checkbox"]:checked').count(), 1,
+      'At most one Brand image may be selected in the native picker.');
+    assert.ok(await secondCard.evaluate(element => element.classList.contains('fi-selected')),
+      'Selected image card should have the native highlighted background.');
+    await modalWindow.screenshot({ path: `${root}/brand-media-picker-selected.png` });
     const card = cardGrid.locator('.fi-ta-record').filter({ hasText: 'other.png' }).first();
     await card.waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await card.locator('img').count(), 'Shared Media card must contain original preview.');
