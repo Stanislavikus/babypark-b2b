@@ -63,3 +63,37 @@ to authorization and deduplication.
 - Native filter UI does not cause nested modal/picker selection conflicts.
 - No horizontal overflow; screenshots compared visually with owner expectation.
 - Full MySQL/Pint and Chrome tests at frozen HEAD, owner visual signoff.
+
+## Owner review 2026-10-12 — selection and filters
+
+- Brand Media block and picker cards visually accepted so far; no new card redesign.
+- UX goal: filters must be **contained within** the opened media picker, not a second
+  global slide-over anchored to the browser window. Native Filament 5
+  `FiltersLayout::AboveContentCollapsible` is documented and its implementation
+  renders `fi-ta-filters-above-content-ctn` *inside* the table, unlike
+  `FiltersLayout::Modal`. Use this native layout rather than modal-on-modal.
+- Owner requests a familiar selected thumbnail highlight, preferably click the
+  whole image without a checkbox in **single** mode. This is under evaluation:
+  installed official Filament `TableSelectLivewireComponent` uses
+  `->maxSelectableRecords(1)`, renders the selection checkbox, and JS
+  `selectRecords()` always deselects previous selection when max is 1.
+  A second selection therefore *replaces* the first, not a multi-select validation
+  error. `fi-selected` is a native card class for the selected state.
+- The installed native `ModalTableSelect` **does not provide a supported
+  checkbox-free thumbnail-click control**. Do not invent a custom selection
+  transport/JS. Keep native single-selection with highlighted card while the
+  owner decides whether this constraint is acceptable. Multiple selection
+  for future Product Media remains separate work and is not implemented here.
+- Chromium acceptance must verify 1) filters contained by parent modal and no
+  second open modal; 2) switching between grid/list; 3) selecting the second
+  Brand image deselects first; 4) selected card visibly highlighted;
+  5) picker confirmation + save.
+- Screenshot evidence should focus on **selected card, opened contained filters,
+  and the accepted Brand Media form**. Grid/list screenshots remain diagnostic,
+  not repeated as separate approvals.
+
+Official implementation evidence:
+- https://github.com/filamentphp/filament/blob/v5.7.6/packages/forms/src/Components/TableSelect/Livewire/TableSelectLivewireComponent.php
+- https://github.com/filamentphp/filament/blob/v5.7.6/packages/tables/resources/js/components/table.js
+- https://github.com/filamentphp/filament/blob/v5.7.6/packages/tables/resources/views/index.blade.php
+- https://filamentphp.com/docs/5.x/tables/filters/layout
