@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = new URL(process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18767');
@@ -9,6 +10,62 @@ assert.equal(baseUrl.href, 'http://127.0.0.1:18767/');
 const root = 'test-results/browser-smoke';
 const fixture = JSON.parse(await readFile(`${root}/fixture.json`, 'utf8'));
 const brandPath = `/admin/brands/${fixture.pickerBrandId}/edit`;
+
+test('Brand Media accepts real Chromium file drop near the dashed edge and native browse click', { timeout: 90_000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await context.tracing.start({ screenshots: true, snapshots: true });
+  let succeeded = false;
+  try {
+    const login = await page.goto(new URL('/admin/login', baseUrl).href);
+    assert.equal(login?.status(), 200);
+    await page.locator('input[type="email"]').fill(process.env.E2E_ADMIN_EMAIL);
+    await page.locator('input[type="password"]').fill(process.env.E2E_ADMIN_PASSWORD);
+    await page.locator('button[type="submit"]').first().click();
+    await page.waitForURL(url => url.pathname.startsWith('/admin') && url.pathname !== '/admin/login');
+    await page.goto(new URL(brandPath, baseUrl).href);
+    const area = page.locator('.bp-brand-media-dropzone');
+    await area.waitFor({ state: 'visible' });
+    await mkdir(root, { recursive: true });
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/VuoAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const filePath = resolve(root, 'synthetic-drop-image.png');
+    await writeFile(filePath, png);
+    const bounds = await area.boundingBox();
+    assert.ok(bounds && bounds.width > 200 && bounds.height > 180);
+    const x = Math.round(bounds.x + 12);
+    const y = Math.round(bounds.y + 12);
+    const cdp = await context.newCDPSession(page);
+    const data = {
+      items: [{ mimeType: 'image/png', data: '', title: 'synthetic-drop-image.png', baseURL: '' }],
+      files: [filePath],
+      dragOperationsMask: 1,
+    };
+    for (const type of ['dragEnter', 'dragOver', 'drop']) {
+      await cdp.send('Input.dispatchDragEvent', { type, x, y, data });
+    }
+    await area.locator('.filepond--item').first().waitFor({ state: 'visible', timeout: 15_000 });
+    await area.screenshot({ path: root + '/brand-media-real-drop.png' });
+    await page.reload();
+    const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await page.locator('.bp-brand-media-dropzone .filepond--label-action').click();
+    const chooser = await fileChooser;
+    await chooser.setFiles(filePath);
+    await page.locator('.bp-brand-media-dropzone .filepond--item').first()
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    succeeded = true;
+  } finally {
+    if (!succeeded) {
+      await mkdir(root, { recursive: true });
+      await page.screenshot({ path: root + '/brand-media-drop-failure.png', fullPage: true }).catch(() => {});
+    }
+    await context.tracing.stop({ path: root + '/brand-media-real-drop-trace.zip' }).catch(() => {});
+    await browser.close();
+  }
+});
 
 test('Brand picks an existing Original image from the native Assets visual library', { timeout: 100_000 }, async () => {
   const browser = await chromium.launch({ headless: true });
