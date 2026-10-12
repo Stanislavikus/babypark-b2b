@@ -30,7 +30,7 @@ final class OriginalImagesTable
                     ->placeholder('Сітка')
                     ->indicateUsing(fn (): array => [])
                     ->query(fn (Builder $query): Builder => $query),
-            ], layout: FiltersLayout::AboveContentCollapsible)
+            ], layout: FiltersLayout::AfterContentCollapsible)
             ->deferFilters(false)
             ->filtersFormWidth('md')
             ->filtersTriggerAction(fn (Action $action): Action => $action
