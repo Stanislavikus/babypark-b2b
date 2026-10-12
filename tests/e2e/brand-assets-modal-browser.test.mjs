@@ -34,13 +34,13 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const unifiedDropzone = mediaSection.locator('.bp-brand-media-dropzone');
     await unifiedDropzone.getByText('Перетягніть зображення сюди', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
-    await unifiedDropzone.getByText('або додайте його з комп’ютера чи Assets', { exact: true })
+    await unifiedDropzone.getByText('або додайте його з комп’ютера, медіатеки чи за URL', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
     await unifiedDropzone.getByText('Завантажити', { exact: true }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
     assert.ok(await unifiedDropzone.locator('input[type="file"]').count() > 0,
       'The canonical FilePond uploader is inside the single dashed Media area.');
-    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з Assets' });
+    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з медіатеки' });
     await selectButton.waitFor({ state: 'visible', timeout: 20_000 });
     const geometry = await unifiedDropzone.evaluate(element => {
       const rect = node => {
@@ -69,15 +69,35 @@ test('Brand picks an existing Original image from the native Assets visual libra
       assert.ok(geometry[name].top >= geometry.area.top && geometry[name].bottom <= geometry.area.bottom,
         `${name} must be vertically inside the dashed area: ${JSON.stringify(geometry)}`);
     }
-    assert.ok(geometry.actions, 'The two native media actions must share a dedicated row.');
+    assert.ok(geometry.actions, 'The three native media actions must share a dedicated row.');
+    await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).waitFor({ state: 'visible' });
     assert.ok(Math.abs((geometry.upload.top + geometry.upload.bottom) / 2
       - (geometry.picker.top + geometry.picker.bottom) / 2) < 30,
       `Upload and Assets selection must be side by side: ${JSON.stringify(geometry)}`);
-    assert.ok(geometry.upload.bottom - geometry.upload.top <= 70,
-      `Empty FilePond must be a compact action, not its own large rectangular upload panel: ${JSON.stringify(geometry)}`);
+    assert.ok(Math.abs((geometry.upload.right - geometry.upload.left) - (geometry.area.right - geometry.area.left)) < 8
+      && Math.abs((geometry.upload.bottom - geometry.upload.top) - (geometry.area.bottom - geometry.area.top)) < 8,
+      `Native FilePond must cover the ENTIRE advertised dashed dropzone: ${JSON.stringify(geometry)}`);
     assert.equal(geometry.innerPanelShadow, 'none', 'FilePond must not render a second framed surface.');
     await mkdir(root, { recursive: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
+    // The URL action must be a real Filament modal, not a decorative third button.
+    await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
+    const urlDialog = page.locator('.fi-modal.fi-modal-open').filter({
+      has: page.getByRole('heading', { name: 'Додати за URL', exact: true }),
+    });
+    await urlDialog.getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mediaSection.screenshot({ path: `${root}/brand-media-mobile.png` });
+    const mobileGeometry = await unifiedDropzone.evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      viewport: document.documentElement.clientWidth,
+      documentWidth: document.documentElement.scrollWidth,
+    }));
+    assert.ok(mobileGeometry.scrollWidth <= mobileGeometry.clientWidth + 2,
+      `Responsive Media block must not overflow its own box: ${JSON.stringify(mobileGeometry)}`);
+    await page.setViewportSize({ width: 1440, height: 900 });
     await selectButton.click();
     const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
     await modal.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
