@@ -369,13 +369,22 @@ button.bp-category-tree-header-cell {
     }
 }
 
-/* Native FilePond owns its preview geometry while a file is selected.
-   Do not compress its internal item list with root-height overrides: that
-   hides processed uploads and blocks shared Media browser workflows. */
+/* Keep FilePond's native full-area drag surface and 96px image preview.
+   Collapse obsolete empty-state copy instead of reserving an invisible blank
+   block; actions start below the native image preview. */
+.bp-brand-media-dropzone:has(.filepond--item) {
+    min-height: 0;
+}
+.bp-brand-media-dropzone:has(.filepond--item) > .fi-grid {
+    min-height: 0;
+}
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-icon,
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-heading,
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-subheading {
-    visibility: hidden;
+    display: none;
+}
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
+    padding-top: 7.5rem;
 }
 
 /* Filament itself uses an absolutely positioned, closable filter panel on
