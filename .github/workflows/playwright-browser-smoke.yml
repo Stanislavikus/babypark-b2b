@@ -88,6 +88,11 @@ jobs:
           php artisan migrate:fresh --seed --force
           php artisan storage:link
 
+      - name: Focused URL Media ingest regressions
+        run: |
+          php artisan test tests/Feature/OriginalImageUrlIngestTest.php --no-ansi
+          vendor/bin/pint --test app/Services/Media/OriginalImageUrlIngestService.php app/Filament/Resources/BrandResource.php app/Filament/Resources/MediaAssetResource/Pages/ListMediaAssets.php tests/Feature/OriginalImageUrlIngestTest.php
+
       - name: Seed isolated shared-media fixture
         run: php tests/e2e/seed-shared-media.php
 
