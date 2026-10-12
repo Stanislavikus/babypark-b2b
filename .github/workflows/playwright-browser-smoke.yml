@@ -125,6 +125,7 @@ jobs:
           name: brand-media-visual-acceptance
           path: |
             test-results/browser-smoke/brand-media-layout.png
+            test-results/browser-smoke/brand-media-desktop-page.png
             test-results/browser-smoke/brand-media-mobile.png
             test-results/browser-smoke/brand-media-real-drop.png
             test-results/browser-smoke/brand-media-picker-layout.png
