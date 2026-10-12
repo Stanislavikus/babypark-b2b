@@ -219,7 +219,7 @@ button.bp-category-tree-header-cell {
     isolation: isolate;
     container-type: inline-size;
     min-width: 0;
-    min-height: 15rem;
+    min-height: 17.75rem;
     padding: clamp(1rem, 3%, 1.75rem);
     text-align: center;
 }
@@ -229,8 +229,8 @@ button.bp-category-tree-header-cell {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.55rem;
-    min-height: 12rem;
+    gap: 0.75rem;
+    min-height: 14.5rem;
     width: 100%;
 }
 .bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
@@ -251,8 +251,8 @@ button.bp-category-tree-header-cell {
     display: flex;
     justify-content: center;
 }
-.bp-brand-media-heading { @apply text-xl font-semibold text-gray-950 dark:text-white; }
-.bp-brand-media-subheading { @apply text-base text-gray-500 dark:text-gray-400; }
+.bp-brand-media-heading { @apply text-xl font-semibold text-gray-950 dark:text-white; font-size: clamp(1.2rem, 2.3cqw, 1.4rem); }
+.bp-brand-media-subheading { @apply text-base text-gray-500 dark:text-gray-400; font-size: 1.1rem; }
 
 .bp-brand-media-actions { width: 100%; min-width: 0; }
 .bp-brand-media-actions > .fi-grid {
@@ -313,10 +313,38 @@ button.bp-category-tree-header-cell {
     transform: none !important;
     width: 172px;
     height: 46px;
-    line-height: 44px;
+    line-height: normal;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     white-space: nowrap;
     cursor: pointer;
     transition: border-color 150ms, background-color 150ms, box-shadow 150ms;
+}
+.bp-brand-media-actions .filepond--drop-label label::before {
+    content: '';
+    display: inline-block;
+    flex: 0 0 1.15rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23171717' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4m-5 5 5-5 5 5M4 17v3h16v-3'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.bp-brand-media-actions .bp-brand-media-picker .fi-btn,
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    min-height: 46px;
+    padding-inline: 0.9rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.bp-brand-media-actions .bp-brand-media-picker .fi-btn svg {
+    order: -1;
 }
 .bp-brand-media-actions .filepond--drop-label label:hover,
 .bp-brand-media-dropzone:focus-within .filepond--drop-label label {
@@ -343,6 +371,7 @@ button.bp-category-tree-header-cell {
 }
 .bp-brand-media-format {
     @apply text-center text-sm text-gray-500 dark:text-gray-400;
+    font-size: 1rem;
 }
 
 @container (max-width: 38rem) {
