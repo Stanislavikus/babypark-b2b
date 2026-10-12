@@ -71,22 +71,22 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       throw error;
     }
     const processed = await area.evaluate(element => {
-      const rect = selector => {
-        const node = element.querySelector(selector);
-        if (!node) return null;
-        const r = node.getBoundingClientRect();
-        return { x: r.x, y: r.y, width: r.width, height: r.height };
-      };
+      const item = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const heading = element.querySelector('.bp-brand-media-heading');
+      const r = item?.getBoundingClientRect();
+      const zone = element.getBoundingClientRect();
       return {
-        heading: rect('.bp-brand-media-heading'),
-        preview: rect('.filepond--root'),
-        picker: rect('.bp-brand-media-picker button'),
+        headingVisibility: heading ? getComputedStyle(heading).visibility : null,
+        item: r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null,
+        zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
-    assert.ok(processed.heading && processed.preview && processed.picker
-      && processed.preview.y >= processed.heading.y + processed.heading.height + 4
-      && processed.preview.y + processed.preview.height + 4 <= processed.picker.y,
-      'Completed native FilePond preview must not cover heading or subsequent actions: ' + JSON.stringify(processed));
+    assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5
+      && processed.headingVisibility === 'hidden',
+      'Native FilePond item must remain visible and replace empty-state copy after completed drag: ' + JSON.stringify(processed));
+    assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
+      && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
+      'Selecting a native file must not disable the other Media source actions.');
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
@@ -255,6 +255,12 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await filtersPanel.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
     await filtersPanel.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
     await filtersPanel.getByLabel('Відображення').waitFor({ state: 'visible' });
+    const panelScroll = await filtersPanel.evaluate(element => ({
+      client: element.clientHeight,
+      content: element.scrollHeight,
+    }));
+    assert.ok(panelScroll.content <= panelScroll.client + 3,
+      'Desktop picker filters should display their full form instead of clipping controls: ' + JSON.stringify(panelScroll));
     assert.equal(await page.locator('.fi-modal.fi-modal-open').count(), 1,
       'Opening picker filters must not create a second modal over the workspace.');
     const modalBox = await modalWindow.boundingBox();
