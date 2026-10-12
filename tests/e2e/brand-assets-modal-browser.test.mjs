@@ -138,7 +138,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const unifiedDropzone = mediaSection.locator('.bp-brand-media-dropzone');
     await unifiedDropzone.getByText('Перетягніть зображення сюди', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
-    await unifiedDropzone.getByText('або додайте його з комп’ютера, медіатеки чи за URL', { exact: true })
+    await unifiedDropzone.getByText('або скористайтеся одним зі способів додавання', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
     await unifiedDropzone.getByText('Завантажити', { exact: true }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
@@ -183,7 +183,43 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && Math.abs((geometry.upload.bottom - geometry.upload.top) - (geometry.area.bottom - geometry.area.top)) < 8,
       `Native FilePond must cover the ENTIRE advertised dashed dropzone: ${JSON.stringify(geometry)}`);
     assert.equal(geometry.innerPanelShadow, 'none', 'FilePond must not render a second framed surface.');
+    // Frozen owner-approved 1440px desktop composition, not merely "buttons exist".
+    const desktop = await unifiedDropzone.evaluate(element => {
+      const rect = node => {
+        if (!node) return null;
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return {
+        area: rect(element),
+        heading: rect(element.querySelector('.bp-brand-media-heading')),
+        guidance: rect(element.querySelector('.bp-brand-media-subheading')),
+        upload: rect(element.querySelector('.filepond--drop-label label')),
+        library: rect(element.querySelector('.bp-brand-media-picker button')),
+        url: rect(element.querySelector('.bp-brand-media-url-action button')),
+        hint: rect(element.querySelector('.bp-brand-media-format')),
+        section: rect(element.closest('.bp-brand-media-section')),
+      };
+    });
+    assert.ok(desktop.area.width >= 680 && desktop.section.width >= 710,
+      `Brand form on desktop must span the native Filament form grid, not a narrow half-column: ${JSON.stringify(desktop)}`);
+    const { heading, guidance, upload, library, url, hint } = desktop;
+    assert.ok(heading && guidance && upload && library && url && hint,
+      `Approved Media heading, guidance and three source controls must all exist: ${JSON.stringify(desktop)}`);
+    assert.ok(heading.y + heading.height <= guidance.y + 2
+      && guidance.y + guidance.height <= Math.min(upload.y, library.y, url.y) + 2,
+      `Approved desktop hierarchy: icon, heading, guidance, actions: ${JSON.stringify(desktop)}`);
+    assert.ok(Math.abs(upload.y - library.y) <= 12 && Math.abs(library.y - url.y) <= 12
+      && upload.x + upload.width <= library.x + 4
+      && library.x + library.width <= url.x + 4
+      && url.y + url.height <= hint.y + 2,
+      `Desktop Media source actions must form ONE ordered horizontal row: ${JSON.stringify(desktop)}`);
+    for (const action of [upload, library, url]) {
+      assert.ok(action.height >= 36 && action.height <= 58 && action.width >= 110,
+        `Approved Media controls need consistent button-sized bounds: ${JSON.stringify(desktop)}`);
+    }
     await mkdir(root, { recursive: true });
+    await page.screenshot({ path: `${root}/brand-media-desktop-page.png`, fullPage: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
     // The URL action must be a real Filament modal, not a decorative third button.
     await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
