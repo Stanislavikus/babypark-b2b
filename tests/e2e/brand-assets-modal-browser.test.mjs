@@ -164,6 +164,36 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await urlDialog.getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
     await page.keyboard.press('Escape');
     await page.setViewportSize({ width: 390, height: 844 });
+    const mobileRects = await unifiedDropzone.evaluate(element => {
+      const bounds = selector => {
+        const node = element.querySelector(selector);
+        if (!node) return null;
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return {
+        guidance: bounds('.bp-brand-media-subheading'),
+        upload: bounds('.filepond--drop-label label'),
+        choose: bounds('.bp-brand-media-picker button'),
+        url: bounds('.bp-brand-media-url-action button'),
+        zone: bounds('.bp-brand-media-dropzone') ?? (() => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        })(),
+      };
+    });
+    const { guidance, upload, choose, url, zone } = mobileRects;
+    assert.ok(guidance && upload && choose && url && zone,
+      `Missing real responsive actions: ${JSON.stringify(mobileRects)}`);
+    assert.ok(guidance.y + guidance.height + 6 <= upload.y,
+      `Mobile upload must not cover media guidance: ${JSON.stringify(mobileRects)}`);
+    assert.ok(upload.y + upload.height + 6 <= choose.y
+      && choose.y + choose.height + 6 <= url.y,
+      `Three Media buttons must not overlap vertically: ${JSON.stringify(mobileRects)}`);
+    for (const action of [upload, choose, url]) {
+      assert.ok(Math.abs(action.x + action.width / 2 - zone.x - zone.width / 2) <= 20,
+        `Responsive Media actions must be centered: ${JSON.stringify(mobileRects)}`);
+    }
     await mediaSection.screenshot({ path: `${root}/brand-media-mobile.png` });
     const mobileGeometry = await unifiedDropzone.evaluate(element => ({
       scrollWidth: element.scrollWidth,
