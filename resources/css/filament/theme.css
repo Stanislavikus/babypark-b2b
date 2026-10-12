@@ -427,6 +427,19 @@ button.bp-category-tree-header-cell {
     margin-inline-start: max(0px, calc(50% - 7.5rem));
 }
 
+/* FilePond paints a green processing-complete status panel on top of
+   its image-preview canvas. After processing, expose the actual native image
+   preview, while retaining the remove button and all non-success states. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--item-panel,
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--image-preview-overlay-success {
+    opacity: 0 !important;
+}
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-info,
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-status {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
 /* Filament itself uses an absolutely positioned, closable filter panel on
    narrow screens. Keep that native interaction when the picker is on desktop:
    overlay its own card grid instead of shrinking grid cards and badges. */
