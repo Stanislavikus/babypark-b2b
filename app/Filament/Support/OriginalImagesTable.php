@@ -32,7 +32,6 @@ final class OriginalImagesTable
                     ->query(fn (Builder $query): Builder => $query),
             ], layout: FiltersLayout::AfterContentCollapsible)
             ->deferFilters(false)
-            ->filtersFormWidth('md')
             ->filtersTriggerAction(fn (Action $action): Action => $action
                 ->button()
                 ->outlined()
