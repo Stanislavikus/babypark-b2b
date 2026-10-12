@@ -1116,6 +1116,19 @@ existing Asset because `brands.logo_media_asset_id` is an association, not Asset
 identity mutation. No new Asset metadata column is introduced by this UX alignment.
 
 
+[Resolved 2026-10-11 — Owner visual rejection of deployed #292]
+The separate oversized FilePond upload rectangle and a picker button below it
+do **not** satisfy the approved media mock merely because both are descendants
+of a dashed border. The single dashed zone must include a centered image-plus
+icon, a bold drag/drop heading, a short subtitle, a **side-by-side upload/Assets
+actions row**, and the format hint. FilePond remains the native uploader with
+compact visual presentation. ModalTableSelect remains the native picker and uses
+the shared Media library cards, but card columns must fit the **modal container**
+(two across on desktop, one on narrow screens) without a horizontal scrollbar.
+Real isolated Chromium screenshots of both surfaces are required for owner
+visual signoff before merge; geometry/functional green alone is insufficient.
+See `docs/reviews/BRAND_MEDIA_APPROVED_LAYOUT_CORRECTION_2026_10_11.md`.
+
 [Resolved 2026-10-11 — Brand Media visual acceptance correction after PR #291]
 The owner-provided approved composition is a **single dashed control region** within
 `Медіа` with native upload/drop and `Обрати з медіатеки` *inside that same region*,

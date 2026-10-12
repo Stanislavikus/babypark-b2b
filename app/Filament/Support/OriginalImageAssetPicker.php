@@ -5,10 +5,12 @@ namespace App\Filament\Support;
 use App\Enums\MediaAssetType;
 use App\Enums\MediaDiagnosisStatus;
 use App\Models\MediaAsset;
+use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetSourceResolver;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Forms\Components\ModalTableSelect;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 
 final class OriginalImageAssetPicker
@@ -20,7 +22,9 @@ final class OriginalImageAssetPicker
             ->getOptionLabelUsing(fn (?string $value): ?string => self::labelForId($value))
             ->selectAction(fn (Action $action): Action => $action
                 ->button()
-                ->label(__('media_ui.select_existing'))
+                ->label(__('media_ui.choose_assets'))
+                ->modalWidth(Width::FiveExtraLarge)
+                ->slideOver(false)
                 ->icon('heroicon-o-photo')
                 ->color('gray')
                 ->modalHeading(__('media_ui.library'))
@@ -30,9 +34,8 @@ final class OriginalImageAssetPicker
     /** @return Builder<MediaAsset> */
     public static function scopedOriginalImages(): Builder
     {
-        return MediaAsset::withoutWorkspaceScope()
-            ->where('workspace_id', app(WorkspaceContext::class)->id())
-            ->whereNull('parent_media_asset_id')
+        return app(MediaAssetLibraryReadService::class)
+            ->originalsQuery(app(WorkspaceContext::class)->current())
             ->where('asset_type', MediaAssetType::Image->value);
     }
 
