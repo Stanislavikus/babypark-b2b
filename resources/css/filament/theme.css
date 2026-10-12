@@ -369,32 +369,13 @@ button.bp-category-tree-header-cell {
     }
 }
 
-/* When a file has been added, keep FilePond itself as the preview,
-   but let it return to a compact native item instead of covering the dropzone.
-   Empty state alone uses the full-area drag surface. */
-.bp-brand-media-dropzone:has(.filepond--item) > .fi-grid {
-    min-height: 0;
-}
+/* Native FilePond owns its preview geometry while a file is selected.
+   Do not compress its internal item list with root-height overrides: that
+   hides processed uploads and blocks shared Media browser workflows. */
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-icon,
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-heading,
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-subheading {
-    display: none;
-}
-.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
-    padding-top: 0;
-}
-.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions .fi-fo-file-upload {
-    width: min(100%, 12rem);
-    min-height: 7rem;
-}
-.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions .filepond--root {
-    position: relative !important;
-    inset: auto !important;
-    z-index: 2;
-    width: 100% !important;
-    height: 7rem !important;
-    min-height: 7rem !important;
-    overflow: hidden;
+    visibility: hidden;
 }
 
 /* Filament itself uses an absolutely positioned, closable filter panel on
