@@ -73,17 +73,25 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     const processed = await area.evaluate(element => {
       const item = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const heading = element.querySelector('.bp-brand-media-heading');
-      const r = item?.getBoundingClientRect();
+      const root = element.querySelector('.filepond--root');
+      const itemRect = item?.getBoundingClientRect();
+      const rootRect = root?.getBoundingClientRect();
       const zone = element.getBoundingClientRect();
       return {
-        headingVisibility: heading ? getComputedStyle(heading).visibility : null,
-        item: r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null,
+        headingDisplay: heading ? getComputedStyle(heading).display : null,
+        item: itemRect ? { x: itemRect.x, y: itemRect.y, width: itemRect.width, height: itemRect.height } : null,
+        preview: rootRect ? { x: rootRect.x, y: rootRect.y, width: rootRect.width, height: rootRect.height } : null,
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
     assert.ok(processed.item && processed.item.width > 5 && processed.item.height > 5
-      && processed.headingVisibility === 'hidden',
-      'Native FilePond item must remain visible and replace empty-state copy after completed drag: ' + JSON.stringify(processed));
+      && processed.headingDisplay === 'none'
+      && processed.preview && processed.preview.width <= 210 && processed.preview.height <= 145
+      && processed.preview.x >= processed.zone.x - 2
+      && processed.preview.y >= processed.zone.y - 2
+      && processed.preview.x + processed.preview.width <= processed.zone.x + processed.zone.width + 2
+      && processed.preview.y + processed.preview.height <= processed.zone.y + processed.zone.height + 2,
+      'Uploaded FilePond preview must remain compact within the Media block: ' + JSON.stringify(processed));
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
       && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
       'Selecting a native file must not disable the other Media source actions.');
