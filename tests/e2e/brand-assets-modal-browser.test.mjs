@@ -95,6 +95,9 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
+    assert.ok(processed.item && processed.item.height >= 240,
+      'Native selected image must occupy a legible preview, not 96px: '
+        + JSON.stringify(processed));
     assert.ok(processed.item && processed.item.width >= processed.zone.width * 0.85
       && processed.item.width <= processed.zone.width && processed.item.height > 5
       && processed.headingDisplay === 'none'
@@ -180,6 +183,14 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           transform:s.transform, translate:s.translate, padding:s.padding };
       });
     });
+    const localGaps = {
+      first: matchedMetrics[1].x-(matchedMetrics[0].x+matchedMetrics[0].width),
+      second: matchedMetrics[2].x-(matchedMetrics[1].x+matchedMetrics[1].width),
+    };
+    assert.ok(Math.abs(localGaps.first-localGaps.second) <= 2
+      && localGaps.first >= 8 && localGaps.second >= 8,
+      'Three source actions need equal horizontal spacing: '
+        + JSON.stringify({ localGaps, matchedMetrics }));
     assert.ok(Math.abs(matchedMetrics[0].y-matchedMetrics[1].y) <= 1
       && Math.abs(matchedMetrics[1].y-matchedMetrics[2].y) <= 1,
       'Local selected Media buttons must align within 1px: ' + JSON.stringify(matchedMetrics));
@@ -189,6 +200,17 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.equal(matchedMetrics[1].border, matchedMetrics[2].border,
       'Filament URL button cannot add a second outline to a standard 1px border.');
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
+    for (const [shape, path] of [['square', 'square.png'], ['portrait', 'portrait.png']]) {
+      const choose=page.waitForEvent('filechooser', { timeout: 10_000 });
+      await area.locator('.filepond--drop-label label').click();
+      await (await choose).setFiles(resolve(root,path));
+      const picture=area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first();
+      await picture.waitFor({ state: 'visible', timeout: 20_000 });
+      const frame=await picture.boundingBox();
+      assert.ok(frame && frame.height >= 240 && frame.width >= 280,
+        'A real ' + shape + ' Original must have a legible frame: ' + JSON.stringify(frame));
+      await area.screenshot({path: root+'/brand-media-'+shape+'-drop.png'});
+    }
     // Upload must remain a working native chooser after the file was dropped.
     const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await area.locator('.filepond--drop-label label').click();
@@ -347,6 +369,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(nativeMetrics.icon.includes('9ca3af'), 'Upload icon must be muted gray: '+nativeMetrics.icon);
     assert.equal(nativeMetrics.upload.radius,nativeMetrics.url.radius);
     assert.equal(nativeMetrics.upload.font,nativeMetrics.url.font);
+    const gaps = await unifiedDropzone.evaluate(node => {
+      const box = s => node.querySelector(s)?.getBoundingClientRect();
+      const first=box('.filepond--drop-label label');
+      const second=box('.bp-brand-media-picker button');
+      const third=box('.bp-brand-media-url-action button');
+      return { first:second.left-first.right, second:third.left-second.right };
+    });
+    assert.ok(Math.abs(gaps.first-gaps.second) <= 2 && gaps.first>=8 && gaps.second>=8,
+      'Native desktop controls must have equal horizontal gaps: '+JSON.stringify(gaps));
     assert.equal(nativeMetrics.upload.height, nativeMetrics.url.height,
       'Upload and URL source controls must have exactly equal box height.');
     assert.equal(nativeMetrics.library.height, nativeMetrics.url.height,
@@ -666,6 +697,23 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.equal(saveResponse.status(), 200, 'Save must complete before navigating away.');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const savedPanel = page.locator('.bp-brand-media-current-layout');
+    await savedPanel.waitFor({ state:'visible', timeout:20_000 });
+    const currentSize=await savedPanel.evaluate(node => {
+      const frame=node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
+      const info=node.querySelector('.bp-brand-media-current-metadata')?.getBoundingClientRect();
+      const group=node.getBoundingClientRect();
+      return {frame:frame && {width:frame.width,height:frame.height},
+        metadata:info && {width:info.width},width:group.width};
+    });
+    assert.ok(currentSize.frame && currentSize.frame.width>=280
+      && currentSize.metadata && currentSize.metadata.width<=480
+      && currentSize.width<=900,
+      'Brand current image must be at least 280px and metadata compact: '+JSON.stringify(currentSize));
+    await savedPanel.screenshot({path: `${root}/brand-media-current-saved.png`});
+    await page.setViewportSize({width:390,height:844});
+    await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
+    await page.setViewportSize({width:1440,height:900});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
     const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();

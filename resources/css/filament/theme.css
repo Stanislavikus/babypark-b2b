@@ -291,6 +291,20 @@ button.bp-category-tree-header-cell {
     width: 100%;
     min-width: 0;
 }
+/* The Filament field/action wrapper is shrink-to-fit by default, even when
+   its button is width:100%. Stretch the existing wrapper to its grid cell:
+   equal 12px gaps, no measured 30px/50px visual gaps. */
+@container (min-width: 44.01rem) {
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col > *,
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col :is(
+        .fi-sc-component, .fi-fo-field-wrp, .fi-fo-field-wrp-input,
+        .fi-fo-modal-table-select, .fi-ac, .fi-ac-action, .fi-btn
+    ) {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100%;
+    }
+}
 .bp-brand-media-actions .filepond--root {
     /* Expand the native FilePond drop target to the exact visible dashed area.
        No fake drag handlers, no duplicate input, no page-wide drop capture. */
@@ -499,7 +513,10 @@ button.bp-category-tree-header-cell {
 @container (min-width: 44.01rem) {
     .bp-brand-media-dropzone:has(.filepond--item)
         .bp-brand-media-actions .filepond--drop-label label {
-        top: calc(50% + 1.10rem) !important;
+        /* 320px preview makes 50% point to the middle of the image.
+           Align to the bottom action row, not the middle of FilePond's root. */
+        top: auto !important;
+        bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.18rem) !important;
     }
 }
 /* FilePond hides its browse label after selecting one file. With single-file
