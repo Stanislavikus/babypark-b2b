@@ -162,6 +162,23 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
       && realPreview.removePresent,
       'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
+    const visibleCrop = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const scroller = node.querySelector('.filepond--list-scroller');
+      const preview = item?.querySelector('.filepond--image-preview');
+      const ib = item?.getBoundingClientRect();
+      const sb = scroller?.getBoundingClientRect();
+      const pb = preview?.getBoundingClientRect();
+      return { item:ib && {top:ib.top,bottom:ib.bottom,height:ib.height},
+        scroller:sb && {top:sb.top,bottom:sb.bottom,height:sb.height},
+        preview:pb && {top:pb.top,bottom:pb.bottom,height:pb.height} };
+    });
+    assert.ok(visibleCrop.item && visibleCrop.scroller && visibleCrop.preview
+      && visibleCrop.scroller.bottom >= visibleCrop.item.bottom - 2
+      && visibleCrop.scroller.height >= 340
+      && visibleCrop.preview.height >= 310,
+      'The entire 320px native image must be visible, not merely exist in a clipped item: '
+        + JSON.stringify(visibleCrop));
     const inset = await area.evaluate(node => {
       const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const a = node.getBoundingClientRect(), b = item?.getBoundingClientRect();

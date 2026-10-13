@@ -500,6 +500,14 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
     padding-top: 19.25rem;
 }
+/* FilePond defaults its internal list scroller to ~282px despite a 320px
+   image-preview item. With the native 24px top inset this clips ~64px from
+   the bottom of the image. Reserve 320px + the 24px inset in that one native
+   scroller, without changing FilePond's upload JS or form state. */
+.bp-brand-media-dropzone .filepond--root:has(.filepond--item) .filepond--list-scroller {
+    height: calc(20rem + 1.5rem) !important;
+    min-height: calc(20rem + 1.5rem) !important;
+}
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
     width: calc(100% - 3rem) !important;
     margin-inline-start: 1.5rem;
