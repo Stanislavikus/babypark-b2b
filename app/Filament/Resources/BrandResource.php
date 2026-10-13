@@ -146,8 +146,7 @@ class BrandResource extends Resource
                                 ->hiddenLabel()
                                 ->state(fn (Get $get): ?string => app(MediaAssetSourceResolver::class)
                                     ->sourceReference(self::selectedLogoAsset($get)))
-                                ->visible(fn (Get $get, ?Brand $record): bool =>
-                                    blank($get('logo_upload'))
+                                ->visible(fn (Get $get, ?Brand $record): bool => blank($get('logo_upload'))
                                     && self::selectedLogoAsset($get) instanceof MediaAsset
                                     && (string) $get('logo_media_asset_id') !== (string) ($record?->logo_media_asset_id ?? ''))
                                 ->extraAttributes(['class' => 'bp-brand-media-candidate']),
