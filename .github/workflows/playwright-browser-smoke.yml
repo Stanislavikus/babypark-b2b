@@ -88,8 +88,29 @@ jobs:
           php artisan migrate:fresh --seed --force
           php artisan storage:link
 
-      - name: Seed isolated shared-media fixture
-        run: php tests/e2e/seed-shared-media.php
+      - name: Focused URL Media ingest regressions
+        run: |
+          set -euo pipefail
+          STYLE_FILES=(
+            app/Services/Media/OriginalImageUrlIngestService.php
+            app/Filament/Resources/BrandResource.php
+            app/Filament/Resources/MediaAssetResource/Pages/ListMediaAssets.php
+            tests/Feature/OriginalImageUrlIngestTest.php
+          )
+          if ! vendor/bin/pint --test "${STYLE_FILES[@]}"; then
+            echo "::error::Pint formatting failed; exact isolated-runner diff follows."
+            vendor/bin/pint "${STYLE_FILES[@]}"
+            git diff -- "${STYLE_FILES[@]}"
+            exit 1
+          fi
+          php artisan test tests/Feature/OriginalImageUrlIngestTest.php --no-ansi
+
+      - name: Restore isolated browser fixtures after RefreshDatabase tests
+        run: |
+          set -euo pipefail
+          php artisan migrate:fresh --seed --force
+          php tests/e2e/seed-shared-media.php
+          test -s test-results/browser-smoke/fixture.json
 
       - name: Start local application
         run: |
@@ -116,6 +137,11 @@ jobs:
           name: brand-media-visual-acceptance
           path: |
             test-results/browser-smoke/brand-media-layout.png
+            test-results/browser-smoke/brand-media-desktop-page.png
+            test-results/browser-smoke/brand-media-mobile.png
+            test-results/browser-smoke/brand-media-real-drop.png
+            test-results/browser-smoke/brand-media-library-preview.png
+            test-results/browser-smoke/brand-media-library-mobile.png
             test-results/browser-smoke/brand-media-picker-layout.png
             test-results/browser-smoke/brand-media-picker-filters.png
             test-results/browser-smoke/brand-media-picker-selected.png

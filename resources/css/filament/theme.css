@@ -200,8 +200,9 @@ button.bp-category-tree-header-cell {
     @apply min-h-10 border-b border-gray-200 dark:border-white/5;
 }
 
-/* Brand Media owner-approved composition. Only presentation of native Filament
-   FileUpload (FilePond) and ModalTableSelect; no custom upload or select logic. */
+/* Brand Media: native FilePond is the complete dashed area's input/drop target.
+   The Filament picker and URL Action are ordinary clickable controls over it.
+   This is presentation only: no extra file handlers or upload transports. */
 .bp-brand-media-section .fi-section-header-text-ctn {
     display: flex;
     align-items: center;
@@ -210,138 +211,497 @@ button.bp-category-tree-header-cell {
     gap: 0.5rem;
     width: 100%;
 }
-
-.bp-brand-media-section .fi-section-header-description {
-    margin: 0;
-}
+.bp-brand-media-section .fi-section-header-description { margin: 0; }
 
 .bp-brand-media-dropzone {
-    @apply rounded-xl border border-dashed border-gray-300 bg-white px-5 py-6 dark:border-white/20 dark:bg-gray-900;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    text-align: center;
+    @apply rounded-xl border border-dashed border-gray-300 bg-white dark:border-white/20 dark:bg-gray-900;
+    position: relative;
+    isolation: isolate;
+    container-type: inline-size;
     min-width: 0;
+    min-height: 17.75rem;
+    padding: clamp(1rem, 3%, 1.75rem);
+    text-align: center;
 }
 
-/* Filament Group renders an inner .fi-grid. Styling only the Group wrapper
-   leaves both actions in its default single-column grid (confirmed in trace #22). */
 .bp-brand-media-dropzone > .fi-grid {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.6rem;
-}
-
-.bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
-    width: 100%;
-    min-width: 0;
-}
-
-.bp-brand-media-actions > .fi-grid {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
     gap: 0.75rem;
+    min-height: 14.5rem;
+    width: 100%;
 }
-
-.bp-brand-media-actions > .fi-grid > .fi-grid-col {
-    flex: 0 1 auto;
-    width: auto;
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col {
+    position: relative;
+    z-index: 2;
     min-width: 0;
+    width: 100%;
+    pointer-events: none;
 }
-
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col:has(.bp-brand-media-actions) {
+    /* FilePond's absolute root must anchor to the outer dashed Media area,
+       not to this inner Filament grid column. */
+    position: static;
+    z-index: auto;
+}
 .bp-brand-media-icon {
     @apply text-gray-500 dark:text-gray-400;
     display: flex;
     justify-content: center;
-    margin-bottom: 0.15rem;
 }
+.bp-brand-media-heading { @apply text-xl font-semibold text-gray-950 dark:text-white; font-size: clamp(1.2rem, 2.3cqw, 1.4rem); }
+.bp-brand-media-subheading { @apply text-base text-gray-500 dark:text-gray-400; font-size: 1.1rem; }
 
-.bp-brand-media-heading {
-    @apply text-xl font-semibold text-gray-950 dark:text-white;
-}
-
-.bp-brand-media-subheading {
-    @apply text-base text-gray-500 dark:text-gray-400;
-}
-
-.bp-brand-media-actions {
+.bp-brand-media-actions { width: 100%; min-width: 0; }
+.bp-brand-media-actions > .fi-grid {
     display: flex;
+    justify-content: center;
+    align-items: center;
     flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.bp-brand-media-actions > .fi-grid > .fi-grid-col {
+    display: flex;
+    flex: 0 1 auto;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
     width: auto;
     min-width: 0;
-    margin: 0.15rem auto;
 }
-
-.bp-brand-media-actions > * {
-    flex: 0 1 auto;
-    min-width: 0;
-}
-
 .bp-brand-media-actions .fi-fo-file-upload {
     width: 172px;
-    max-width: 100%;
+    min-height: 46px;
 }
-
-/* Empty FilePond renders as a compact upload action beside Assets selection;
-   when a file is selected FilePond regains enough room for progress/preview. */
 .bp-brand-media-actions .filepond--root {
-    width: 172px;
-    max-width: 100%;
-    border: none !important;
-    box-shadow: none !important;
+    /* Expand the native FilePond drop target to the exact visible dashed area.
+       No fake drag handlers, no duplicate input, no page-wide drop capture. */
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    pointer-events: auto;
+    overflow: hidden;
+}
+.bp-brand-media-actions .filepond--panel-root,
+.bp-brand-media-actions .filepond--panel,
+.bp-brand-media-actions .filepond--panel-top,
+.bp-brand-media-actions .filepond--panel-center,
+.bp-brand-media-actions .filepond--panel-bottom {
     background: transparent !important;
-    min-height: 46px !important;
-    height: 46px !important;
-    margin-bottom: 0 !important;
-}
-
-.bp-brand-media-actions .filepond--root:has(.filepond--item) {
-    min-height: 105px !important;
-    height: 105px !important;
-    width: 220px;
-}
-
-.bp-brand-media-actions .filepond--panel-root {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.bp-brand-media-actions .filepond--drop-label {
-    min-height: 46px !important;
-    height: 46px !important;
-    cursor: pointer;
     border: 0 !important;
     box-shadow: none !important;
-    background: transparent !important;
 }
-
-.bp-brand-media-actions .filepond--drop-label label {
-    @apply font-semibold text-gray-950 dark:text-white;
+.bp-brand-media-actions .filepond--drop-label {
+    position: absolute !important;
+    inset: 0;
+    width: 100%;
+    height: 100% !important;
+    min-height: 100% !important;
     cursor: pointer;
 }
-
-.bp-brand-media-actions .fi-fo-modal-table-select {
+.bp-brand-media-actions .filepond--drop-label label {
+    @apply rounded-lg border border-gray-300 bg-white px-3 font-semibold text-gray-950 shadow-sm dark:border-white/20 dark:bg-gray-900 dark:text-white;
+    position: absolute;
+    left: max(0px, calc(50% - 19.75rem));
+    top: calc(50% + 1.25rem);
+    transform: none !important;
+    width: 172px;
+    height: 46px;
+    line-height: normal;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 150ms, background-color 150ms, box-shadow 150ms;
 }
-
-/* Selected filename remains accessible but the only visible result is the
-   canonical current-logo preview above. */
+.bp-brand-media-actions .filepond--drop-label label::before {
+    content: '';
+    display: inline-block;
+    flex: 0 0 1.15rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4m-5 5 5-5 5 5M4 17v3h16v-3'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.bp-brand-media-actions .bp-brand-media-picker .fi-btn,
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    min-height: 46px;
+    padding-inline: 0.9rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.bp-brand-media-actions .bp-brand-media-picker .fi-btn svg {
+    order: -1;
+}
+.bp-brand-media-actions .filepond--drop-label label:hover,
+.bp-brand-media-actions .filepond--drop-label:focus-within label {
+    @apply border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:bg-primary-500/10;
+}
+.bp-brand-media-actions .filepond--label-action {
+    @apply font-semibold text-gray-950 no-underline dark:text-white;
+    cursor: pointer;
+}
+.bp-brand-media-actions .fi-fo-modal-table-select,
+.bp-brand-media-actions .bp-brand-media-url-action {
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+}
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    @apply border border-gray-300 bg-white text-gray-950 shadow-sm hover:border-primary-500 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-gray-900 dark:text-white;
+}
+/* Filament outlined action adds a 1px inset box-shadow ring in addition to
+   the 1px CSS border. Chromium measured this as the only thicker Media button.
+   Normalize its RESTING shadow to its two peers. Preserve Filament's native
+   keyboard focus-visible ring rather than overriding its focus state. */
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn:not(:focus-visible) {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06) !important;
+}
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn:not(:hover):not(:focus-visible) {
+    border-color: rgb(209 213 219) !important;
+}
+.bp-brand-media-actions .fi-fo-modal-table-select .fi-btn {
+    @apply hover:border-primary-500 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500;
+}
 .bp-brand-media-picker.fi-fo-modal-table-select > div:first-child:not(:last-child) {
     @apply sr-only;
 }
-
 .bp-brand-media-format {
     @apply text-center text-sm text-gray-500 dark:text-gray-400;
+    font-size: 1rem;
 }
 
+@container (max-width: 38rem) {
+    .bp-brand-media-actions > .fi-grid { flex-direction: column; }
+    /* A narrow Filament drawer must size the real button wrappers, not only
+       their flex columns. Otherwise the picker keeps its intrinsic width and
+       the URL action shrink-wraps to its label. */
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col {
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: 18rem;
+        min-width: 0;
+    }
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col > *,
+    .bp-brand-media-actions .bp-brand-media-picker,
+    .bp-brand-media-actions .bp-brand-media-picker > *,
+    .bp-brand-media-actions .bp-brand-media-url-action,
+    .bp-brand-media-actions .bp-brand-media-url-action :is(.fi-ac, .fi-ac-action),
+    .bp-brand-media-actions .bp-brand-media-picker button,
+    .bp-brand-media-actions .bp-brand-media-url-action button {
+        box-sizing: border-box;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100%;
+    }
+    .bp-brand-media-actions .fi-fo-file-upload { width: 100%; }
+    .bp-brand-media-actions .filepond--drop-label label {
+        left: 50%;
+        transform: translateX(-50%) !important;
+        width: min(18rem, calc(100% - 2rem));
+        font-size: 0.875rem !important;
+        padding-inline: 0.5rem;
+        top: calc(50% - 1.65rem);
+    }
+    .bp-brand-media-actions .bp-brand-media-picker,
+    .bp-brand-media-actions .bp-brand-media-picker > *,
+    .bp-brand-media-actions .bp-brand-media-url-action,
+    .bp-brand-media-actions .bp-brand-media-picker button,
+    .bp-brand-media-actions .bp-brand-media-url-action button {
+        width: 100%;
+    }
+    .bp-brand-media-actions .bp-brand-media-picker button,
+    .bp-brand-media-actions .bp-brand-media-url-action button {
+        height: 46px;
+        padding-inline: 0.5rem;
+        font-size: 0.875rem !important;
+        white-space: nowrap;
+    }
+    .bp-brand-media-dropzone .bp-brand-media-heading { font-size: clamp(1rem, 5cqw, 1.25rem); }
+}
+
+
+
+/* Small Brand drawers use multi-line guidance. Reserve a real action row
+   before the absolute native FilePond browse label to avoid text overlap. */
+@container (max-width: 23rem) {
+    .bp-brand-media-actions > .fi-grid {
+        padding-top: 2.15rem;
+    }
+    .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% + 0.3rem);
+    }
+}
+
+/* Keep FilePond's native full-area drag surface and 96px image preview.
+   Collapse obsolete empty-state copy instead of reserving an invisible blank
+   block; actions start below the native image preview. */
+.bp-brand-media-dropzone:has(.filepond--item) {
+    min-height: 0;
+}
+.bp-brand-media-dropzone:has(.filepond--item) > .fi-grid {
+    min-height: 0;
+}
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-icon,
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-heading,
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-subheading {
+    display: none;
+}
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
+    padding-top: 0;
+}
+/* Keep the native full-area drop target after selection. The preview card
+   occupies the Media area (rather than a fixed 15rem centered thumbnail),
+   leaving the three actions in their separate row underneath. */
+.bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
+    padding-top: 5rem;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
+    width: calc(100% - 3rem) !important;
+    margin-inline-start: 1.5rem;
+    /* FilePond positions items independently: margin-top does not move its box.
+       Independent translate preserves FilePond's own animated transform. */
+    translate: 0 1.5rem;
+}
+/* Only after a local file is selected, the native absolute browse label is
+   2.42px lower than the two Filament buttons. Adjust the selected-desktop
+   position by precisely 0.15rem (2.4px); keep empty/mobile/library untouched. */
+@container (min-width: 38.01rem) {
+    .bp-brand-media-dropzone:has(.filepond--item)
+        .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% + 1.10rem) !important;
+    }
+}
+/* FilePond hides its browse label after selecting one file. With single-file
+   replace enabled, retain the SAME native browse label as the Upload button;
+   do not inject a fake button or a second input. */
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    pointer-events: none;
+}
+.bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--drop-label label {
+    pointer-events: auto;
+}
+
+/* All three native controls share the same visual metrics; FilePond uses a
+   label, while Filament actions use actual buttons. */
+.bp-brand-media-actions .filepond--drop-label label,
+.bp-brand-media-actions .bp-brand-media-picker button,
+.bp-brand-media-actions .bp-brand-media-url-action button {
+    box-sizing: border-box;
+    height: 46px;
+    min-height: 46px;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.75rem !important;
+    background: white;
+    color: rgb(17 24 39) !important;
+    font-size: 1rem;
+    font-weight: 600 !important;
+    line-height: 1.25rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+}
+.bp-brand-media-actions .filepond--root,
+.bp-brand-media-actions .filepond--drop-label,
+.bp-brand-media-actions .filepond--drop-label label,
+.bp-brand-media-actions .filepond--drop-label label * {
+    opacity: 1 !important;
+}
+.bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
+    color: inherit !important;
+    font-weight: inherit !important;
+    font-size: inherit !important;
+}
+.dark .bp-brand-media-actions .filepond--drop-label label,
+.dark .bp-brand-media-actions .bp-brand-media-picker button,
+.dark .bp-brand-media-actions .bp-brand-media-url-action button {
+    background: rgb(17 24 39);
+    color: white !important;
+    border-color: rgb(75 85 99);
+}
+/* Empty desktop state uses FilePond's absolute label. Align it with the
+   two native Filament controls; measured Chromium difference was 3.296875px.
+   Pending-file and pending-asset states keep their verified positions. */
+@container (min-width: 38.01rem) {
+    .bp-brand-media-dropzone:not(:has(.filepond--item)):not(:has(.bp-brand-media-candidate))
+        .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% + 1.45rem) !important;
+    }
+}
+/* Native FilePond ships an important layered muted-text rule. A scoped base
+   layer override keeps its button text identical to the two Filament actions
+   without affecting other FilePond controls or their normal states. */
+@layer base {
+    .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label,
+    .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
+        color: rgb(17 24 39) !important;
+        font-weight: 600 !important;
+    }
+    .dark .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label,
+    .dark .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
+        color: white !important;
+    }
+}
+/* Existing MediaAsset selected through library or URL is rendered natively
+   as a pending ImageEntry; the original is not duplicated or changed. */
+/* Filament wraps each hidden guidance element in a distinct grid column.
+   Hiding only its Text component leaves three empty columns and 36px of
+   flex gap ahead of the candidate image. Hide those columns as well. */
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid { min-height: 0; }
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-icon),
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-heading),
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-subheading) {
+    display: none;
+}
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-actions) {
+    margin-top: 0.75rem;
+}
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-icon,
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-heading,
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-subheading { display: none; }
+/* Cross-source selected-image surface: one neutral color for native
+   Filament ImageEntry and FilePond. FilePond's plugin defaults to #222,
+   which is why previously the same Original looked black after an upload. */
+.bp-brand-media-dropzone {
+    --bp-media-preview-background: rgb(249 250 251);
+}
+.dark .bp-brand-media-dropzone {
+    --bp-media-preview-background: rgb(31 41 55);
+}
+.bp-brand-media-dropzone .filepond--image-preview-wrapper,
+.bp-brand-media-dropzone .filepond--image-preview {
+    background: var(--bp-media-preview-background) !important;
+}
+/* FilePond's idle SVG overlay darkens the top of otherwise neutral whitespace.
+   Status/error overlays remain native; only idle shading is suppressed here. */
+.bp-brand-media-dropzone .filepond--image-preview-overlay-idle {
+    opacity: 0 !important;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate {
+    /* The native dashed area already supplies ~24px padding on each edge;
+       another 24px on ImageEntry produced double inset and top whitespace. */
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: .75rem;
+    background: var(--bp-media-preview-background);
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate img {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: clamp(10rem, 24cqw, 20rem) !important;
+    max-height: 20rem !important;
+    object-fit: contain !important;
+    object-position: center !important;
+}
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
+    top: auto !important;
+    /* Align with Filament's buttons; actual selected desktop drift was 10.84px. */
+    bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.93rem) !important;
+}
+@container (max-width: 38rem) {
+    .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
+        /* FilePond's absolute label is the FIRST of three stacked actions.
+           At 5.25rem it overlaps URL. Position it above the native library
+           and URL controls while leaving their Filament layout unchanged. */
+        bottom: 12rem !important;
+    }
+}
+/* Standard Filament icon action, visually overlaying the pending ImageEntry.
+   Its grid wrapper contributes no extra vertical space in the dashed area. */
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col:has(.bp-brand-media-candidate-dismiss) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
+    position: absolute;
+    /* The X is inset from the *inner preview frame*, not its dashed outer
+       boundary: 12px inside the shared responsive container padding. */
+    top: calc(clamp(1rem, 3%, 1.75rem) + 2rem);
+    right: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
+    z-index: 5;
+    pointer-events: auto;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate-dismiss button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    min-height: 34px;
+    height: 34px;
+    border-radius: 9999px;
+    background: rgb(17 17 17 / 90%) !important;
+    color: white !important;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate-dismiss button svg {
+    color: white !important;
+}
+@container (max-width: 38rem) {
+    .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
+        /* Mobile maintains the same 12px inset from preview bounds. */
+        top: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
+        right: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
+    }
+}
+/* FilePond paints a green processing-complete status panel on top of
+   its image-preview canvas. After processing, expose the actual native image
+   preview, while retaining the remove button and all non-success states. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--item-panel,
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--image-preview-overlay-success {
+    opacity: 0 !important;
+}
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-info,
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-status {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+/* Filament itself uses an absolutely positioned, closable filter panel on
+   narrow screens. Keep that native interaction when the picker is on desktop:
+   overlay its own card grid instead of shrinking grid cards and badges. */
+.bp-original-images-picker .fi-ta-ctn {
+    position: relative;
+}
+@media (min-width: 64rem) {
+    .bp-original-images-picker:has(.fi-ta-filters-after-content-ctn.fi-open) .fi-ta-ctn {
+        min-height: 34rem;
+    }
+}
+.bp-original-images-picker .fi-ta-filters-after-content-ctn {
+    position: absolute !important;
+    inset-inline-end: 0;
+    top: 3.65rem;
+    bottom: 0;
+    z-index: 30 !important;
+    width: min(17rem, 78%) !important;
+    max-width: 17rem !important;
+    overflow-y: auto;
+    border-inline-start: 1px solid var(--color-gray-200);
+    background: white;
+    box-shadow: -0.5rem 0 1.25rem rgb(0 0 0 / 0.09) !important;
+}
+@media (prefers-color-scheme: dark) {
+    .bp-original-images-picker .fi-ta-filters-after-content-ctn {
+        border-inline-start-color: rgb(255 255 255 / 0.12);
+        background: var(--color-gray-900);
+    }
+}

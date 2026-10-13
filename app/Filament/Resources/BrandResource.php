@@ -11,7 +11,9 @@ use App\Models\Brand;
 use App\Models\MediaAsset;
 use App\Models\User;
 use App\Services\Media\MediaAssetSourceResolver;
+use App\Services\Media\OriginalImageUrlIngestService;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
@@ -37,10 +39,12 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class BrandResource extends Resource
@@ -136,9 +140,36 @@ class BrandResource extends Resource
                                 ->extraAttributes(['class' => 'bp-brand-media-heading']),
                             Text::make(__('media_ui.drop_subheading'))
                                 ->extraAttributes(['class' => 'bp-brand-media-subheading']),
+                            // A library/URL selection previews its existing canonical Original,
+                            // never creating a second upload or MediaAsset identity.
+                            ImageEntry::make('pending_logo_source')
+                                ->hiddenLabel()
+                                ->state(fn (Get $get): ?string => app(MediaAssetSourceResolver::class)
+                                    ->sourceReference(self::selectedLogoAsset($get)))
+                                ->visible(fn (Get $get, ?Brand $record): bool => blank($get('logo_upload'))
+                                    && self::selectedLogoAsset($get) instanceof MediaAsset
+                                    && (string) $get('logo_media_asset_id') !== (string) ($record?->logo_media_asset_id ?? ''))
+                                ->extraAttributes(['class' => 'bp-brand-media-candidate']),
+                            Actions::make([
+                                Action::make('cancel_pending_logo')
+                                    ->label(__('media_ui.cancel_pending_image'))
+                                    ->tooltip(__('media_ui.cancel_pending_image'))
+                                    ->icon('heroicon-m-x-mark')
+                                    ->iconButton()
+                                    ->color('gray')
+                                    ->visible(fn (Get $get, ?Brand $record): bool => blank($get('logo_upload'))
+                                        && self::selectedLogoAsset($get) instanceof MediaAsset
+                                        && (string) $get('logo_media_asset_id') !== (string) ($record?->logo_media_asset_id ?? ''))
+                                    ->action(function (Set $set, ?Brand $record): void {
+                                        // Cancel only unsaved selection, not the canonical file.
+                                        $set('logo_media_asset_id', $record?->logo_media_asset_id);
+                                    }),
+                            ])->extraAttributes(['class' => 'bp-brand-media-candidate-dismiss']),
                             Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
+                                    ->panelLayout('compact')
+                                    ->imagePreviewHeight('96')
                                     ->hiddenLabel()
                                     ->placeholder(__('media_ui.upload'))
                                     ->storeFiles(false)
@@ -155,13 +186,16 @@ class BrandResource extends Resource
                                         'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                                     ])
                                     ->live()
-                                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                                    ->afterStateUpdated(function (Set $set, Get $get, mixed $state, Component $livewire, ?Brand $record): void {
                                         if ($livewire instanceof EditBrand) {
                                             $livewire->logoPostSaveNotice = null;
                                         }
 
                                         if (filled($state)) {
                                             $set('logo_media_asset_id', null);
+                                        } elseif (blank($get('logo_media_asset_id')) && $record instanceof Brand) {
+                                            // X on a pending file cancels it; it does not delete the saved logo.
+                                            $set('logo_media_asset_id', $record->logo_media_asset_id);
                                         }
                                     }),
                                 OriginalImageAssetPicker::make('logo_media_asset_id')
@@ -180,6 +214,48 @@ class BrandResource extends Resource
                                     })
                                     ->helperText(null)
                                     ->extraAttributes(['class' => 'bp-brand-media-picker']),
+                                Actions::make([
+                                    Action::make('import_logo_from_url')
+                                        ->label(__('media_ui.add_from_url'))
+                                        ->icon('heroicon-o-link')
+                                        ->color('gray')
+                                        ->outlined()
+                                        ->modalHeading(__('media_ui.add_from_url'))
+                                        ->modalSubmitActionLabel(__('media_ui.add_from_url'))
+                                        ->schema([
+                                            TextInput::make('url')
+                                                ->label(__('media_ui.image_url'))
+                                                ->placeholder('https://example.com/photo.jpg')
+                                                ->url()
+                                                ->required()
+                                                ->maxLength(2048),
+                                        ])
+                                        ->action(function (array $data, Set $set, Component $livewire): void {
+                                            $actor = auth()->user();
+                                            if (($actor instanceof User) === false) {
+                                                throw new AuthorizationException('This action is unauthorized.');
+                                            }
+
+                                            try {
+                                                $asset = app(OriginalImageUrlIngestService::class)->ingest(
+                                                    $actor,
+                                                    app(WorkspaceContext::class)->current(),
+                                                    (string) $data['url'],
+                                                );
+                                            } catch (MediaIngestException $e) {
+                                                throw ValidationException::withMessages(['url' => $e->getMessage()]);
+                                            }
+
+                                            if ($livewire instanceof EditBrand) {
+                                                $livewire->logoPostSaveNotice = null;
+                                            }
+
+                                            $set('logo_upload', null);
+                                            $set('logo_media_asset_id', (string) $asset->id);
+                                        }),
+                                ])
+                                    ->key('brand_media_url_actions')
+                                    ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                             ])
                                 ->extraAttributes(['class' => 'bp-brand-media-actions']),
                             Text::make(__('media_ui.upload_hint'))
@@ -197,6 +273,7 @@ class BrandResource extends Resource
                         Actions::make([
                             Action::make('remove_logo')
                                 ->label('Прибрати логотип')
+                                ->visible(fn (Get $get, ?Brand $record): bool => filled($get('logo_upload')) || self::formLogoAsset($get, $record) instanceof MediaAsset)
                                 ->icon('heroicon-o-x-mark')
                                 ->color('gray')
                                 ->action(function (Set $set): void {
@@ -252,7 +329,7 @@ class BrandResource extends Resource
                     ->label('Активний')
                     ->helperText('Неактивний бренд залишається у Master і на існуючих товарах, але не пропонується для нового призначення.')
                     ->default(true),
-            ]),
+            ])->columnSpanFull(),
         ]);
     }
 

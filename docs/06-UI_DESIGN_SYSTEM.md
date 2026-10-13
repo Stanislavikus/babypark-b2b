@@ -1140,6 +1140,22 @@ Brand authoring remains responsible for new upload. Share the card presentation
 implementation, rather than rebuilding a look-alike. Product media remains a
 separate capability. See `docs/reviews/BRAND_MEDIA_APPROVED_LAYOUT_CORRECTION_2026_10_11.md`.
 
+
+[Resolved 2026-10-12 — Approved Media three-source visual contract]
+The owner explicitly approved the exact screenshot `image(20261012-192742).png`
+(2026-10-12 19:28 UTC). The full desktop Media section consists of one roomy
+centered dashed drop area containing image-plus icon, bold heading, subtitle,
+ONE horizontal row of three same-style functional icon controls (Upload,
+Media library, URL), and a centered formats/limits hint. The text
+`Єдина медіатека` in the mock was explanatory and MUST NOT be implemented.
+Adaptive layouts preserve the design hierarchy and permit a vertical action
+stack only when the *container* itself is narrow. Brand Create/Edit must span
+the available Filament form grid (native `columnSpanFull()` on the parent
+Section), not act like a mobile pane at 1440px. Browser success alone does not
+establish a visual PASS; compare against the owner-approved image and examine
+selected-file state. Every button must perform its advertised operation.
+Exact acceptance contract: `docs/reviews/APPROVED_MEDIA_UI_VISUAL_CONTRACT_2026_10_12.md`.
+
 [Resolved 2026-10-11 — Brand Media single surface / owner correction] Brand Create/Edit
 must expose one titled `Медіа` block with the current logo, native local
 FileUpload drop zone, and `Обрати з медіатеки` action that opens the existing
@@ -2659,3 +2675,6 @@ destructive action, not a peer of navigation `Закрити`. On the editable A
 visually separated to the far end from `Зберегти / Скасувати`. Existing lifecycle guards and the
 danger confirmation remain unchanged. Replacement business conflicts remain warning/amber, not
 error/red; the heading is visually stronger than its explanatory text.
+
+
+[Resolved 2026-10-13 — Brand Media pending replacement] The owner approved keeping all three source buttons visible after selection. A successful new local, library or URL choice replaces only the pending choice; cancellation and errors preserve it. FilePond retains native single-file replacement and full-area drop; chosen library/URL Original has a native ImageEntry candidate preview, with the persisted Brand logo unchanged in Current Image until Save. X on pending upload cancels it without implicitly removing the already-saved logo. Buttons use matching 46px height, 12px corners, font and border, with equal stacked widths. Selected preview has balanced top/side insets and image contain. No new media writer or storage identity.

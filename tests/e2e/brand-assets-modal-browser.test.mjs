@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = new URL(process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18767');
@@ -9,6 +10,210 @@ assert.equal(baseUrl.href, 'http://127.0.0.1:18767/');
 const root = 'test-results/browser-smoke';
 const fixture = JSON.parse(await readFile(`${root}/fixture.json`, 'utf8'));
 const brandPath = `/admin/brands/${fixture.pickerBrandId}/edit`;
+
+test('Brand Media accepts real Chromium file drop near the dashed edge and native browse click', { timeout: 90_000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await context.tracing.start({ screenshots: true, snapshots: true });
+  let succeeded = false;
+  try {
+    const login = await page.goto(new URL('/admin/login', baseUrl).href);
+    assert.equal(login?.status(), 200);
+    await page.locator('input[type="email"]').fill(process.env.E2E_ADMIN_EMAIL);
+    await page.locator('input[type="password"]').fill(process.env.E2E_ADMIN_PASSWORD);
+    await page.locator('button[type="submit"]').first().click();
+    await page.waitForURL(url => url.pathname.startsWith('/admin') && url.pathname !== '/admin/login');
+    await page.goto(new URL(brandPath, baseUrl).href);
+    const area = page.locator('.bp-brand-media-dropzone');
+    await area.waitFor({ state: 'visible' });
+    await mkdir(root, { recursive: true });
+    // Seed fixture is a valid actual PNG, unlike an unvalidated tiny base64 stub.
+    const filePath = resolve(root, 'other.png');
+    const bounds = await area.boundingBox();
+    assert.ok(bounds && bounds.width > 200 && bounds.height > 180);
+    const x = Math.round(bounds.x + 12);
+    const y = Math.round(bounds.y + 12);
+    await area.evaluate(node => {
+      window.__babyparkDropEvents = [];
+      for (const name of ['dragenter', 'dragover', 'drop']) {
+        node.addEventListener(name, event => {
+          window.__babyparkDropEvents.push({
+            name,
+            targetClass: event.target?.className,
+            fileCount: event.dataTransfer?.files.length,
+            types: Array.from(event.dataTransfer?.types ?? []),
+          });
+        }, true);
+      }
+    });
+    const hit = await page.evaluate(([px, py]) => ({
+      target: document.elementFromPoint(px, py)?.className,
+      root: !!document.elementFromPoint(px, py)?.closest('.filepond--root'),
+    }), [x, y]);
+    assert.ok(hit.root, 'True dashed drop target must be the native FilePond surface: ' + JSON.stringify(hit));
+    const cdp = await context.newCDPSession(page);
+    const data = {
+      items: [{ mimeType: 'image/png', data: '', title: 'synthetic-drop-image.png', baseURL: '' }],
+      files: [filePath],
+      dragOperationsMask: 1,
+    };
+    for (const type of ['dragEnter', 'dragOver', 'drop']) {
+      await cdp.send('Input.dispatchDragEvent', { type, x, y, data });
+    }
+    try {
+      await area.locator('.filepond--item').first().waitFor({ state: 'visible', timeout: 15_000 });
+    await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    } catch (error) {
+      const events = await page.evaluate(() => window.__babyparkDropEvents);
+      console.log('NATIVE_FILEPOND_DROP_EVIDENCE', JSON.stringify({ hit, events }));
+      throw error;
+    }
+    const processed = await area.evaluate(element => {
+      const item = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const heading = element.querySelector('.bp-brand-media-heading');
+      const root = element.querySelector('.filepond--root');
+      const pickButton = element.querySelector('.bp-brand-media-picker button');
+      const urlRect = element.querySelector('.bp-brand-media-url-action button')?.getBoundingClientRect();
+      const uploadLabel = element.querySelector('.filepond--drop-label label');
+      const uploadParent = uploadLabel?.closest('.filepond--drop-label');
+      const uploadRect = uploadLabel?.getBoundingClientRect();
+      const pickRect = pickButton?.getBoundingClientRect();
+      const itemRect = item?.getBoundingClientRect();
+      const rootRect = root?.getBoundingClientRect();
+      const zone = element.getBoundingClientRect();
+      return {
+        headingDisplay: heading ? getComputedStyle(heading).display : null,
+        picker: pickRect ? { x: pickRect.x, y: pickRect.y, width: pickRect.width, height: pickRect.height } : null,
+        url: urlRect ? { y:urlRect.y, height:urlRect.height } : null,
+        upload: uploadRect ? { x: uploadRect.x, y: uploadRect.y, width: uploadRect.width, height: uploadRect.height } : null,
+        uploadOpacity: uploadParent ? getComputedStyle(uploadParent).opacity : null,
+        uploadVisibility: uploadParent ? getComputedStyle(uploadParent).visibility : null,
+        item: itemRect ? { x: itemRect.x, y: itemRect.y, width: itemRect.width, height: itemRect.height } : null,
+        root: rootRect ? { x: rootRect.x, y: rootRect.y, width: rootRect.width, height: rootRect.height } : null,
+        zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+      };
+    });
+    assert.ok(processed.item && processed.item.width >= processed.zone.width * 0.85
+      && processed.item.width <= processed.zone.width && processed.item.height > 5
+      && processed.headingDisplay === 'none'
+      && processed.root && Math.abs(processed.root.width - processed.zone.width) <= 8
+      && processed.picker && processed.upload
+      && processed.uploadOpacity === '1' && processed.uploadVisibility === 'visible'
+      && processed.url
+      && Math.abs(processed.upload.y - processed.picker.y) <= 3
+      && Math.abs(processed.url.y - processed.picker.y) <= 3
+      && Math.abs(processed.url.height-processed.upload.height) <= 1
+      && processed.upload.y >= processed.item.y + processed.item.height + 5
+      && (
+        processed.item.x + processed.item.width + 5 <= processed.picker.x
+        || processed.picker.x + processed.picker.width + 5 <= processed.item.x
+        || processed.item.y + processed.item.height + 5 <= processed.picker.y
+        || processed.picker.y + processed.picker.height + 5 <= processed.item.y
+      ),
+      'Completed FilePond item must remain visible in native full-area drop target: ' + JSON.stringify(processed));
+    assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
+      && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
+      'Selecting a native file must not disable the other Media source actions.');
+    const filePondSurface = await area.evaluate(element => {
+      const preview = element.querySelector('.filepond--image-preview');
+      const wrapper = element.querySelector('.filepond--image-preview-wrapper');
+      const idleOverlay = element.querySelector('.filepond--image-preview-overlay-idle');
+      return {
+        preview: preview && getComputedStyle(preview).backgroundColor,
+        wrapper: wrapper && getComputedStyle(wrapper).backgroundColor,
+        idleOverlayOpacity: idleOverlay && getComputedStyle(idleOverlay).opacity,
+      };
+    });
+    assert.deepEqual(filePondSurface, {
+      preview: 'rgb(249, 250, 251)', wrapper: 'rgb(249, 250, 251)',
+      idleOverlayOpacity: '0',
+    }, 'FilePond and Filament must use a neutral preview without idle black shading.');
+    // FilePond reports processing-complete before its native panel fade-out
+    // animation finishes. Wait for the actual panel to disappear before
+    // asserting it is hidden; never weaken the final opacity requirement.
+    await page.waitForFunction(() => {
+      const panel = document.querySelector(
+        '.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--item-panel',
+      );
+      return panel && Number(getComputedStyle(panel).opacity) <= 0.001;
+    }, null, { timeout: 10_000 });
+    const realPreview = await area.evaluate(element => {
+      const completed = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const image = completed?.querySelector('.filepond--image-preview');
+      const panel = completed?.querySelector('.filepond--item-panel');
+      const status = completed?.querySelector('.filepond--file-status');
+      const remove = completed?.querySelector('.filepond--action-remove-item');
+      const imgBox = image?.getBoundingClientRect();
+      return {
+        image: image ? { width: imgBox.width, height: imgBox.height, display: getComputedStyle(image).display } : null,
+        panelOpacity: panel ? getComputedStyle(panel).opacity : null,
+        statusOpacity: status ? getComputedStyle(status).opacity : null,
+        removePresent: !!remove,
+      };
+    });
+    assert.ok(realPreview.image && realPreview.image.width > 20 && realPreview.image.height > 20
+      && realPreview.image.display !== 'none'
+      && realPreview.panelOpacity === '0'
+      && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
+      && realPreview.removePresent,
+      'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
+    const inset = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const a = node.getBoundingClientRect(), b = item?.getBoundingClientRect();
+      return b ? { top: b.top-a.top, left: b.left-a.left, right: a.right-b.right } : null;
+    });
+    assert.ok(inset && inset.top >= 16 && inset.left >= 16 && inset.right >= 16
+      && Math.abs(inset.left-inset.right) <= 5,
+      'Selected preview requires balanced 24px insets: ' + JSON.stringify(inset));
+    const matchedMetrics = await area.evaluate(node => {
+      const items = [
+        node.querySelector('.filepond--drop-label label'),
+        node.querySelector('.bp-brand-media-picker button'),
+        node.querySelector('.bp-brand-media-url-action button'),
+      ];
+      return items.map(element => {
+        const s = getComputedStyle(element), b = element.getBoundingClientRect();
+        return { x:b.x,y:b.y,width:b.width,height:b.height, border:s.border,
+          boxShadow:s.boxShadow, outline:s.outline, background:s.backgroundColor,
+          transform:s.transform, translate:s.translate, padding:s.padding };
+      });
+    });
+    assert.ok(Math.abs(matchedMetrics[0].y-matchedMetrics[1].y) <= 1
+      && Math.abs(matchedMetrics[1].y-matchedMetrics[2].y) <= 1,
+      'Local selected Media buttons must align within 1px: ' + JSON.stringify(matchedMetrics));
+    assert.ok(matchedMetrics[0].boxShadow === matchedMetrics[1].boxShadow
+      && matchedMetrics[1].boxShadow === matchedMetrics[2].boxShadow,
+      'Local selected Media buttons must share one resting shadow: ' + JSON.stringify(matchedMetrics));
+    assert.equal(matchedMetrics[1].border, matchedMetrics[2].border,
+      'Filament URL button cannot add a second outline to a standard 1px border.');
+    await area.screenshot({ path: root + '/brand-media-real-drop.png' });
+    // Upload must remain a working native chooser after the file was dropped.
+    const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await area.locator('.filepond--drop-label label').click();
+    await (await replacementChooser).setFiles(resolve(root, 'replacement.png'));
+    assert.equal(await area.locator('.filepond--item').count(), 1,
+      'A second native local file must replace, not append.');
+    await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await page.reload();
+    const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
+    const chooser = await fileChooser;
+    await chooser.setFiles(filePath);
+    await page.locator('.bp-brand-media-dropzone .filepond--item').first()
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    succeeded = true;
+  } finally {
+    if (!succeeded) {
+      await mkdir(root, { recursive: true });
+      await page.screenshot({ path: root + '/brand-media-drop-failure.png', fullPage: true }).catch(() => {});
+    }
+    await context.tracing.stop({ path: root + '/brand-media-real-drop-trace.zip' }).catch(() => {});
+    await browser.close();
+  }
+});
 
 test('Brand picks an existing Original image from the native Assets visual library', { timeout: 100_000 }, async () => {
   const browser = await chromium.launch({ headless: true });
@@ -34,13 +239,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const unifiedDropzone = mediaSection.locator('.bp-brand-media-dropzone');
     await unifiedDropzone.getByText('Перетягніть зображення сюди', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
-    await unifiedDropzone.getByText('або додайте його з комп’ютера чи Assets', { exact: true })
+    await unifiedDropzone.getByText('або скористайтеся одним зі способів додавання', { exact: true })
       .waitFor({ state: 'visible', timeout: 20_000 });
     await unifiedDropzone.getByText('Завантажити', { exact: true }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
-    assert.ok(await unifiedDropzone.locator('input[type="file"]').count() > 0,
-      'The canonical FilePond uploader is inside the single dashed Media area.');
-    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з Assets' });
+    await unifiedDropzone.locator('input[type="file"]').first()
+      .waitFor({ state: 'attached', timeout: 20_000 });
+    assert.ok(await unifiedDropzone.locator('.filepond--root').count() > 0,
+      'The canonical FilePond uploader must initialize inside the dashed Media area.');
+    const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з медіатеки' });
     await selectButton.waitFor({ state: 'visible', timeout: 20_000 });
     const geometry = await unifiedDropzone.evaluate(element => {
       const rect = node => {
@@ -69,15 +276,138 @@ test('Brand picks an existing Original image from the native Assets visual libra
       assert.ok(geometry[name].top >= geometry.area.top && geometry[name].bottom <= geometry.area.bottom,
         `${name} must be vertically inside the dashed area: ${JSON.stringify(geometry)}`);
     }
-    assert.ok(geometry.actions, 'The two native media actions must share a dedicated row.');
-    assert.ok(Math.abs((geometry.upload.top + geometry.upload.bottom) / 2
-      - (geometry.picker.top + geometry.picker.bottom) / 2) < 30,
-      `Upload and Assets selection must be side by side: ${JSON.stringify(geometry)}`);
-    assert.ok(geometry.upload.bottom - geometry.upload.top <= 70,
-      `Empty FilePond must be a compact action, not its own large rectangular upload panel: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.actions, 'The three native media actions must share a dedicated row.');
+    await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).waitFor({ state: 'visible' });
+    assert.ok(geometry.picker.top >= geometry.actions.top && geometry.picker.bottom <= geometry.actions.bottom,
+      `Library button must remain inside the three-source actions region: ${JSON.stringify(geometry)}`);
+    assert.ok(Math.abs((geometry.upload.right - geometry.upload.left) - (geometry.area.right - geometry.area.left)) < 8
+      && Math.abs((geometry.upload.bottom - geometry.upload.top) - (geometry.area.bottom - geometry.area.top)) < 8,
+      `Native FilePond must cover the ENTIRE advertised dashed dropzone: ${JSON.stringify(geometry)}`);
     assert.equal(geometry.innerPanelShadow, 'none', 'FilePond must not render a second framed surface.');
+    // Frozen owner-approved 1440px desktop composition, not merely "buttons exist".
+    const desktop = await unifiedDropzone.evaluate(element => {
+      const rect = node => {
+        if (!node) return null;
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return {
+        area: rect(element),
+        heading: rect(element.querySelector('.bp-brand-media-heading')),
+        guidance: rect(element.querySelector('.bp-brand-media-subheading')),
+        upload: rect(element.querySelector('.filepond--drop-label label')),
+        library: rect(element.querySelector('.bp-brand-media-picker button')),
+        url: rect(element.querySelector('.bp-brand-media-url-action button')),
+        hint: rect(element.querySelector('.bp-brand-media-format')),
+        section: rect(element.closest('.bp-brand-media-section')),
+      };
+    });
+    assert.ok(desktop.area.width >= 680 && desktop.section.width >= 710,
+      `Brand form on desktop must span the native Filament form grid, not a narrow half-column: ${JSON.stringify(desktop)}`);
+    const { heading, guidance: desktopGuidance, upload: desktopUpload, library, url: desktopUrl, hint } = desktop;
+    assert.ok(heading && desktopGuidance && desktopUpload && library && desktopUrl && hint,
+      `Approved Media heading, guidance and three source controls must all exist: ${JSON.stringify(desktop)}`);
+    assert.ok(heading.y + heading.height <= desktopGuidance.y + 2
+      && desktopGuidance.y + desktopGuidance.height <= Math.min(desktopUpload.y, library.y, desktopUrl.y) + 2,
+      `Approved desktop hierarchy: icon, heading, guidance, actions: ${JSON.stringify(desktop)}`);
+    assert.ok(Math.abs(desktopUpload.y - library.y) <= 12 && Math.abs(library.y - desktopUrl.y) <= 12
+      && desktopUpload.x + desktopUpload.width <= library.x + 4
+      && library.x + library.width <= desktopUrl.x + 4
+      && desktopUrl.y + desktopUrl.height <= hint.y + 2,
+      `Desktop Media source actions must form ONE ordered horizontal row: ${JSON.stringify(desktop)}`);
+    for (const action of [desktopUpload, library, desktopUrl]) {
+      assert.ok(action.height >= 36 && action.height <= 58 && action.width >= 110,
+        `Approved Media controls need consistent button-sized bounds: ${JSON.stringify(desktop)}`);
+    }
     await mkdir(root, { recursive: true });
+    await page.screenshot({ path: `${root}/brand-media-desktop-page.png`, fullPage: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
+    const nativeMetrics = await unifiedDropzone.evaluate(node => {
+      const upload=node.querySelector('.filepond--drop-label label');
+      const uploadText=upload?.querySelector('.filepond--label-action') || upload;
+      const library=node.querySelector('.bp-brand-media-picker button');
+      const url=node.querySelector('.bp-brand-media-url-action button');
+      const style=element => { const s=getComputedStyle(element), r=element.getBoundingClientRect();
+        return { color:s.color, opacity:s.opacity, weight:s.fontWeight,
+          radius:s.borderTopLeftRadius, font:s.fontSize, top:r.top, height:r.height,
+          border:s.borderTopWidth, shadow:s.boxShadow }; };
+      return { upload:style(upload), uploadText:style(uploadText),
+        library:style(library), url:style(url), icon:getComputedStyle(upload,'::before').backgroundImage };
+    });
+    assert.equal(nativeMetrics.url.shadow, nativeMetrics.library.shadow,
+      'Empty Media URL button must not keep an extra Filament inset ring.');
+    assert.equal(nativeMetrics.url.shadow, nativeMetrics.upload.shadow,
+      'All empty Media controls share one shadow profile.');
+    assert.equal(nativeMetrics.upload.opacity, '1', 'Native upload label must not fade.');
+    assert.equal(nativeMetrics.uploadText.opacity, '1', 'Native upload text must not fade.');
+    assert.equal(nativeMetrics.upload.radius, nativeMetrics.library.radius,
+      'All Media buttons must have identical corner radius.');
+    assert.equal(nativeMetrics.upload.color, nativeMetrics.library.color,
+      'All Media buttons must have the same text color.');
+    assert.ok(nativeMetrics.icon.includes('9ca3af'), 'Upload icon must be muted gray: '+nativeMetrics.icon);
+    assert.equal(nativeMetrics.upload.radius,nativeMetrics.url.radius);
+    assert.equal(nativeMetrics.upload.font,nativeMetrics.url.font);
+    assert.equal(nativeMetrics.upload.height, nativeMetrics.url.height,
+      'Upload and URL source controls must have exactly equal box height.');
+    assert.equal(nativeMetrics.library.height, nativeMetrics.url.height,
+      'Library and URL source controls must have exactly equal box height.');
+    assert.equal(nativeMetrics.upload.border, nativeMetrics.url.border,
+      'Upload and URL source controls must have equal border width.');
+    assert.ok(Math.abs(nativeMetrics.upload.top-nativeMetrics.library.top) <= 3
+      && Math.abs(nativeMetrics.library.top-nativeMetrics.url.top) <= 3,
+      'All Media buttons must align vertically: ' + JSON.stringify(nativeMetrics));
+    // The URL action must be a real Filament modal, not a decorative third button.
+    await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
+    const urlDialog = page.locator('.fi-modal.fi-modal-open').filter({
+      has: page.getByRole('heading', { name: 'Додати за URL', exact: true }),
+    });
+    await urlDialog.getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileRects = await unifiedDropzone.evaluate(element => {
+      const bounds = selector => {
+        const node = element.querySelector(selector);
+        if (!node) return null;
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return {
+        guidance: bounds('.bp-brand-media-subheading'),
+        upload: bounds('.filepond--drop-label label'),
+        choose: bounds('.bp-brand-media-picker button'),
+        url: bounds('.bp-brand-media-url-action button'),
+        zone: bounds('.bp-brand-media-dropzone') ?? (() => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        })(),
+      };
+    });
+    const { guidance, upload, choose, url, zone } = mobileRects;
+    assert.ok(guidance && upload && choose && url && zone,
+      `Missing real responsive actions: ${JSON.stringify(mobileRects)}`);
+    assert.ok(guidance.y + guidance.height + 6 <= upload.y,
+      `Mobile upload must not cover media guidance: ${JSON.stringify(mobileRects)}`);
+    assert.ok(upload.y + upload.height + 6 <= choose.y
+      && choose.y + choose.height + 6 <= url.y,
+      `Three Media buttons must not overlap vertically: ${JSON.stringify(mobileRects)}`);
+    for (const action of [upload, choose, url]) {
+      assert.ok(Math.abs(action.x + action.width / 2 - zone.x - zone.width / 2) <= 20,
+        `Responsive Media actions must be centered: ${JSON.stringify(mobileRects)}`);
+    }
+    assert.ok(Math.max(upload.width, choose.width, url.width) - Math.min(upload.width, choose.width, url.width) <= 3
+      && Math.max(upload.height, choose.height, url.height) - Math.min(upload.height, choose.height, url.height) <= 3,
+      `Mobile Media buttons must share exactly one width and height: ${JSON.stringify(mobileRects)}`);
+    await page.evaluate(() => document.activeElement?.blur());
+    await mediaSection.screenshot({ path: `${root}/brand-media-mobile.png` });
+    const mobileGeometry = await unifiedDropzone.evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      viewport: document.documentElement.clientWidth,
+      documentWidth: document.documentElement.scrollWidth,
+    }));
+    assert.ok(mobileGeometry.scrollWidth <= mobileGeometry.clientWidth + 2,
+      `Responsive Media block must not overflow its own box: ${JSON.stringify(mobileGeometry)}`);
+    await page.setViewportSize({ width: 1440, height: 900 });
     await selectButton.click();
     const modal = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
     await modal.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
@@ -102,20 +432,31 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(searchBox && buttonBox && buttonBox.x >= searchBox.x + searchBox.width - 2
       && Math.abs(buttonBox.y - searchBox.y) < 45,
       `Filter button must stay next to search in the same toolbar: ${JSON.stringify({ searchBox, buttonBox })}`);
+    const unfilteredMainWidth = await modalWindow.locator('.fi-ta-main').first()
+      .evaluate(element => element.getBoundingClientRect().width);
     await filtersButton.click();
     const filtersPanel = modalWindow.locator('.fi-ta-filters-after-content-ctn');
     await filtersPanel.getByText('Зберігання', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
     await filtersPanel.getByText('Використання', { exact: true }).waitFor({ state: 'visible' });
     await filtersPanel.getByText('Потребує уваги', { exact: true }).waitFor({ state: 'visible' });
     await filtersPanel.getByLabel('Відображення').waitFor({ state: 'visible' });
+    const panelScroll = await filtersPanel.evaluate(element => ({
+      client: element.clientHeight,
+      content: element.scrollHeight,
+    }));
+    assert.ok(panelScroll.content <= panelScroll.client + 3,
+      'Desktop picker filters should display their full form instead of clipping controls: ' + JSON.stringify(panelScroll));
     assert.equal(await page.locator('.fi-modal.fi-modal-open').count(), 1,
       'Opening picker filters must not create a second modal over the workspace.');
     const modalBox = await modalWindow.boundingBox();
     const filtersBox = await filtersPanel.boundingBox();
     const mainBox = await modalWindow.locator('.fi-ta-main').first().boundingBox();
-    assert.ok(modalBox && filtersBox && mainBox && filtersBox.x >= mainBox.x + mainBox.width - 2
-      && filtersBox.x >= modalBox.x - 2 && (filtersBox.x + filtersBox.width) <= modalBox.x + modalBox.width + 2,
-      `Native filters must occupy the right edge inside the Media picker: ${JSON.stringify({ modalBox, filtersBox, mainBox })}`);
+    assert.ok(modalBox && filtersBox && mainBox
+      && Math.abs(mainBox.width - unfilteredMainWidth) <= 2
+      && filtersBox.x > mainBox.x + mainBox.width * 0.45
+      && filtersBox.x < mainBox.x + mainBox.width - 20
+      && filtersBox.x >= modalBox.x - 2 && filtersBox.x + filtersBox.width <= modalBox.x + modalBox.width + 2,
+      `Native filters must overlay the right of Media grid WITHOUT shrinking cards: ${JSON.stringify({ modalBox, filtersBox, mainBox, unfilteredMainWidth })}`);
     assert.ok(filtersBox.width <= 280,
       `The sidebar must stay compact instead of consuming half of the Media picker: ${JSON.stringify(filtersBox)}`);
     const visibleCards = await cardGrid.locator('.fi-ta-record').evaluateAll(nodes =>
@@ -172,6 +513,148 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await modal.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
     await modal.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'hidden', timeout: 20_000 });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });
+    const pending = unifiedDropzone.locator('.bp-brand-media-candidate');
+    await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
+    const placement = await unifiedDropzone.evaluate(node => {
+      const zone=node.getBoundingClientRect();
+      const image=node.querySelector('.bp-brand-media-candidate img')?.getBoundingClientRect();
+      const upload=node.querySelector('.filepond--drop-label label')?.getBoundingClientRect();
+      const library=node.querySelector('.bp-brand-media-picker button')?.getBoundingClientRect();
+      const outer = node.querySelector('.bp-brand-media-candidate');
+      const chain = [];
+      let current = node.querySelector('.bp-brand-media-candidate img');
+      for (let i = 0; current && i < 6; i++, current = current.parentElement) {
+        const rect = current.getBoundingClientRect();
+        const style = getComputedStyle(current);
+        chain.push({ tag: current.tagName, cls: String(current.className).slice(0,130),
+          x: Math.round(rect.x-zone.x), y: Math.round(rect.y-zone.y),
+          width: Math.round(rect.width), height: Math.round(rect.height),
+          margin: style.margin, padding: style.padding, display: style.display });
+      }
+      return { zone: zone.width, image: image?.width, uploadY: upload?.y, libraryY: library?.y,
+        inset: image ? { top: image.top-zone.top, left: image.left-zone.left,
+          right: zone.right-image.right } : null,
+        candidate: outer?.getBoundingClientRect().top-zone.top, chain };
+    });
+    console.log('MEDIA_CANDIDATE_GEOMETRY ' + JSON.stringify(placement));
+    const candidateBackground = await pending.evaluate(node => getComputedStyle(node).backgroundColor);
+    assert.equal(candidateBackground, 'rgb(249, 250, 251)',
+      'Library/URL and native FilePond must use the same neutral background.');
+    assert.ok(placement.image >= placement.zone*.85
+      && placement.inset
+      && placement.inset.top >= 16 && placement.inset.top <= 40
+      && placement.inset.left >= 16 && placement.inset.left <= 40
+      && placement.inset.right >= 16 && placement.inset.right <= 40
+      && Math.abs(placement.inset.left-placement.inset.right) <= 4
+      && Math.abs(placement.uploadY-placement.libraryY) <= 12,
+      'Library preview must have equal ~24px top and side insets and aligned buttons: '
+        + JSON.stringify(placement));
+    const libraryActionMetrics = await unifiedDropzone.evaluate(node => [
+      '.filepond--drop-label label', '.bp-brand-media-picker button',
+      '.bp-brand-media-url-action button',
+    ].map(selector => {
+      const el=node.querySelector(selector);
+      const s=getComputedStyle(el),b=el.getBoundingClientRect();
+      return { y:b.y,height:b.height,border:s.border,shadow:s.boxShadow,outline:s.outline,padding:s.padding };
+    }));
+    assert.ok(Math.abs(libraryActionMetrics[0].y-libraryActionMetrics[1].y) <= 1
+      && Math.abs(libraryActionMetrics[1].y-libraryActionMetrics[2].y) <= 1,
+      'Library selected buttons must share a baseline: ' + JSON.stringify(libraryActionMetrics));
+    assert.ok(libraryActionMetrics[0].shadow === libraryActionMetrics[1].shadow
+      && libraryActionMetrics[1].shadow === libraryActionMetrics[2].shadow,
+      'Library selected buttons must share one border/shadow style: ' + JSON.stringify(libraryActionMetrics));
+    await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
+    const cancelImage = unifiedDropzone.getByRole('button', { name: 'Скасувати вибір зображення' });
+    await cancelImage.waitFor({state:'visible',timeout:20_000});
+    const bounds = await unifiedDropzone.evaluate(node => {
+      const rect = selector => {
+        const r=node.querySelector(selector)?.getBoundingClientRect();
+        return r ? {x:r.x,y:r.y,right:r.right,width:r.width,height:r.height}:null;
+      };
+      return {frame:rect('.bp-brand-media-candidate'),x:rect('.bp-brand-media-candidate-dismiss button'),
+        upload:rect('.filepond--drop-label label'),library:rect('.bp-brand-media-picker button'),
+        url:rect('.bp-brand-media-url-action button')};
+    });
+    assert.ok(bounds.frame && bounds.x && bounds.upload && bounds.library && bounds.url
+      && bounds.x.right <= bounds.frame.right - 10
+      && bounds.x.y >= bounds.frame.y + 10
+      && Math.abs(bounds.upload.y-bounds.library.y) <= 3
+      && Math.abs(bounds.library.y-bounds.url.y) <= 3
+      && Math.abs(bounds.upload.height-bounds.url.height) <= 1,
+      'Desktop library preview must have overlaid X and aligned buttons: '+JSON.stringify(bounds));
+    await cancelImage.click();
+    await pending.waitFor({state:'hidden',timeout:20_000});
+    // The canceled canonical Original remains usable; it was never deleted.
+    await selectButton.click();
+    const retry = page.locator('.fi-modal.fi-modal-open').filter({hasText:'Медіатека'});
+    await retry.getByRole('heading',{name:'Медіатека',exact:true}).waitFor({state:'visible',timeout:20_000});
+    await retry.locator('.fi-ta-record').filter({hasText:'other.png'})
+      .first().locator('input[type="checkbox"]').first().check();
+    await retry.getByRole('button',{name:'Підтвердити вибір',exact:true}).click();
+    await retry.getByRole('heading',{name:'Медіатека',exact:true}).waitFor({state:'hidden',timeout:20_000});
+    await pending.locator('img').waitFor({state:'visible',timeout:20_000});
+    // Check the selected-state on a genuinely narrow viewport as well:
+    // a passing mobile empty-state is not proof that its preview/action row works.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
+    const mobileCandidate = await unifiedDropzone.evaluate(node => {
+      const bounds = selector => {
+        const element = selector ? node.querySelector(selector) : node;
+        if (!element) return null;
+        const r = element.getBoundingClientRect();
+        return { x:r.x, y:r.y, width:r.width, height:r.height, right:r.right, bottom:r.bottom };
+      };
+      return {
+        zone: bounds(null),
+        preview: bounds('.bp-brand-media-candidate img'),
+        upload: bounds('.filepond--drop-label label'),
+        library: bounds('.bp-brand-media-picker button'),
+        url: bounds('.bp-brand-media-url-action button'),
+        cancel: bounds('.bp-brand-media-candidate-dismiss button'),
+      };
+    });
+    assert.ok(mobileCandidate.cancel && mobileCandidate.zone && mobileCandidate.preview
+      && mobileCandidate.upload && mobileCandidate.library && mobileCandidate.url,
+      'Mobile selected media must show the pending image and all three source controls: '
+        + JSON.stringify(mobileCandidate));
+    assert.ok(mobileCandidate.preview.x >= mobileCandidate.zone.x + 12
+      && mobileCandidate.preview.right <= mobileCandidate.zone.right - 12
+      && mobileCandidate.upload.y >= mobileCandidate.preview.bottom + 12
+      && mobileCandidate.library.y >= mobileCandidate.upload.bottom + 6
+      && mobileCandidate.url.y >= mobileCandidate.library.bottom + 6
+      && Math.abs(mobileCandidate.upload.width-mobileCandidate.library.width) <= 3
+      && Math.abs(mobileCandidate.library.width-mobileCandidate.url.width) <= 3
+      && Math.abs(mobileCandidate.upload.height-mobileCandidate.library.height) <= 1
+      && Math.abs(mobileCandidate.library.height-mobileCandidate.url.height) <= 1
+      && mobileCandidate.cancel.right <= mobileCandidate.preview.right - 10
+      && mobileCandidate.cancel.y >= mobileCandidate.preview.y + 10,
+      'Mobile selected Media preview and controls must remain stacked with equal widths: '
+        + JSON.stringify(mobileCandidate));
+    await mediaSection.screenshot({ path: `${root}/brand-media-library-mobile.png` });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
+    await page.locator('.fi-modal.fi-modal-open').filter({
+      has: page.getByRole('heading', { name: 'Додати за URL', exact: true }),
+    }).getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await pending.locator('img').waitFor({ state: 'visible' });
+    // Replacing a pending library Original with a local upload must not require X.
+    const localChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await unifiedDropzone.locator('.filepond--drop-label label').click();
+    await (await localChooser).setFiles(resolve(root, 'replacement.png'));
+    await unifiedDropzone.locator('.filepond--item[data-filepond-item-state="processing-complete"]')
+      .first().waitFor({ state: 'visible', timeout: 20_000 });
+    await pending.waitFor({ state: 'hidden', timeout: 15_000 });
+    // Replacing the pending local file with a library Original must also work.
+    await selectButton.click();
+    const secondPicker = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
+    await secondPicker.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'visible' });
+    await secondPicker.locator('.fi-ta-record').filter({ hasText: 'other.png' })
+      .first().locator('input[type="checkbox"]').first().check();
+    await secondPicker.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
+    await secondPicker.getByRole('heading', { name: 'Медіатека', exact: true })
+      .waitFor({ state: 'hidden', timeout: 20_000 });
+    await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
     const saved = page.waitForResponse(response =>
       response.request().method() === 'POST'
       && response.url().includes('/livewire-')
@@ -181,6 +664,25 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     const saveResponse = await saved;
     assert.equal(saveResponse.status(), 200, 'Save must complete before navigating away.');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    // A pending local upload removed with X is NOT an explicit Brand logo deletion.
+    const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
+    await (await discardChooser).setFiles(resolve(root, 'replacement.png'));
+    const uploadedItem = page.locator('.bp-brand-media-dropzone .filepond--item');
+    await uploadedItem.first().waitFor({ state: 'visible', timeout: 20_000 });
+    await page.locator('.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]')
+      .first().waitFor({ state: 'visible', timeout: 20_000 });
+    // FilePond disables remove-item after processing; the enabled native X is
+    // its revert-processing action. Do not click a disabled shadow control.
+    const nativeX = uploadedItem.first().locator(
+      '.filepond--action-revert-item-processing:not([disabled]), .filepond--action-remove-item:not([disabled])',
+    ).first();
+    await nativeX.waitFor({ state: 'visible', timeout: 20_000 });
+    await nativeX.click();
+    await uploadedItem.first().waitFor({ state: 'hidden', timeout: 15_000 });
+    await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
     assert.deepEqual(jsErrors, []);
