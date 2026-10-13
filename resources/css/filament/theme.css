@@ -498,7 +498,7 @@ button.bp-category-tree-header-cell {
    occupies the Media area (rather than a fixed 15rem centered thumbnail),
    leaving the three actions in their separate row underneath. */
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
-    padding-top: 15.5rem;
+    padding-top: 19.25rem;
 }
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
     width: calc(100% - 3rem) !important;
