@@ -187,7 +187,9 @@ class BrandResource extends Resource
                                         'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
                                         'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                                     ])
-                                    ->live()
+                                    // FilePond/Livewire temporary uploads already trigger state callbacks.
+                                    // An extra live re-render while reverting a completed file can
+                                    // reset FilePond before its next native replacement starts.
                                     ->afterStateUpdated(function (Set $set, Get $get, mixed $state, Component $livewire, ?Brand $record): void {
                                         if ($livewire instanceof EditBrand) {
                                             $livewire->logoPostSaveNotice = null;

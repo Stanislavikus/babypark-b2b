@@ -627,7 +627,7 @@ class MediaAssetCoreTest extends TestCase
         $this->assertStringContainsString('height: auto;', $theme);
         $this->assertStringContainsString('object-fit: contain !important;', $theme);
         $this->assertStringContainsString('--bp-media-preview-width: 4rem;', $theme);
-        $this->assertStringContainsString('--bp-media-preview-width: 9rem;', $theme);
+        $this->assertStringContainsString('--bp-media-preview-width: min(100%, 20rem);', $theme);
         $this->assertStringContainsString('--bp-media-preview-width: min(100%, 18rem);', $theme);
         $this->assertStringNotContainsString('--bp-media-preview-height:', $theme);
     }
