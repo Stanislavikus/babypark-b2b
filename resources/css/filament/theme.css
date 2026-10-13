@@ -567,6 +567,11 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .filepond--image-preview {
     background: var(--bp-media-preview-background) !important;
 }
+/* FilePond's idle SVG overlay darkens the top of otherwise neutral whitespace.
+   Status/error overlays remain native; only idle shading is suppressed here. */
+.bp-brand-media-dropzone .filepond--image-preview-overlay-idle {
+    opacity: 0 !important;
+}
 .bp-brand-media-dropzone .bp-brand-media-candidate {
     /* The native dashed area already supplies ~24px padding on each edge;
        another 24px on ImageEntry produced double inset and top whitespace. */
