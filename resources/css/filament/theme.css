@@ -554,6 +554,19 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-icon,
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-heading,
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-subheading { display: none; }
+/* Cross-source selected-image surface: one neutral color for native
+   Filament ImageEntry and FilePond. FilePond's plugin defaults to #222,
+   which is why previously the same Original looked black after an upload. */
+.bp-brand-media-dropzone {
+    --bp-media-preview-background: rgb(249 250 251);
+}
+.dark .bp-brand-media-dropzone {
+    --bp-media-preview-background: rgb(31 41 55);
+}
+.bp-brand-media-dropzone .filepond--image-preview-wrapper,
+.bp-brand-media-dropzone .filepond--image-preview {
+    background: var(--bp-media-preview-background) !important;
+}
 .bp-brand-media-dropzone .bp-brand-media-candidate {
     /* The native dashed area already supplies ~24px padding on each edge;
        another 24px on ImageEntry produced double inset and top whitespace. */
@@ -562,7 +575,7 @@ button.bp-category-tree-header-cell {
     margin: 0 auto;
     overflow: hidden;
     border-radius: .75rem;
-    background: rgb(249 250 251);
+    background: var(--bp-media-preview-background);
 }
 .bp-brand-media-dropzone .bp-brand-media-candidate img {
     width: 100% !important;
@@ -597,8 +610,10 @@ button.bp-category-tree-header-cell {
 }
 .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
     position: absolute;
-    top: calc(clamp(1rem, 3%, 1.75rem) + 1.75rem);
-    right: calc(clamp(1rem, 3%, 1.75rem) + 0.4rem);
+    /* The X is inset from the *inner preview frame*, not its dashed outer
+       boundary: 12px inside the shared responsive container padding. */
+    top: calc(clamp(1rem, 3%, 1.75rem) + 2rem);
+    right: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
     z-index: 5;
     pointer-events: auto;
 }
@@ -618,9 +633,9 @@ button.bp-category-tree-header-cell {
 }
 @container (max-width: 38rem) {
     .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
-        top: calc(clamp(1rem, 3%, 1.75rem) + 1.45rem);
-        /* Keep the X within the 16px mobile preview inset. */
-        right: calc(clamp(1rem, 3%, 1.75rem) + 0.85rem);
+        /* Mobile maintains the same 12px inset from preview bounds. */
+        top: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
+        right: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
     }
 }
 /* FilePond paints a green processing-complete status panel on top of

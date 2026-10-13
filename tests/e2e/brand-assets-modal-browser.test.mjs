@@ -116,6 +116,17 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.ok(await area.getByRole('button', { name: 'Обрати з медіатеки' }).isVisible()
       && await area.getByRole('button', { name: 'Додати за URL' }).isVisible(),
       'Selecting a native file must not disable the other Media source actions.');
+    const filePondSurface = await area.evaluate(element => {
+      const preview = element.querySelector('.filepond--image-preview');
+      const wrapper = element.querySelector('.filepond--image-preview-wrapper');
+      return {
+        preview: preview && getComputedStyle(preview).backgroundColor,
+        wrapper: wrapper && getComputedStyle(wrapper).backgroundColor,
+      };
+    });
+    assert.deepEqual(filePondSurface, {
+      preview: 'rgb(249, 250, 251)', wrapper: 'rgb(249, 250, 251)',
+    }, 'Native FilePond must not render a black background behind a contained Original.');
     const realPreview = await area.evaluate(element => {
       const completed = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const image = completed?.querySelector('.filepond--image-preview');
@@ -285,7 +296,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
       const url=node.querySelector('.bp-brand-media-url-action button');
       const style=element => { const s=getComputedStyle(element), r=element.getBoundingClientRect();
         return { color:s.color, opacity:s.opacity, weight:s.fontWeight,
-          radius:s.borderTopLeftRadius, font:s.fontSize, top:r.top }; };
+          radius:s.borderTopLeftRadius, font:s.fontSize, top:r.top, height:r.height,
+          border:s.borderTopWidth, shadow:s.boxShadow }; };
       return { upload:style(upload), uploadText:style(uploadText),
         library:style(library), url:style(url), icon:getComputedStyle(upload,'::before').backgroundImage };
     });
@@ -298,6 +310,12 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(nativeMetrics.icon.includes('9ca3af'), 'Upload icon must be muted gray: '+nativeMetrics.icon);
     assert.equal(nativeMetrics.upload.radius,nativeMetrics.url.radius);
     assert.equal(nativeMetrics.upload.font,nativeMetrics.url.font);
+    assert.equal(nativeMetrics.upload.height, nativeMetrics.url.height,
+      'Upload and URL source controls must have exactly equal box height.');
+    assert.equal(nativeMetrics.library.height, nativeMetrics.url.height,
+      'Library and URL source controls must have exactly equal box height.');
+    assert.equal(nativeMetrics.upload.border, nativeMetrics.url.border,
+      'Upload and URL source controls must have equal border width.');
     assert.ok(Math.abs(nativeMetrics.upload.top-nativeMetrics.library.top) <= 3
       && Math.abs(nativeMetrics.library.top-nativeMetrics.url.top) <= 3,
       'All Media buttons must align vertically: ' + JSON.stringify(nativeMetrics));
@@ -482,6 +500,9 @@ test('Brand picks an existing Original image from the native Assets visual libra
         candidate: outer?.getBoundingClientRect().top-zone.top, chain };
     });
     console.log('MEDIA_CANDIDATE_GEOMETRY ' + JSON.stringify(placement));
+    const candidateBackground = await pending.evaluate(node => getComputedStyle(node).backgroundColor);
+    assert.equal(candidateBackground, 'rgb(249, 250, 251)',
+      'Library/URL and native FilePond must use the same neutral background.');
     assert.ok(placement.image >= placement.zone*.85
       && placement.inset
       && placement.inset.top >= 16 && placement.inset.top <= 40
@@ -504,7 +525,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
         url:rect('.bp-brand-media-url-action button')};
     });
     assert.ok(bounds.frame && bounds.x && bounds.upload && bounds.library && bounds.url
-      && bounds.x.right <= bounds.frame.right + 6 && bounds.x.y >= bounds.frame.y - 5
+      && bounds.x.right <= bounds.frame.right - 10
+      && bounds.x.y >= bounds.frame.y + 10
       && Math.abs(bounds.upload.y-bounds.library.y) <= 3
       && Math.abs(bounds.library.y-bounds.url.y) <= 3
       && Math.abs(bounds.upload.height-bounds.url.height) <= 1,
@@ -553,8 +575,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && Math.abs(mobileCandidate.library.width-mobileCandidate.url.width) <= 3
       && Math.abs(mobileCandidate.upload.height-mobileCandidate.library.height) <= 1
       && Math.abs(mobileCandidate.library.height-mobileCandidate.url.height) <= 1
-      && mobileCandidate.cancel.right <= mobileCandidate.preview.right + 6
-      && mobileCandidate.cancel.y >= mobileCandidate.preview.y - 5,
+      && mobileCandidate.cancel.right <= mobileCandidate.preview.right - 10
+      && mobileCandidate.cancel.y >= mobileCandidate.preview.y + 10,
       'Mobile selected Media preview and controls must remain stacked with equal widths: '
         + JSON.stringify(mobileCandidate));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-mobile.png` });
