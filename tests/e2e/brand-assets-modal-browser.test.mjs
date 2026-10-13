@@ -127,6 +127,15 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.deepEqual(filePondSurface, {
       preview: 'rgb(249, 250, 251)', wrapper: 'rgb(249, 250, 251)',
     }, 'Native FilePond must not render a black background behind a contained Original.');
+    // FilePond reports processing-complete before its native panel fade-out
+    // animation finishes. Wait for the actual panel to disappear before
+    // asserting it is hidden; never weaken the final opacity requirement.
+    await page.waitForFunction(() => {
+      const panel = document.querySelector(
+        '.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--item-panel',
+      );
+      return panel && Number(getComputedStyle(panel).opacity) <= 0.001;
+    }, null, { timeout: 10_000 });
     const realPreview = await area.evaluate(element => {
       const completed = element.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const image = completed?.querySelector('.filepond--image-preview');
