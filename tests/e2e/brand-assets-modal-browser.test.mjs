@@ -180,7 +180,14 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           transform:s.transform, translate:s.translate, padding:s.padding };
       });
     });
-    console.log('MEDIA_ACTION_METRICS_LOCAL ' + JSON.stringify(matchedMetrics));
+    assert.ok(Math.abs(matchedMetrics[0].y-matchedMetrics[1].y) <= 1
+      && Math.abs(matchedMetrics[1].y-matchedMetrics[2].y) <= 1,
+      'Local selected Media buttons must align within 1px: ' + JSON.stringify(matchedMetrics));
+    assert.ok(matchedMetrics[0].boxShadow === matchedMetrics[1].boxShadow
+      && matchedMetrics[1].boxShadow === matchedMetrics[2].boxShadow,
+      'Local selected Media buttons must share one resting shadow: ' + JSON.stringify(matchedMetrics));
+    assert.equal(matchedMetrics[1].border, matchedMetrics[2].border,
+      'Filament URL button cannot add a second outline to a standard 1px border.');
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     // Upload must remain a working native chooser after the file was dropped.
     const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
@@ -327,7 +334,10 @@ test('Brand picks an existing Original image from the native Assets visual libra
       return { upload:style(upload), uploadText:style(uploadText),
         library:style(library), url:style(url), icon:getComputedStyle(upload,'::before').backgroundImage };
     });
-    console.log('MEDIA_ACTION_METRICS_EMPTY ' + JSON.stringify(nativeMetrics));
+    assert.equal(nativeMetrics.url.shadow, nativeMetrics.library.shadow,
+      'Empty Media URL button must not keep an extra Filament inset ring.');
+    assert.equal(nativeMetrics.url.shadow, nativeMetrics.upload.shadow,
+      'All empty Media controls share one shadow profile.');
     assert.equal(nativeMetrics.upload.opacity, '1', 'Native upload label must not fade.');
     assert.equal(nativeMetrics.uploadText.opacity, '1', 'Native upload text must not fade.');
     assert.equal(nativeMetrics.upload.radius, nativeMetrics.library.radius,
@@ -539,14 +549,20 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && Math.abs(placement.uploadY-placement.libraryY) <= 12,
       'Library preview must have equal ~24px top and side insets and aligned buttons: '
         + JSON.stringify(placement));
-    console.log('MEDIA_ACTION_METRICS_LIBRARY ' + JSON.stringify(await unifiedDropzone.evaluate(node => [
+    const libraryActionMetrics = await unifiedDropzone.evaluate(node => [
       '.filepond--drop-label label', '.bp-brand-media-picker button',
       '.bp-brand-media-url-action button',
     ].map(selector => {
       const el=node.querySelector(selector);
       const s=getComputedStyle(el),b=el.getBoundingClientRect();
       return { y:b.y,height:b.height,border:s.border,shadow:s.boxShadow,outline:s.outline,padding:s.padding };
-    }))));
+    })));
+    assert.ok(Math.abs(libraryActionMetrics[0].y-libraryActionMetrics[1].y) <= 1
+      && Math.abs(libraryActionMetrics[1].y-libraryActionMetrics[2].y) <= 1,
+      'Library selected buttons must share a baseline: ' + JSON.stringify(libraryActionMetrics));
+    assert.ok(libraryActionMetrics[0].shadow === libraryActionMetrics[1].shadow
+      && libraryActionMetrics[1].shadow === libraryActionMetrics[2].shadow,
+      'Library selected buttons must share one border/shadow style: ' + JSON.stringify(libraryActionMetrics));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
     const cancelImage = unifiedDropzone.getByRole('button', { name: 'Скасувати вибір зображення' });
     await cancelImage.waitFor({state:'visible',timeout:20_000});

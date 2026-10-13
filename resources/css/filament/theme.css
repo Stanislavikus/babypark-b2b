@@ -363,6 +363,16 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
     @apply border border-gray-300 bg-white text-gray-950 shadow-sm hover:border-primary-500 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-gray-900 dark:text-white;
 }
+/* Filament outlined action adds a 1px inset box-shadow ring in addition to
+   the 1px CSS border. Chromium measured this as the only thicker Media button.
+   Normalize its RESTING shadow to its two peers. Preserve Filament's native
+   keyboard focus-visible ring rather than overriding its focus state. */
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn:not(:focus-visible) {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06) !important;
+}
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn:not(:hover):not(:focus-visible) {
+    border-color: rgb(209 213 219) !important;
+}
 .bp-brand-media-actions .fi-fo-modal-table-select .fi-btn {
     @apply hover:border-primary-500 hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-500;
 }
@@ -465,6 +475,15 @@ button.bp-category-tree-header-cell {
     /* FilePond positions items independently: margin-top does not move its box.
        Independent translate preserves FilePond's own animated transform. */
     translate: 0 1.5rem;
+}
+/* Only after a local file is selected, the native absolute browse label is
+   2.42px lower than the two Filament buttons. Adjust the selected-desktop
+   position by precisely 0.15rem (2.4px); keep empty/mobile/library untouched. */
+@container (min-width: 38.01rem) {
+    .bp-brand-media-dropzone:has(.filepond--item)
+        .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% + 1.10rem) !important;
+    }
 }
 /* FilePond hides its browse label after selecting one file. With single-file
    replace enabled, retain the SAME native browse label as the Upload button;
