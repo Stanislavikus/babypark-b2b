@@ -539,14 +539,27 @@ button.bp-category-tree-header-cell {
 }
 /* Existing MediaAsset selected through library or URL is rendered natively
    as a pending ImageEntry; the original is not duplicated or changed. */
+/* Filament wraps each hidden guidance element in a distinct grid column.
+   Hiding only its Text component leaves three empty columns and 36px of
+   flex gap ahead of the candidate image. Hide those columns as well. */
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid { min-height: 0; }
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-icon),
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-heading),
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-subheading) {
+    display: none;
+}
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid > .fi-grid-col:has(.bp-brand-media-actions) {
+    margin-top: 0.75rem;
+}
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-icon,
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-heading,
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-subheading { display: none; }
 .bp-brand-media-dropzone .bp-brand-media-candidate {
-    width: calc(100% - 3rem) !important;
-    max-width: calc(100% - 3rem);
-    margin: 1.5rem auto 0;
+    /* The native dashed area already supplies ~24px padding on each edge;
+       another 24px on ImageEntry produced double inset and top whitespace. */
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 auto;
     overflow: hidden;
     border-radius: .75rem;
     background: rgb(249 250 251);

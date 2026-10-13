@@ -474,9 +474,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
         candidate: outer?.getBoundingClientRect().top-zone.top, chain };
     });
     console.log('MEDIA_CANDIDATE_GEOMETRY ' + JSON.stringify(placement));
-    assert.ok(placement.image >= placement.zone*.75
+    assert.ok(placement.image >= placement.zone*.85
+      && placement.inset
+      && placement.inset.top >= 16 && placement.inset.top <= 40
+      && placement.inset.left >= 16 && placement.inset.left <= 40
+      && placement.inset.right >= 16 && placement.inset.right <= 40
+      && Math.abs(placement.inset.left-placement.inset.right) <= 4
       && Math.abs(placement.uploadY-placement.libraryY) <= 12,
-      'Library preview and native upload must coexist: ' + JSON.stringify(placement));
+      'Library preview must have equal ~24px top and side insets and aligned buttons: '
+        + JSON.stringify(placement));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
     await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
     await page.locator('.fi-modal.fi-modal-open').filter({
