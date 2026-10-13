@@ -167,6 +167,20 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.ok(inset && inset.top >= 16 && inset.left >= 16 && inset.right >= 16
       && Math.abs(inset.left-inset.right) <= 5,
       'Selected preview requires balanced 24px insets: ' + JSON.stringify(inset));
+    const matchedMetrics = await area.evaluate(node => {
+      const items = [
+        node.querySelector('.filepond--drop-label label'),
+        node.querySelector('.bp-brand-media-picker button'),
+        node.querySelector('.bp-brand-media-url-action button'),
+      ];
+      return items.map(element => {
+        const s = getComputedStyle(element), b = element.getBoundingClientRect();
+        return { x:b.x,y:b.y,width:b.width,height:b.height, border:s.border,
+          boxShadow:s.boxShadow, outline:s.outline, background:s.backgroundColor,
+          transform:s.transform, translate:s.translate, padding:s.padding };
+      });
+    });
+    console.log('MEDIA_ACTION_METRICS_LOCAL ' + JSON.stringify(matchedMetrics));
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     // Upload must remain a working native chooser after the file was dropped.
     const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
@@ -313,6 +327,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       return { upload:style(upload), uploadText:style(uploadText),
         library:style(library), url:style(url), icon:getComputedStyle(upload,'::before').backgroundImage };
     });
+    console.log('MEDIA_ACTION_METRICS_EMPTY ' + JSON.stringify(nativeMetrics));
     assert.equal(nativeMetrics.upload.opacity, '1', 'Native upload label must not fade.');
     assert.equal(nativeMetrics.uploadText.opacity, '1', 'Native upload text must not fade.');
     assert.equal(nativeMetrics.upload.radius, nativeMetrics.library.radius,
@@ -524,6 +539,14 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && Math.abs(placement.uploadY-placement.libraryY) <= 12,
       'Library preview must have equal ~24px top and side insets and aligned buttons: '
         + JSON.stringify(placement));
+    console.log('MEDIA_ACTION_METRICS_LIBRARY ' + JSON.stringify(await unifiedDropzone.evaluate(node => [
+      '.filepond--drop-label label', '.bp-brand-media-picker button',
+      '.bp-brand-media-url-action button',
+    ].map(selector => {
+      const el=node.querySelector(selector);
+      const s=getComputedStyle(el),b=el.getBoundingClientRect();
+      return { y:b.y,height:b.height,border:s.border,shadow:s.boxShadow,outline:s.outline,padding:s.padding };
+    }))));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
     const cancelImage = unifiedDropzone.getByRole('button', { name: 'Скасувати вибір зображення' });
     await cancelImage.waitFor({state:'visible',timeout:20_000});
