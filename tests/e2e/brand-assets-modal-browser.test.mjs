@@ -457,8 +457,23 @@ test('Brand picks an existing Original image from the native Assets visual libra
       const image=node.querySelector('.bp-brand-media-candidate img')?.getBoundingClientRect();
       const upload=node.querySelector('.filepond--drop-label label')?.getBoundingClientRect();
       const library=node.querySelector('.bp-brand-media-picker button')?.getBoundingClientRect();
-      return { zone: zone.width, image: image?.width, uploadY: upload?.y, libraryY: library?.y };
+      const outer = node.querySelector('.bp-brand-media-candidate');
+      const chain = [];
+      let current = node.querySelector('.bp-brand-media-candidate img');
+      for (let i = 0; current && i < 6; i++, current = current.parentElement) {
+        const rect = current.getBoundingClientRect();
+        const style = getComputedStyle(current);
+        chain.push({ tag: current.tagName, cls: String(current.className).slice(0,130),
+          x: Math.round(rect.x-zone.x), y: Math.round(rect.y-zone.y),
+          width: Math.round(rect.width), height: Math.round(rect.height),
+          margin: style.margin, padding: style.padding, display: style.display });
+      }
+      return { zone: zone.width, image: image?.width, uploadY: upload?.y, libraryY: library?.y,
+        inset: image ? { top: image.top-zone.top, left: image.left-zone.left,
+          right: zone.right-image.right } : null,
+        candidate: outer?.getBoundingClientRect().top-zone.top, chain };
     });
+    console.log('MEDIA_CANDIDATE_GEOMETRY ' + JSON.stringify(placement));
     assert.ok(placement.image >= placement.zone*.75
       && Math.abs(placement.uploadY-placement.libraryY) <= 12,
       'Library preview and native upload must coexist: ' + JSON.stringify(placement));
