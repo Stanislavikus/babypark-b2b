@@ -466,13 +466,6 @@ button.bp-category-tree-header-cell {
        Independent translate preserves FilePond's own animated transform. */
     translate: 0 1.5rem;
 }
-/* Local file preview: the native absolute browse label must share the same
-   button baseline as both Filament actions. Its FilePond item stays untouched. */
-@container (min-width: 38.01rem) {
-    .bp-brand-media-dropzone:has(.filepond--item) .filepond--drop-label label {
-        top: calc(50% + 0.55rem) !important;
-    }
-}
 /* FilePond hides its browse label after selecting one file. With single-file
    replace enabled, retain the SAME native browse label as the Upload button;
    do not inject a fake button or a second input. */
@@ -597,14 +590,14 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone > .fi-grid > .fi-grid-col:has(.bp-brand-media-candidate-dismiss) {
     position: absolute;
     inset: 0;
-    width: 0;
+    width: 100%;
     height: 0;
     z-index: 5;
     pointer-events: none;
 }
 .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
     position: absolute;
-    top: calc(clamp(1rem, 3%, 1.75rem) + 0.4rem);
+    top: calc(clamp(1rem, 3%, 1.75rem) + 1.75rem);
     right: calc(clamp(1rem, 3%, 1.75rem) + 0.4rem);
     z-index: 5;
     pointer-events: auto;
@@ -625,7 +618,7 @@ button.bp-category-tree-header-cell {
 }
 @container (max-width: 38rem) {
     .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
-        top: calc(clamp(1rem, 3%, 1.75rem) + 0.1rem);
+        top: calc(clamp(1rem, 3%, 1.75rem) + 1.45rem);
         right: calc(clamp(1rem, 3%, 1.75rem) + 0.1rem);
     }
 }
