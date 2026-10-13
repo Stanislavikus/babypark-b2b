@@ -124,12 +124,14 @@ class BrandResource extends Resource
 
                                         return $asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—';
                                     }),
-                            ])->columns(2),
+                            ])->columns(2)
+                                ->extraAttributes(['class' => 'bp-brand-media-current-metadata']),
                         ])
                             ->columns([
                                 'default' => 1,
                                 'md' => 2,
                             ])
+                            ->extraAttributes(['class' => 'bp-brand-media-current-layout'])
                             ->columnSpanFull()
                             ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
                         Group::make([
@@ -169,7 +171,7 @@ class BrandResource extends Resource
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
                                     ->panelLayout('compact')
-                                    ->imagePreviewHeight('96')
+                                    ->imagePreviewHeight('320')
                                     ->hiddenLabel()
                                     ->placeholder(__('media_ui.upload'))
                                     ->storeFiles(false)
