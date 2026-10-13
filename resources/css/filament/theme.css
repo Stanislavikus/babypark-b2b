@@ -514,6 +514,15 @@ button.bp-category-tree-header-cell {
     color: white !important;
     border-color: rgb(75 85 99);
 }
+/* Empty desktop state uses FilePond's absolute label. Align it with the
+   two native Filament controls; measured Chromium difference was 3.296875px.
+   Pending-file and pending-asset states keep their verified positions. */
+@container (min-width: 38.01rem) {
+    .bp-brand-media-dropzone:not(:has(.filepond--item)):not(:has(.bp-brand-media-candidate))
+        .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% + 1.45rem) !important;
+    }
+}
 /* Native FilePond ships an important layered muted-text rule. A scoped base
    layer override keeps its button text identical to the two Filament actions
    without affecting other FilePond controls or their normal states. */
