@@ -75,6 +75,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const heading = element.querySelector('.bp-brand-media-heading');
       const root = element.querySelector('.filepond--root');
       const pickButton = element.querySelector('.bp-brand-media-picker button');
+      const urlRect = element.querySelector('.bp-brand-media-url-action button')?.getBoundingClientRect();
       const uploadLabel = element.querySelector('.filepond--drop-label label');
       const uploadParent = uploadLabel?.closest('.filepond--drop-label');
       const uploadRect = uploadLabel?.getBoundingClientRect();
@@ -85,6 +86,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       return {
         headingDisplay: heading ? getComputedStyle(heading).display : null,
         picker: pickRect ? { x: pickRect.x, y: pickRect.y, width: pickRect.width, height: pickRect.height } : null,
+        url: urlRect ? { y:urlRect.y, height:urlRect.height } : null,
         upload: uploadRect ? { x: uploadRect.x, y: uploadRect.y, width: uploadRect.width, height: uploadRect.height } : null,
         uploadOpacity: uploadParent ? getComputedStyle(uploadParent).opacity : null,
         uploadVisibility: uploadParent ? getComputedStyle(uploadParent).visibility : null,
@@ -99,7 +101,10 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       && processed.root && Math.abs(processed.root.width - processed.zone.width) <= 8
       && processed.picker && processed.upload
       && processed.uploadOpacity === '1' && processed.uploadVisibility === 'visible'
-      && Math.abs(processed.upload.y - processed.picker.y) <= 15
+      && processed.url
+      && Math.abs(processed.upload.y - processed.picker.y) <= 3
+      && Math.abs(processed.url.y - processed.picker.y) <= 3
+      && Math.abs(processed.url.height-processed.upload.height) <= 1
       && processed.upload.y >= processed.item.y + processed.item.height + 5
       && (
         processed.item.x + processed.item.width + 5 <= processed.picker.x
@@ -282,7 +287,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
         return { color:s.color, opacity:s.opacity, weight:s.fontWeight,
           radius:s.borderTopLeftRadius, font:s.fontSize, top:r.top }; };
       return { upload:style(upload), uploadText:style(uploadText),
-        library:style(library), url:style(url) };
+        library:style(library), url:style(url), icon:getComputedStyle(upload,'::before').backgroundImage };
     });
     assert.equal(nativeMetrics.upload.opacity, '1', 'Native upload label must not fade.');
     assert.equal(nativeMetrics.uploadText.opacity, '1', 'Native upload text must not fade.');
@@ -290,6 +295,9 @@ test('Brand picks an existing Original image from the native Assets visual libra
       'All Media buttons must have identical corner radius.');
     assert.equal(nativeMetrics.upload.color, nativeMetrics.library.color,
       'All Media buttons must have the same text color.');
+    assert.ok(nativeMetrics.icon.includes('9ca3af'), 'Upload icon must be muted gray: '+nativeMetrics.icon);
+    assert.equal(nativeMetrics.upload.radius,nativeMetrics.url.radius);
+    assert.equal(nativeMetrics.upload.font,nativeMetrics.url.font);
     assert.ok(Math.abs(nativeMetrics.upload.top-nativeMetrics.library.top) <= 3
       && Math.abs(nativeMetrics.library.top-nativeMetrics.url.top) <= 3,
       'All Media buttons must align vertically: ' + JSON.stringify(nativeMetrics));
@@ -484,6 +492,34 @@ test('Brand picks an existing Original image from the native Assets visual libra
       'Library preview must have equal ~24px top and side insets and aligned buttons: '
         + JSON.stringify(placement));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
+    const cancelImage = unifiedDropzone.getByRole('button', { name: 'Скасувати вибір зображення' });
+    await cancelImage.waitFor({state:'visible',timeout:20_000});
+    const bounds = await unifiedDropzone.evaluate(node => {
+      const rect = selector => {
+        const r=node.querySelector(selector)?.getBoundingClientRect();
+        return r ? {x:r.x,y:r.y,right:r.right,width:r.width,height:r.height}:null;
+      };
+      return {frame:rect('.bp-brand-media-candidate'),x:rect('.bp-brand-media-candidate-dismiss button'),
+        upload:rect('.filepond--drop-label label'),library:rect('.bp-brand-media-picker button'),
+        url:rect('.bp-brand-media-url-action button')};
+    });
+    assert.ok(bounds.frame && bounds.x && bounds.upload && bounds.library && bounds.url
+      && bounds.x.right <= bounds.frame.right + 6 && bounds.x.y >= bounds.frame.y - 5
+      && Math.abs(bounds.upload.y-bounds.library.y) <= 3
+      && Math.abs(bounds.library.y-bounds.url.y) <= 3
+      && Math.abs(bounds.upload.height-bounds.url.height) <= 1,
+      'Desktop library preview must have overlaid X and aligned buttons: '+JSON.stringify(bounds));
+    await cancelImage.click();
+    await pending.waitFor({state:'hidden',timeout:20_000});
+    // The canceled canonical Original remains usable; it was never deleted.
+    await selectButton.click();
+    const retry = page.locator('.fi-modal.fi-modal-open').filter({hasText:'Медіатека'});
+    await retry.getByRole('heading',{name:'Медіатека',exact:true}).waitFor({state:'visible',timeout:20_000});
+    await retry.locator('.fi-ta-record').filter({hasText:'other.png'})
+      .first().locator('input[type="checkbox"]').first().check();
+    await retry.getByRole('button',{name:'Підтвердити вибір',exact:true}).click();
+    await retry.getByRole('heading',{name:'Медіатека',exact:true}).waitFor({state:'hidden',timeout:20_000});
+    await pending.locator('img').waitFor({state:'visible',timeout:20_000});
     // Check the selected-state on a genuinely narrow viewport as well:
     // a passing mobile empty-state is not proof that its preview/action row works.
     await page.setViewportSize({ width: 390, height: 844 });
@@ -501,9 +537,10 @@ test('Brand picks an existing Original image from the native Assets visual libra
         upload: bounds('.filepond--drop-label label'),
         library: bounds('.bp-brand-media-picker button'),
         url: bounds('.bp-brand-media-url-action button'),
+        cancel: bounds('.bp-brand-media-candidate-dismiss button'),
       };
     });
-    assert.ok(mobileCandidate.zone && mobileCandidate.preview
+    assert.ok(mobileCandidate.cancel && mobileCandidate.zone && mobileCandidate.preview
       && mobileCandidate.upload && mobileCandidate.library && mobileCandidate.url,
       'Mobile selected media must show the pending image and all three source controls: '
         + JSON.stringify(mobileCandidate));
@@ -513,7 +550,11 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && mobileCandidate.library.y >= mobileCandidate.upload.bottom + 6
       && mobileCandidate.url.y >= mobileCandidate.library.bottom + 6
       && Math.abs(mobileCandidate.upload.width-mobileCandidate.library.width) <= 3
-      && Math.abs(mobileCandidate.library.width-mobileCandidate.url.width) <= 3,
+      && Math.abs(mobileCandidate.library.width-mobileCandidate.url.width) <= 3
+      && Math.abs(mobileCandidate.upload.height-mobileCandidate.library.height) <= 1
+      && Math.abs(mobileCandidate.library.height-mobileCandidate.url.height) <= 1
+      && mobileCandidate.cancel.right <= mobileCandidate.preview.right + 6
+      && mobileCandidate.cancel.y >= mobileCandidate.preview.y - 5,
       'Mobile selected Media preview and controls must remain stacked with equal widths: '
         + JSON.stringify(mobileCandidate));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-mobile.png` });
