@@ -490,13 +490,13 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
     const mobileCandidate = await unifiedDropzone.evaluate(node => {
       const bounds = selector => {
-        const element = node.querySelector(selector);
+        const element = selector ? node.querySelector(selector) : node;
         if (!element) return null;
         const r = element.getBoundingClientRect();
         return { x:r.x, y:r.y, width:r.width, height:r.height, right:r.right, bottom:r.bottom };
       };
       return {
-        zone: bounds('.bp-brand-media-dropzone'),
+        zone: bounds(null),
         preview: bounds('.bp-brand-media-candidate img'),
         upload: bounds('.filepond--drop-label label'),
         library: bounds('.bp-brand-media-picker button'),
