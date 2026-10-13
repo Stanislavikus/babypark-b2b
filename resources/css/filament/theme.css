@@ -516,7 +516,7 @@ button.bp-category-tree-header-cell {
         /* 320px preview makes 50% point to the middle of the image.
            Align to the bottom action row, not the middle of FilePond's root. */
         top: auto !important;
-        bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.18rem) !important;
+        bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.68rem) !important;
     }
 }
 /* FilePond hides its browse label after selecting one file. With single-file
