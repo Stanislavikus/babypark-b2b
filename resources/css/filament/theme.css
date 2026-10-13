@@ -619,7 +619,8 @@ button.bp-category-tree-header-cell {
 @container (max-width: 38rem) {
     .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
         top: calc(clamp(1rem, 3%, 1.75rem) + 1.45rem);
-        right: calc(clamp(1rem, 3%, 1.75rem) + 0.1rem);
+        /* Keep the X within the 16px mobile preview inset. */
+        right: calc(clamp(1rem, 3%, 1.75rem) + 0.85rem);
     }
 }
 /* FilePond paints a green processing-complete status panel on top of
