@@ -462,7 +462,9 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
     width: calc(100% - 3rem) !important;
     margin-inline-start: 1.5rem;
-    margin-top: 1.5rem;
+    /* FilePond positions items independently: margin-top does not move its box.
+       Independent translate preserves FilePond's own animated transform. */
+    translate: 0 1.5rem;
 }
 /* FilePond hides its browse label after selecting one file. With single-file
    replace enabled, retain the SAME native browse label as the Upload button;
