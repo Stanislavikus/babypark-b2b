@@ -556,7 +556,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       const el=node.querySelector(selector);
       const s=getComputedStyle(el),b=el.getBoundingClientRect();
       return { y:b.y,height:b.height,border:s.border,shadow:s.boxShadow,outline:s.outline,padding:s.padding };
-    })));
+    }));
     assert.ok(Math.abs(libraryActionMetrics[0].y-libraryActionMetrics[1].y) <= 1
       && Math.abs(libraryActionMetrics[1].y-libraryActionMetrics[2].y) <= 1,
       'Library selected buttons must share a baseline: ' + JSON.stringify(libraryActionMetrics));
