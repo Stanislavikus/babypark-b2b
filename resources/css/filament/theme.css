@@ -514,6 +514,20 @@ button.bp-category-tree-header-cell {
     color: white !important;
     border-color: rgb(75 85 99);
 }
+/* Native FilePond ships an important layered muted-text rule. A scoped base
+   layer override keeps its button text identical to the two Filament actions
+   without affecting other FilePond controls or their normal states. */
+@layer base {
+    .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label,
+    .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
+        color: rgb(17 24 39) !important;
+        font-weight: 600 !important;
+    }
+    .dark .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label,
+    .dark .bp-brand-media-section .bp-brand-media-dropzone .bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
+        color: white !important;
+    }
+}
 /* Existing MediaAsset selected through library or URL is rendered natively
    as a pending ImageEntry; the original is not duplicated or changed. */
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid { min-height: 0; }
