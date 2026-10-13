@@ -200,10 +200,15 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.equal(matchedMetrics[1].border, matchedMetrics[2].border,
       'Filament URL button cannot add a second outline to a standard 1px border.');
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
+    // FilePond processing-complete precedes the Livewire afterStateUpdated
+    // roundtrip. Wait for that native update before opening another chooser:
+    // otherwise its old file input can be unmounted during setFiles().
+    await page.waitForLoadState('networkidle', {timeout:20_000});
     for (const [shape, path] of [['square', 'square.png'], ['portrait', 'portrait.png']]) {
       const choose=page.waitForEvent('filechooser', { timeout: 10_000 });
       await area.locator('.filepond--drop-label label').click();
       await (await choose).setFiles(resolve(root,path));
+      await page.waitForLoadState('networkidle', {timeout:20_000});
       // Wait for the NEW named file to finish and old items to disappear.
       await page.waitForFunction(expected => {
         const items=Array.from(document.querySelectorAll('.bp-brand-media-dropzone .filepond--item'));
@@ -218,6 +223,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       await area.screenshot({path: root+'/brand-media-'+shape+'-drop.png'});
     }
     // Upload must remain a working native chooser after the file was dropped.
+    await page.waitForLoadState('networkidle', {timeout:20_000});
     const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await area.locator('.filepond--drop-label label').click();
     await (await replacementChooser).setFiles(resolve(root, 'replacement.png'));
