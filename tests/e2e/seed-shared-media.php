@@ -60,6 +60,14 @@ $render = static function (string $name, int $red, int $green, int $blue, int $w
     $path = $dir.'/'.$name;
     $canvas = imagecreatetruecolor($width, $height);
     imagefill($canvas, 0, 0, imagecolorallocate($canvas, $red, $green, $blue));
+    // Real decodable image fixtures with explicit visual landmarks and aspect ratios.
+    $white = imagecolorallocate($canvas, 250, 250, 250);
+    $dark = imagecolorallocate($canvas, 35, 42, 53);
+    imagefilledrectangle($canvas, 0, (int) ($height * 0.65), $width, $height, $dark);
+    imagefilledellipse($canvas, (int) ($width * 0.70), (int) ($height * 0.24),
+        max(30, (int) ($width * 0.18)), max(30, (int) ($width * 0.18)), $white);
+    imagerectangle($canvas, 14, 14, $width - 15, $height - 15, $white);
+    imagestring($canvas, 5, 24, 25, $width.' x '.$height.' - '.$name, $white);
     imagepng($canvas, $path);
     imagedestroy($canvas);
 

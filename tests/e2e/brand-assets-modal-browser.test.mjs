@@ -204,8 +204,14 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const choose=page.waitForEvent('filechooser', { timeout: 10_000 });
       await area.locator('.filepond--drop-label label').click();
       await (await choose).setFiles(resolve(root,path));
+      // Wait for the NEW named file to finish and old items to disappear.
+      await page.waitForFunction(expected => {
+        const items=Array.from(document.querySelectorAll('.bp-brand-media-dropzone .filepond--item'));
+        return items.length === 1
+          && items[0].dataset.filepondItemState === 'processing-complete'
+          && items[0].querySelector('.filepond--file-info-main')?.textContent?.includes(expected);
+      }, path, {timeout:25_000});
       const picture=area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first();
-      await picture.waitFor({ state: 'visible', timeout: 20_000 });
       const frame=await picture.boundingBox();
       assert.ok(frame && frame.height >= 240 && frame.width >= 280,
         'A real ' + shape + ' Original must have a legible frame: ' + JSON.stringify(frame));
@@ -215,10 +221,14 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await area.locator('.filepond--drop-label label').click();
     await (await replacementChooser).setFiles(resolve(root, 'replacement.png'));
+    await page.waitForFunction(() => {
+      const items=Array.from(document.querySelectorAll('.bp-brand-media-dropzone .filepond--item'));
+      return items.length === 1
+        && items[0].dataset.filepondItemState === 'processing-complete'
+        && items[0].querySelector('.filepond--file-info-main')?.textContent?.includes('replacement.png');
+    }, null, {timeout:25_000});
     assert.equal(await area.locator('.filepond--item').count(), 1,
       'A second native local file must replace, not append.');
-    await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
-      .waitFor({ state: 'visible', timeout: 20_000 });
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
@@ -710,7 +720,24 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && currentSize.metadata && currentSize.metadata.width<=480
       && currentSize.width<=900,
       'Brand current image must be at least 280px and metadata compact: '+JSON.stringify(currentSize));
+    const fileLabel = savedPanel.getByText('Файл', {exact:true});
+    await fileLabel.waitFor({state:'visible',timeout:15_000});
+    const fileGeometry = await savedPanel.evaluate(node => {
+      const preview=node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
+      const label=Array.from(node.querySelectorAll('*'))
+        .find(e => e.textContent?.trim()==='Файл' && e.children.length===0)?.getBoundingClientRect();
+      const box=node.getBoundingClientRect();
+      return {preview:preview && {right:preview.right,top:preview.top},
+        label:label && {left:label.left,top:label.top},
+        row:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}};
+    });
+    assert.ok(fileGeometry.preview && fileGeometry.label
+      && fileGeometry.label.left >= fileGeometry.preview.right + 8
+      && fileGeometry.label.top >= fileGeometry.row.top
+      && fileGeometry.label.top < fileGeometry.row.bottom,
+      'Saved metadata must start alongside image: '+JSON.stringify(fileGeometry));
     await savedPanel.screenshot({path: `${root}/brand-media-current-saved.png`});
+    await page.locator('.bp-brand-media-section').screenshot({path: `${root}/brand-media-current-full-section.png`});
     await page.setViewportSize({width:390,height:844});
     await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
     await page.setViewportSize({width:1440,height:900});
