@@ -141,6 +141,7 @@ jobs:
             test-results/browser-smoke/brand-media-mobile.png
             test-results/browser-smoke/brand-media-real-drop.png
             test-results/browser-smoke/brand-media-library-preview.png
+            test-results/browser-smoke/brand-media-library-mobile.png
             test-results/browser-smoke/brand-media-picker-layout.png
             test-results/browser-smoke/brand-media-picker-filters.png
             test-results/browser-smoke/brand-media-picker-selected.png

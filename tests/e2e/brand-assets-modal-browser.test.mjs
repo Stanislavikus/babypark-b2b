@@ -484,6 +484,40 @@ test('Brand picks an existing Original image from the native Assets visual libra
       'Library preview must have equal ~24px top and side insets and aligned buttons: '
         + JSON.stringify(placement));
     await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
+    // Check the selected-state on a genuinely narrow viewport as well:
+    // a passing mobile empty-state is not proof that its preview/action row works.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
+    const mobileCandidate = await unifiedDropzone.evaluate(node => {
+      const bounds = selector => {
+        const element = node.querySelector(selector);
+        if (!element) return null;
+        const r = element.getBoundingClientRect();
+        return { x:r.x, y:r.y, width:r.width, height:r.height, right:r.right, bottom:r.bottom };
+      };
+      return {
+        zone: bounds('.bp-brand-media-dropzone'),
+        preview: bounds('.bp-brand-media-candidate img'),
+        upload: bounds('.filepond--drop-label label'),
+        library: bounds('.bp-brand-media-picker button'),
+        url: bounds('.bp-brand-media-url-action button'),
+      };
+    });
+    assert.ok(mobileCandidate.zone && mobileCandidate.preview
+      && mobileCandidate.upload && mobileCandidate.library && mobileCandidate.url,
+      'Mobile selected media must show the pending image and all three source controls: '
+        + JSON.stringify(mobileCandidate));
+    assert.ok(mobileCandidate.preview.x >= mobileCandidate.zone.x + 12
+      && mobileCandidate.preview.right <= mobileCandidate.zone.right - 12
+      && mobileCandidate.upload.y >= mobileCandidate.preview.bottom + 12
+      && mobileCandidate.library.y >= mobileCandidate.upload.bottom + 6
+      && mobileCandidate.url.y >= mobileCandidate.library.bottom + 6
+      && Math.abs(mobileCandidate.upload.width-mobileCandidate.library.width) <= 3
+      && Math.abs(mobileCandidate.library.width-mobileCandidate.url.width) <= 3,
+      'Mobile selected Media preview and controls must remain stacked with equal widths: '
+        + JSON.stringify(mobileCandidate));
+    await mediaSection.screenshot({ path: `${root}/brand-media-library-mobile.png` });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
     await page.locator('.fi-modal.fi-modal-open').filter({
       has: page.getByRole('heading', { name: 'Додати за URL', exact: true }),
