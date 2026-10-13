@@ -578,7 +578,10 @@ button.bp-category-tree-header-cell {
 }
 @container (max-width: 38rem) {
     .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
-        bottom: 5.25rem !important;
+        /* FilePond's absolute label is the FIRST of three stacked actions.
+           At 5.25rem it overlaps URL. Position it above the native library
+           and URL controls while leaving their Filament layout unchanged. */
+        bottom: 12rem !important;
     }
 }
 /* FilePond paints a green processing-complete status panel on top of
