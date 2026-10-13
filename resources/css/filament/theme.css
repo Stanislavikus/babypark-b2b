@@ -496,7 +496,12 @@ button.bp-category-tree-header-cell {
     line-height: 1.25rem;
     box-shadow: 0 1px 2px rgb(0 0 0 / .06);
 }
-.bp-brand-media-actions .filepond--drop-label { opacity: 1 !important; }
+.bp-brand-media-actions .filepond--root,
+.bp-brand-media-actions .filepond--drop-label,
+.bp-brand-media-actions .filepond--drop-label label,
+.bp-brand-media-actions .filepond--drop-label label * {
+    opacity: 1 !important;
+}
 .bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
     color: inherit !important;
     font-weight: inherit !important;

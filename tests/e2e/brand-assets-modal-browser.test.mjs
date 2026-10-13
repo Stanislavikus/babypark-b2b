@@ -273,6 +273,26 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await mkdir(root, { recursive: true });
     await page.screenshot({ path: `${root}/brand-media-desktop-page.png`, fullPage: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
+    const nativeMetrics = await unifiedDropzone.evaluate(node => {
+      const upload=node.querySelector('.filepond--drop-label label');
+      const uploadText=upload?.querySelector('.filepond--label-action') || upload;
+      const library=node.querySelector('.bp-brand-media-picker button');
+      const url=node.querySelector('.bp-brand-media-url-action button');
+      const style=element => { const s=getComputedStyle(element), r=element.getBoundingClientRect();
+        return { color:s.color, opacity:s.opacity, weight:s.fontWeight,
+          radius:s.borderTopLeftRadius, font:s.fontSize, top:r.top }; };
+      return { upload:style(upload), uploadText:style(uploadText),
+        library:style(library), url:style(url) };
+    });
+    assert.equal(nativeMetrics.upload.opacity, '1', 'Native upload label must not fade.');
+    assert.equal(nativeMetrics.uploadText.opacity, '1', 'Native upload text must not fade.');
+    assert.equal(nativeMetrics.upload.radius, nativeMetrics.library.radius,
+      'All Media buttons must have identical corner radius.');
+    assert.equal(nativeMetrics.upload.color, nativeMetrics.library.color,
+      'All Media buttons must have the same text color.');
+    assert.ok(Math.abs(nativeMetrics.upload.top-nativeMetrics.library.top) <= 3
+      && Math.abs(nativeMetrics.library.top-nativeMetrics.url.top) <= 3,
+      'All Media buttons must align vertically: ' + JSON.stringify(nativeMetrics));
     // The URL action must be a real Filament modal, not a decorative third button.
     await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
     const urlDialog = page.locator('.fi-modal.fi-modal-open').filter({
@@ -449,6 +469,23 @@ test('Brand picks an existing Original image from the native Assets visual libra
     }).getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
     await page.keyboard.press('Escape');
     await pending.locator('img').waitFor({ state: 'visible' });
+    // Replacing a pending library Original with a local upload must not require X.
+    const localChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await unifiedDropzone.locator('.filepond--drop-label label').click();
+    await (await localChooser).setFiles(resolve(root, 'replacement.png'));
+    await unifiedDropzone.locator('.filepond--item[data-filepond-item-state="processing-complete"]')
+      .first().waitFor({ state: 'visible', timeout: 20_000 });
+    await pending.waitFor({ state: 'hidden', timeout: 15_000 });
+    // Replacing the pending local file with a library Original must also work.
+    await selectButton.click();
+    const secondPicker = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
+    await secondPicker.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'visible' });
+    await secondPicker.locator('.fi-ta-record').filter({ hasText: 'other.png' })
+      .first().locator('input[type="checkbox"]').first().check();
+    await secondPicker.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
+    await secondPicker.getByRole('heading', { name: 'Медіатека', exact: true })
+      .waitFor({ state: 'hidden', timeout: 20_000 });
+    await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
     const saved = page.waitForResponse(response =>
       response.request().method() === 'POST'
       && response.url().includes('/livewire-')
@@ -458,6 +495,17 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     const saveResponse = await saved;
     assert.equal(saveResponse.status(), 200, 'Save must complete before navigating away.');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    // A pending local upload removed with X is NOT an explicit Brand logo deletion.
+    const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
+    await (await discardChooser).setFiles(resolve(root, 'replacement.png'));
+    const uploadedItem = page.locator('.bp-brand-media-dropzone .filepond--item');
+    await uploadedItem.first().waitFor({ state: 'visible', timeout: 20_000 });
+    await uploadedItem.first().locator('.filepond--action-remove-item').click();
+    await uploadedItem.first().waitFor({ state: 'hidden', timeout: 15_000 });
+    await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
     assert.deepEqual(jsErrors, []);
