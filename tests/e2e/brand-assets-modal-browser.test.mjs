@@ -131,11 +131,21 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
       && realPreview.removePresent,
       'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
+    const inset = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const a = node.getBoundingClientRect(), b = item?.getBoundingClientRect();
+      return b ? { top: b.top-a.top, left: b.left-a.left, right: a.right-b.right } : null;
+    });
+    assert.ok(inset && inset.top >= 16 && inset.left >= 16 && inset.right >= 16
+      && Math.abs(inset.left-inset.right) <= 5,
+      'Selected preview requires balanced 24px insets: ' + JSON.stringify(inset));
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
     // Upload must remain a working native chooser after the file was dropped.
     const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await area.locator('.filepond--drop-label label').click();
-    await (await replacementChooser).setFiles(filePath);
+    await (await replacementChooser).setFiles(resolve(root, 'replacement.png'));
+    assert.equal(await area.locator('.filepond--item').count(), 1,
+      'A second native local file must replace, not append.');
     await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
       .waitFor({ state: 'visible', timeout: 20_000 });
     await page.reload();
@@ -420,6 +430,25 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await modal.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
     await modal.getByRole('heading', { name: 'Медіатека', exact: true }).waitFor({ state: 'hidden', timeout: 20_000 });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible' });
+    const pending = unifiedDropzone.locator('.bp-brand-media-candidate');
+    await pending.locator('img').waitFor({ state: 'visible', timeout: 20_000 });
+    const placement = await unifiedDropzone.evaluate(node => {
+      const zone=node.getBoundingClientRect();
+      const image=node.querySelector('.bp-brand-media-candidate img')?.getBoundingClientRect();
+      const upload=node.querySelector('.filepond--drop-label label')?.getBoundingClientRect();
+      const library=node.querySelector('.bp-brand-media-picker button')?.getBoundingClientRect();
+      return { zone: zone.width, image: image?.width, uploadY: upload?.y, libraryY: library?.y };
+    });
+    assert.ok(placement.image >= placement.zone*.75
+      && Math.abs(placement.uploadY-placement.libraryY) <= 12,
+      'Library preview and native upload must coexist: ' + JSON.stringify(placement));
+    await mediaSection.screenshot({ path: `${root}/brand-media-library-preview.png` });
+    await unifiedDropzone.getByRole('button', { name: 'Додати за URL' }).click();
+    await page.locator('.fi-modal.fi-modal-open').filter({
+      has: page.getByRole('heading', { name: 'Додати за URL', exact: true }),
+    }).getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await pending.locator('img').waitFor({ state: 'visible' });
     const saved = page.waitForResponse(response =>
       response.request().method() === 'POST'
       && response.url().includes('/livewire-')

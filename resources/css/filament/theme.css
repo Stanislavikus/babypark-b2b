@@ -402,7 +402,7 @@ button.bp-category-tree-header-cell {
         left: 50%;
         transform: translateX(-50%) !important;
         width: min(18rem, calc(100% - 2rem));
-        font-size: 0.875rem;
+        font-size: 0.875rem !important;
         padding-inline: 0.5rem;
         top: calc(50% - 1.65rem);
     }
@@ -417,7 +417,7 @@ button.bp-category-tree-header-cell {
     .bp-brand-media-actions .bp-brand-media-url-action button {
         height: 46px;
         padding-inline: 0.5rem;
-        font-size: 0.875rem;
+        font-size: 0.875rem !important;
         white-space: nowrap;
     }
     .bp-brand-media-dropzone .bp-brand-media-heading { font-size: clamp(1rem, 5cqw, 1.25rem); }
@@ -432,7 +432,7 @@ button.bp-category-tree-header-cell {
         padding-top: 2.15rem;
     }
     .bp-brand-media-actions .filepond--drop-label label {
-        top: 50%;
+        top: calc(50% + 0.3rem);
     }
 }
 
@@ -460,8 +460,9 @@ button.bp-category-tree-header-cell {
     padding-top: 5rem;
 }
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
-    width: calc(100% - 1.5rem) !important;
-    margin-inline-start: 0.75rem;
+    width: calc(100% - 3rem) !important;
+    margin-inline-start: 1.5rem;
+    margin-top: 1.5rem;
 }
 /* FilePond hides its browse label after selecting one file. With single-file
    replace enabled, retain the SAME native browse label as the Upload button;
@@ -476,6 +477,67 @@ button.bp-category-tree-header-cell {
     pointer-events: auto;
 }
 
+/* All three native controls share the same visual metrics; FilePond uses a
+   label, while Filament actions use actual buttons. */
+.bp-brand-media-actions .filepond--drop-label label,
+.bp-brand-media-actions .bp-brand-media-picker button,
+.bp-brand-media-actions .bp-brand-media-url-action button {
+    box-sizing: border-box;
+    height: 46px;
+    min-height: 46px;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.75rem !important;
+    background: white;
+    color: rgb(17 24 39) !important;
+    font-size: 1rem;
+    font-weight: 600 !important;
+    line-height: 1.25rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+}
+.bp-brand-media-actions .filepond--drop-label { opacity: 1 !important; }
+.bp-brand-media-actions .filepond--drop-label label .filepond--label-action {
+    color: inherit !important;
+    font-weight: inherit !important;
+    font-size: inherit !important;
+}
+.dark .bp-brand-media-actions .filepond--drop-label label,
+.dark .bp-brand-media-actions .bp-brand-media-picker button,
+.dark .bp-brand-media-actions .bp-brand-media-url-action button {
+    background: rgb(17 24 39);
+    color: white !important;
+    border-color: rgb(75 85 99);
+}
+/* Existing MediaAsset selected through library or URL is rendered natively
+   as a pending ImageEntry; the original is not duplicated or changed. */
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) > .fi-grid { min-height: 0; }
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-icon,
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-heading,
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .bp-brand-media-subheading { display: none; }
+.bp-brand-media-dropzone .bp-brand-media-candidate {
+    width: calc(100% - 3rem) !important;
+    max-width: calc(100% - 3rem);
+    margin: 1.5rem auto 0;
+    overflow: hidden;
+    border-radius: .75rem;
+    background: rgb(249 250 251);
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate img {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: clamp(10rem, 24cqw, 20rem) !important;
+    max-height: 20rem !important;
+    object-fit: contain !important;
+    object-position: center !important;
+}
+.bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
+    top: auto !important;
+    bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.25rem) !important;
+}
+@container (max-width: 38rem) {
+    .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
+        bottom: 5.25rem !important;
+    }
+}
 /* FilePond paints a green processing-complete status panel on top of
    its image-preview canvas. After processing, expose the actual native image
    preview, while retaining the remove button and all non-success states. */

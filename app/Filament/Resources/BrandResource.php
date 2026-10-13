@@ -140,6 +140,17 @@ class BrandResource extends Resource
                                 ->extraAttributes(['class' => 'bp-brand-media-heading']),
                             Text::make(__('media_ui.drop_subheading'))
                                 ->extraAttributes(['class' => 'bp-brand-media-subheading']),
+                            // A library/URL selection previews its existing canonical Original,
+                            // never creating a second upload or MediaAsset identity.
+                            ImageEntry::make('pending_logo_source')
+                                ->hiddenLabel()
+                                ->state(fn (Get $get): ?string => app(MediaAssetSourceResolver::class)
+                                    ->sourceReference(self::selectedLogoAsset($get)))
+                                ->visible(fn (Get $get, ?Brand $record): bool =>
+                                    blank($get('logo_upload'))
+                                    && self::selectedLogoAsset($get) instanceof MediaAsset
+                                    && (string) $get('logo_media_asset_id') !== (string) ($record?->logo_media_asset_id ?? ''))
+                                ->extraAttributes(['class' => 'bp-brand-media-candidate']),
                             Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
@@ -161,13 +172,16 @@ class BrandResource extends Resource
                                         'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                                     ])
                                     ->live()
-                                    ->afterStateUpdated(function (Set $set, mixed $state, Component $livewire): void {
+                                    ->afterStateUpdated(function (Set $set, Get $get, mixed $state, Component $livewire, ?Brand $record): void {
                                         if ($livewire instanceof EditBrand) {
                                             $livewire->logoPostSaveNotice = null;
                                         }
 
                                         if (filled($state)) {
                                             $set('logo_media_asset_id', null);
+                                        } elseif (blank($get('logo_media_asset_id')) && $record instanceof Brand) {
+                                            // X on a pending file cancels it; it does not delete the saved logo.
+                                            $set('logo_media_asset_id', $record->logo_media_asset_id);
                                         }
                                     }),
                                 OriginalImageAssetPicker::make('logo_media_asset_id')

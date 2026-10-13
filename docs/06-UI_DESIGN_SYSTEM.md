@@ -2675,3 +2675,6 @@ destructive action, not a peer of navigation `Закрити`. On the editable A
 visually separated to the far end from `Зберегти / Скасувати`. Existing lifecycle guards and the
 danger confirmation remain unchanged. Replacement business conflicts remain warning/amber, not
 error/red; the heading is visually stronger than its explanatory text.
+
+
+[Resolved 2026-10-13 — Brand Media pending replacement] The owner approved keeping all three source buttons visible after selection. A successful new local, library or URL choice replaces only the pending choice; cancellation and errors preserve it. FilePond retains native single-file replacement and full-area drop; chosen library/URL Original has a native ImageEntry candidate preview, with the persisted Brand logo unchanged in Current Image until Save. X on pending upload cancels it without implicitly removing the already-saved logo. Buttons use matching 46px height, 12px corners, font and border, with equal stacked widths. Selected preview has balanced top/side insets and image contain. No new media writer or storage identity.

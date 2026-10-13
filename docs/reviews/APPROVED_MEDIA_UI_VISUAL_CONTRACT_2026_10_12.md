@@ -38,3 +38,9 @@ The design mock contains two **annotations**, not production text:
 **Gate B — functional proof:** real CDP OS-file drag to edge; native file browser upload; Brand Save/reopen; MediaAsset library single-choice replacement, picker filters/close, active URL form; URL import service authorization, DNS/public-IP/redirect/size limits, MIME and SHA dedup; MySQL suite, Pint, frontend build, and Git diff check on a frozen exact HEAD.
 
 No merge or deployment without both gates and explicit owner OK. Keep PR #294 Draft while either gate is incomplete.
+
+## [Resolved 2026-10-13 — owner-approved replacement behavior]
+
+Owner confirms three working source actions stay visible in empty and selected Media states. New local selection or native single-file drag/drop replaces the pending local file. Picking an existing workspace-scoped Original or successfully importing one by URL replaces any previous pending choice, without mandatory X. Cancelling library or URL, or a URL error, preserves the prior choice. A pending FilePond X cancels only that pending file; the persisted Brand logo is not silently deleted. The separate explicit logo remove action remains available.
+
+Saved Brand logo remains in Current Image until Save; unsaved local uses native FilePond preview, unsaved library/URL uses native Filament ImageEntry resolved from canonical MediaAsset ID, without duplicating the managed file. Selected preview has balanced approximately 24px top/side insets, image contain (up to 320px height), and a separated row of three actions and format hint. All source buttons use equal 46px height, 12px radius, consistent weight, contrast, outline and baseline; mobile buttons share width. Browser verification covers real replacement, pending preview, modal cancellation, Save/reopen, desktop/mobile screenshot geometry. Merge and deploy require owner signoff.
