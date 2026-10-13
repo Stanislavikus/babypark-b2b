@@ -503,7 +503,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await (await discardChooser).setFiles(resolve(root, 'replacement.png'));
     const uploadedItem = page.locator('.bp-brand-media-dropzone .filepond--item');
     await uploadedItem.first().waitFor({ state: 'visible', timeout: 20_000 });
-    await uploadedItem.first().locator('.filepond--action-remove-item').click();
+    await page.locator('.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]')
+      .first().waitFor({ state: 'visible', timeout: 20_000 });
+    // FilePond disables remove-item after processing; the enabled native X is
+    // its revert-processing action. Do not click a disabled shadow control.
+    const nativeX = uploadedItem.first().locator(
+      '.filepond--action-revert-item-processing:not([disabled]), .filepond--action-remove-item:not([disabled])',
+    ).first();
+    await nativeX.waitFor({ state: 'visible', timeout: 20_000 });
+    await nativeX.click();
     await uploadedItem.first().waitFor({ state: 'hidden', timeout: 15_000 });
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.reload({ waitUntil: 'domcontentloaded' });
