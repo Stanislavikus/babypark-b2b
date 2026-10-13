@@ -13,6 +13,7 @@ return [
     'section' => 'Медіа',
     'library' => 'Медіатека',
     'select_existing' => 'Обрати з медіатеки',
+    'cancel_pending_image' => 'Скасувати вибір зображення',
     'upload' => 'Завантажити',
     'drop_label' => 'Перетягніть зображення сюди або виберіть файл',
     'upload_hint' => 'JPEG, PNG, GIF, WebP, AVIF · до 20 МіБ / 25 МП',

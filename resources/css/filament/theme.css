@@ -329,7 +329,7 @@ button.bp-category-tree-header-cell {
     flex: 0 0 1.15rem;
     width: 1.15rem;
     height: 1.15rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23171717' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4m-5 5 5-5 5 5M4 17v3h16v-3'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4m-5 5 5-5 5 5M4 17v3h16v-3'/%3E%3C/svg%3E");
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
@@ -466,6 +466,13 @@ button.bp-category-tree-header-cell {
        Independent translate preserves FilePond's own animated transform. */
     translate: 0 1.5rem;
 }
+/* Local file preview: the native absolute browse label must share the same
+   button baseline as both Filament actions. Its FilePond item stays untouched. */
+@container (min-width: 38.01rem) {
+    .bp-brand-media-dropzone:has(.filepond--item) .filepond--drop-label label {
+        top: calc(50% + 0.55rem) !important;
+    }
+}
 /* FilePond hides its browse label after selecting one file. With single-file
    replace enabled, retain the SAME native browse label as the Upload button;
    do not inject a fake button or a second input. */
@@ -574,7 +581,8 @@ button.bp-category-tree-header-cell {
 }
 .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
     top: auto !important;
-    bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.25rem) !important;
+    /* Align with Filament's buttons; actual selected desktop drift was 10.84px. */
+    bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.93rem) !important;
 }
 @container (max-width: 38rem) {
     .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
@@ -582,6 +590,43 @@ button.bp-category-tree-header-cell {
            At 5.25rem it overlaps URL. Position it above the native library
            and URL controls while leaving their Filament layout unchanged. */
         bottom: 12rem !important;
+    }
+}
+/* Standard Filament icon action, visually overlaying the pending ImageEntry.
+   Its grid wrapper contributes no extra vertical space in the dashed area. */
+.bp-brand-media-dropzone > .fi-grid > .fi-grid-col:has(.bp-brand-media-candidate-dismiss) {
+    position: absolute;
+    inset: 0;
+    width: 0;
+    height: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
+    position: absolute;
+    top: calc(clamp(1rem, 3%, 1.75rem) + 0.4rem);
+    right: calc(clamp(1rem, 3%, 1.75rem) + 0.4rem);
+    z-index: 5;
+    pointer-events: auto;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate-dismiss button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    min-height: 34px;
+    height: 34px;
+    border-radius: 9999px;
+    background: rgb(17 17 17 / 90%) !important;
+    color: white !important;
+}
+.bp-brand-media-dropzone .bp-brand-media-candidate-dismiss button svg {
+    color: white !important;
+}
+@container (max-width: 38rem) {
+    .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
+        top: calc(clamp(1rem, 3%, 1.75rem) + 0.1rem);
+        right: calc(clamp(1rem, 3%, 1.75rem) + 0.1rem);
     }
 }
 /* FilePond paints a green processing-complete status panel on top of

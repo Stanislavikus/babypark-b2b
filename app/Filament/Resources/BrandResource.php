@@ -150,6 +150,21 @@ class BrandResource extends Resource
                                     && self::selectedLogoAsset($get) instanceof MediaAsset
                                     && (string) $get('logo_media_asset_id') !== (string) ($record?->logo_media_asset_id ?? ''))
                                 ->extraAttributes(['class' => 'bp-brand-media-candidate']),
+                            Actions::make([
+                                Action::make('cancel_pending_logo')
+                                    ->label(__('media_ui.cancel_pending_image'))
+                                    ->tooltip(__('media_ui.cancel_pending_image'))
+                                    ->icon('heroicon-m-x-mark')
+                                    ->iconButton()
+                                    ->color('gray')
+                                    ->visible(fn (Get $get, ?Brand $record): bool => blank($get('logo_upload'))
+                                        && self::selectedLogoAsset($get) instanceof MediaAsset
+                                        && (string) $get('logo_media_asset_id') !== (string) ($record?->logo_media_asset_id ?? ''))
+                                    ->action(function (Set $set, ?Brand $record): void {
+                                        // Cancel only unsaved selection, not the canonical file.
+                                        $set('logo_media_asset_id', $record?->logo_media_asset_id);
+                                    }),
+                            ])->extraAttributes(['class' => 'bp-brand-media-candidate-dismiss']),
                             Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))

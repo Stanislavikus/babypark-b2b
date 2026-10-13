@@ -13,6 +13,7 @@ return [
     'section' => 'Media',
     'library' => 'Media library',
     'select_existing' => 'Choose from media library',
+    'cancel_pending_image' => 'Cancel image selection',
     'upload' => 'Upload',
     'drop_label' => 'Drag an image here or choose a file',
     'upload_hint' => 'JPEG, PNG, GIF, WebP, AVIF · up to 20 MiB / 25 MP',
