@@ -170,7 +170,8 @@ class BrandResource extends Resource
                             Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
-                                    ->panelLayout('compact')
+                                    // Native default panel layout can accommodate a 320px
+                                    // preview without compact-mode scroller clipping.
                                     ->imagePreviewHeight('320')
                                     ->hiddenLabel()
                                     ->placeholder(__('media_ui.upload'))

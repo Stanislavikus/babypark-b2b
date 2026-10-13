@@ -61,7 +61,7 @@
 
 /* Bound the saved Brand image/metadata pair, not the entire form.
    On wide screens the metadata stays directly alongside the 320px image. */
-.bp-brand-media-current-layout { width: 100%; max-width: 56rem; }
+.bp-brand-media-current-layout { width: 100%; max-width: 44rem; }
 .bp-brand-media-current-metadata { width: 100%; max-width: 30rem; }
 .bp-media-preview-frame--detail {
     --bp-media-preview-width: min(100%, 18rem);
@@ -477,7 +477,7 @@ button.bp-category-tree-header-cell {
     }
 }
 
-/* Keep FilePond's native full-area drag surface and 96px image preview.
+/* Keep FilePond's native full-area drag surface and legible 320px preview.
    Collapse obsolete empty-state copy instead of reserving an invisible blank
    block; actions start below the native image preview. */
 .bp-brand-media-dropzone:has(.filepond--item) {
@@ -498,7 +498,7 @@ button.bp-category-tree-header-cell {
    occupies the Media area (rather than a fixed 15rem centered thumbnail),
    leaving the three actions in their separate row underneath. */
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
-    padding-top: 19.5rem;
+    padding-top: 15.5rem;
 }
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
     width: calc(100% - 3rem) !important;

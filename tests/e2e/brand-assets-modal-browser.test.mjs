@@ -156,7 +156,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         removePresent: !!remove,
       };
     });
-    assert.ok(realPreview.image && realPreview.image.width > 20 && realPreview.image.height > 20
+    assert.ok(realPreview.image && realPreview.image.width > 20 && realPreview.image.height >= 310
       && realPreview.image.display !== 'none'
       && realPreview.panelOpacity === '0'
       && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
@@ -737,6 +737,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     });
     assert.ok(fileGeometry.preview && fileGeometry.label
       && fileGeometry.label.left >= fileGeometry.preview.right + 8
+      && fileGeometry.label.left <= fileGeometry.preview.right + 72
       && fileGeometry.label.top >= fileGeometry.row.top
       && fileGeometry.label.top < fileGeometry.row.bottom,
       'Saved metadata must start alongside image: '+JSON.stringify(fileGeometry));
