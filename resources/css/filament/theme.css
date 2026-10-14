@@ -764,10 +764,13 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--image-preview-overlay-success {
     opacity: 0 !important;
 }
-/* Keep exactly one native processed-file control: the enabled revert action.
-   The ordinary remove-item button is another gray circle at a distinct
-   inset; hiding it here preserves its normal pre-processing behavior. */
-.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--action-remove-item {
+/* FilePond transitions several old action buttons out after upload. Its
+   disabled 26px button at the stock right inset can remain visible for a
+   frame, behind the 34px revert X, looking like a second gray circle.
+   In completed state ONLY the real revert X may be displayed; keep the
+   native controls unchanged during processing, cancellation and errors. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
+    .filepond--file-action-button:not(.filepond--action-revert-item-processing) {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;

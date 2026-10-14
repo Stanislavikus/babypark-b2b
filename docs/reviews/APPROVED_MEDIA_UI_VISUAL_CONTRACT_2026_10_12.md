@@ -169,3 +169,24 @@ indicator/remove-button suppression. The exact owner of that mark requires
 DOM evidence, not further guesses; a targeted synthetic browser diagnostic
 will list all native control/indicator bounds and computed styles before
 any follow-up fix.
+
+
+## [Resolved 2026-10-14 — eliminate post-upload ghost ring via native action state]
+
+Chromium #149 diagnostic captured every FilePond action on the same synthetic
+processed image. The enabled native 34px revert X is positioned at
+`left=1129, top=422`. Multiple **disabled** 26px default actions, including
+abort/retry/process, share `left=1140, top=419`, exactly the offset of
+the gray circle photographed behind the new X. The settled DOM reported
+them hidden, but the immediate square/portrait screenshots captured a
+transient previous button during FilePond's native opacity animation.
+
+In `processing-complete` ONLY, hide all FilePond native file-action
+buttons **except** the enabled `revert-item-processing` action via
+scoped visibility/opacity/pointer-events CSS. Do not alter JS, native file
+state, processing/error UI, or touch/keyboard behavior of the revert X.
+Browser gate measures all other action buttons invisible immediately after
+processing-complete on landscape/square/portrait, followed by screenshot
+inspection. This replaces the previously incomplete one-button
+`remove-item` filter. Mobile metadata 8px inset already verified on
+Playwright #149.

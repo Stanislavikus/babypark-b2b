@@ -196,8 +196,10 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         );
         const icon = button?.querySelector('svg');
         const progress = item?.querySelector('.filepond--process-indicator');
-        const inactiveRemove = item?.querySelector('.filepond--action-remove-item');
-        if (!item || !button || !icon || !progress || !inactiveRemove) return null;
+        const staleActions = [...(item?.querySelectorAll(
+          '.filepond--file-action-button:not(.filepond--action-revert-item-processing)',
+        ) ?? [])];
+        if (!item || !button || !icon || !progress || !staleActions.length) return null;
         const a = item.getBoundingClientRect(), b = button.getBoundingClientRect();
         const s = getComputedStyle(button), t = getComputedStyle(icon);
         return {
@@ -209,8 +211,11 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           iconScale:t.transform, iconColor:t.color,
           progressOpacity:getComputedStyle(progress).opacity,
           progressVisibility:getComputedStyle(progress).visibility,
-          inactiveRemoveOpacity:getComputedStyle(inactiveRemove).opacity,
-          inactiveRemoveVisibility:getComputedStyle(inactiveRemove).visibility,
+          staleActions:staleActions.map(control => ({
+            cls:control.className,
+            opacity:getComputedStyle(control).opacity,
+            visibility:getComputedStyle(control).visibility,
+          })),
         };
       });
       assert.ok(metrics && metrics.enabled && metrics.focusable
@@ -224,40 +229,13 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         && metrics.iconScale.includes('1.4')
         && metrics.progressOpacity === '0'
         && metrics.progressVisibility === 'hidden'
-        && metrics.inactiveRemoveOpacity === '0'
-        && metrics.inactiveRemoveVisibility === 'hidden',
+        && metrics.staleActions.length >= 2
+        && metrics.staleActions.every(control => control.opacity === '0'
+          && control.visibility === 'hidden'),
         'FilePond '+shape+' cancel X must match 34px Filament actions without a progress arc: '
           + JSON.stringify(metrics));
     };
     await assertUnifiedLocalX('landscape');
-    // Diagnostic is intentionally restricted to isolated synthetic Chromium.
-    // Identify the EXACT native control responsible for a secondary gray circle.
-    const circleProbe = await area.evaluate(node => {
-      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
-      const nativeX = item?.querySelector('.filepond--action-revert-item-processing');
-      if (!item || !nativeX) return null;
-      const itemRect = item.getBoundingClientRect(), rect = nativeX.getBoundingClientRect();
-      const candidates = [...item.querySelectorAll('[class*="filepond--action-"], [class*="filepond--indicator"]')];
-      return {
-        x: {left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom},
-        item: {left:itemRect.left,top:itemRect.top,right:itemRect.right,bottom:itemRect.bottom},
-        elements: candidates.map(el => {
-          const b=el.getBoundingClientRect(), s=getComputedStyle(el);
-          return {tag:el.tagName, cls:el.className?.baseVal ?? el.className,
-            dataAlign:el.getAttribute('data-align'), disabled:el.hasAttribute('disabled'),
-            rect:{left:b.left,top:b.top,right:b.right,bottom:b.bottom,width:b.width,height:b.height},
-            opacity:s.opacity,visibility:s.visibility,display:s.display,
-            bg:s.backgroundColor,shadow:s.boxShadow,transform:s.transform,
-            inlineStyle:el.getAttribute('style')?.slice(0,180)};
-        }),
-        hits: [[-1,-2],[0,0],[7,-7],[9,-10],[13,-9],[15,-12],[17,-14]].map(([dx,dy]) => {
-          const px=rect.right+dx,py=rect.top+dy;
-          return {x:px,y:py,stack:document.elementsFromPoint(px,py).slice(0,9)
-            .map(el => ({tag:el.tagName,cls:el.className?.baseVal ?? el.className}))};
-        }),
-      };
-    });
-    console.log('# FILEPOND_CLOSE_DIAGNOSTIC '+JSON.stringify(circleProbe));
     const visibleCrop = await area.evaluate(node => {
       const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const scroller = node.querySelector('.filepond--list-scroller');
