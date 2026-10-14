@@ -209,3 +209,17 @@ form), the native picker/URL/FilePond controls, saved preview, image metadata,
 Asset identity, or persistence. Browser acceptance MUST run on the approved
 BrandResource edit form, assert both upper preview/X and footer, and capture
 a FULL Brand mobile form screenshot; Asset-only screenshots cannot prove it.
+
+## [Resolved — 2026-10-14 owner confirmation: retain truthful Brand Media count]
+
+Keep the existing right-of-title image count in the **Brand** `Медіа`
+section: `0 зображень` without a selected logo and `1 зображення`
+when a canonical logo is selected. This is a truthful 0/1 count, not a
+claim that multiple Brand assets, videos, or galleries already exist.
+Owner explicitly approved retaining the counter after discussing future
+media possibilities. Brand has one logo in V1; no schema, file-type, or
+media cardinality change is authorized by this UI decision. A future
+multi-image/video Brand media capability requires its own researched
+contract and explicit implementation campaign. Product galleries remain
+an independent scope. **Do not remove the count merely because Brand V1
+has only one slot.**
