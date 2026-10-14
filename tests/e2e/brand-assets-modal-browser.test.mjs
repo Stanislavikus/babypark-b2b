@@ -95,6 +95,9 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         zone: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
       };
     });
+    assert.ok(processed.item && processed.item.height >= 240,
+      'Native selected image must occupy a legible preview, not 96px: '
+        + JSON.stringify(processed));
     assert.ok(processed.item && processed.item.width >= processed.zone.width * 0.85
       && processed.item.width <= processed.zone.width && processed.item.height > 5
       && processed.headingDisplay === 'none'
@@ -153,12 +156,103 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         removePresent: !!remove,
       };
     });
-    assert.ok(realPreview.image && realPreview.image.width > 20 && realPreview.image.height > 20
+    assert.ok(realPreview.image && realPreview.image.width > 20 && realPreview.image.height >= 310
       && realPreview.image.display !== 'none'
       && realPreview.panelOpacity === '0'
       && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
       && realPreview.removePresent,
       'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
+    // A completed upload should expose the enabled NATIVE FilePond X, not
+    // its success-status ring. Never replace the button with fake markup.
+    const completedX = area.locator(
+      '.filepond--item[data-filepond-item-state="processing-complete"] '
+        + ':is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
+    ).first();
+    await completedX.waitFor({ state: 'visible', timeout: 15_000 });
+    const completedAction = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const action = item?.querySelector(
+        ':is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
+      );
+      const indicator = item?.querySelector('.filepond--processing-complete-indicator');
+      const icon = action?.querySelector('svg path');
+      const style = action && getComputedStyle(action);
+      return { enabled:!!action && !action.disabled, iconPath:icon?.getAttribute('d') ?? null,
+        opacity:style?.opacity, visibility:style?.visibility,
+        indicatorOpacity:indicator && getComputedStyle(indicator).opacity };
+    });
+    assert.ok(completedAction.enabled && completedAction.iconPath?.length > 10
+      && completedAction.opacity === '1' && completedAction.visibility === 'visible'
+      && completedAction.indicatorOpacity === '0',
+      'Completed FilePond must show a real native cancel X, not the status ring: '
+        + JSON.stringify(completedAction));
+    // Pixel contract for the real native FilePond X: equal to Filament's
+    // 34px black/white image-dismiss actions, not a 26px hollow status ring.
+    const assertUnifiedLocalX = async (shape) => {
+      const metrics = await area.evaluate(node => {
+        const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+        const button = item?.querySelector(
+          '.filepond--file-action-button.filepond--action-revert-item-processing:not([disabled])',
+        );
+        const icon = button?.querySelector('svg');
+        const progress = item?.querySelector('.filepond--process-indicator');
+        const staleActions = [...(item?.querySelectorAll(
+          '.filepond--file-action-button:not(.filepond--action-revert-item-processing)',
+        ) ?? [])];
+        if (!item || !button || !icon || !progress || !staleActions.length) return null;
+        const a = item.getBoundingClientRect(), b = button.getBoundingClientRect();
+        const s = getComputedStyle(button), t = getComputedStyle(icon);
+        return {
+          enabled: !button.disabled,
+          size: {width:b.width, height:b.height},
+          inset: {top:b.top-a.top, right:a.right-b.right},
+          background:s.backgroundColor, color:s.color, opacity:s.opacity,
+          focusable:button.tabIndex >= 0,
+          iconScale:t.transform, iconColor:t.color,
+          progressOpacity:getComputedStyle(progress).opacity,
+          progressVisibility:getComputedStyle(progress).visibility,
+          staleActions:staleActions.map(control => ({
+            cls:control.className,
+            opacity:getComputedStyle(control).opacity,
+            visibility:getComputedStyle(control).visibility,
+          })),
+        };
+      });
+      assert.ok(metrics && metrics.enabled && metrics.focusable
+        && metrics.size.width >= 33 && metrics.size.width <= 35
+        && metrics.size.height >= 33 && metrics.size.height <= 35
+        && metrics.inset.top >= 9 && metrics.inset.top <= 15
+        && metrics.inset.right >= 9 && metrics.inset.right <= 15
+        && metrics.background === 'rgba(17, 17, 17, 0.9)'
+        && metrics.color === 'rgb(255, 255, 255)'
+        && metrics.iconColor === 'rgb(255, 255, 255)'
+        && metrics.iconScale.includes('1.4')
+        && metrics.progressOpacity === '0'
+        && metrics.progressVisibility === 'hidden'
+        && metrics.staleActions.length >= 2
+        && metrics.staleActions.every(control => control.opacity === '0'
+          && control.visibility === 'hidden'),
+        'FilePond '+shape+' cancel X must match 34px Filament actions without a progress arc: '
+          + JSON.stringify(metrics));
+    };
+    await assertUnifiedLocalX('landscape');
+    const visibleCrop = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const scroller = node.querySelector('.filepond--list-scroller');
+      const preview = item?.querySelector('.filepond--image-preview');
+      const ib = item?.getBoundingClientRect();
+      const sb = scroller?.getBoundingClientRect();
+      const pb = preview?.getBoundingClientRect();
+      return { item:ib && {top:ib.top,bottom:ib.bottom,height:ib.height},
+        scroller:sb && {top:sb.top,bottom:sb.bottom,height:sb.height},
+        preview:pb && {top:pb.top,bottom:pb.bottom,height:pb.height} };
+    });
+    assert.ok(visibleCrop.item && visibleCrop.scroller && visibleCrop.preview
+      && visibleCrop.scroller.bottom >= visibleCrop.item.bottom - 2
+      && visibleCrop.scroller.height >= 340
+      && visibleCrop.preview.height >= 310,
+      'The entire 320px native image must be visible, not merely exist in a clipped item: '
+        + JSON.stringify(visibleCrop));
     const inset = await area.evaluate(node => {
       const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const a = node.getBoundingClientRect(), b = item?.getBoundingClientRect();
@@ -180,6 +274,14 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           transform:s.transform, translate:s.translate, padding:s.padding };
       });
     });
+    const localGaps = {
+      first: matchedMetrics[1].x-(matchedMetrics[0].x+matchedMetrics[0].width),
+      second: matchedMetrics[2].x-(matchedMetrics[1].x+matchedMetrics[1].width),
+    };
+    assert.ok(Math.abs(localGaps.first-localGaps.second) <= 2
+      && localGaps.first >= 8 && localGaps.second >= 8,
+      'Three source actions need equal horizontal spacing: '
+        + JSON.stringify({ localGaps, matchedMetrics }));
     assert.ok(Math.abs(matchedMetrics[0].y-matchedMetrics[1].y) <= 1
       && Math.abs(matchedMetrics[1].y-matchedMetrics[2].y) <= 1,
       'Local selected Media buttons must align within 1px: ' + JSON.stringify(matchedMetrics));
@@ -189,14 +291,40 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
     assert.equal(matchedMetrics[1].border, matchedMetrics[2].border,
       'Filament URL button cannot add a second outline to a standard 1px border.');
     await area.screenshot({ path: root + '/brand-media-real-drop.png' });
-    // Upload must remain a working native chooser after the file was dropped.
-    const replacementChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
-    await area.locator('.filepond--drop-label label').click();
-    await (await replacementChooser).setFiles(resolve(root, 'replacement.png'));
-    assert.equal(await area.locator('.filepond--item').count(), 1,
-      'A second native local file must replace, not append.');
-    await area.locator('.filepond--item[data-filepond-item-state="processing-complete"]').first()
-      .waitFor({ state: 'visible', timeout: 20_000 });
+    // Filament v5.7.6 + Livewire v4.3.5 has a verified pending-file
+    // replace GAP: native drop/browse while an existing item is processed
+    // reverts it but never starts a new Livewire upload. For now exercise
+    // the supported native X + chooser cycle, preserving the full preview.
+    const replaceViaNativeCancel = async (path) => {
+      const oldItem=area.locator('.filepond--item').first();
+      const cancel=oldItem.locator(
+        '.filepond--action-revert-item-processing:not([disabled]), .filepond--action-remove-item:not([disabled])'
+      ).first();
+      await cancel.waitFor({state:'visible',timeout:15_000});
+      await cancel.click();
+      await oldItem.waitFor({state:'hidden',timeout:20_000});
+      await page.waitForLoadState('networkidle',{timeout:20_000});
+      const chooser=page.waitForEvent('filechooser',{timeout:10_000});
+      await area.locator('.filepond--drop-label label').click();
+      await (await chooser).setFiles(resolve(root,path));
+      await page.waitForFunction(expected => {
+        const items=Array.from(document.querySelectorAll('.bp-brand-media-dropzone .filepond--item'));
+        return items.length===1
+          && items[0].dataset.filepondItemState==='processing-complete'
+          && items[0].querySelector('.filepond--file-info-main')?.textContent?.includes(expected);
+      },path,{timeout:25_000});
+    };
+    for (const [shape,path] of [['square','square.png'],['portrait','portrait.png']]) {
+      await replaceViaNativeCancel(path);
+      const frame=await area.locator('.filepond--item').first().boundingBox();
+      assert.ok(frame && frame.height>=240 && frame.width>=280,
+        'A '+shape+' image must stay legible: '+JSON.stringify(frame));
+      await assertUnifiedLocalX(shape);
+      await area.screenshot({path:root+'/brand-media-'+shape+'-drop.png'});
+    }
+    await replaceViaNativeCancel('replacement.png');
+    assert.equal(await area.locator('.filepond--item').count(),1,
+      'Native X + browse must yield exactly one processed local file.');
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
@@ -347,6 +475,15 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(nativeMetrics.icon.includes('9ca3af'), 'Upload icon must be muted gray: '+nativeMetrics.icon);
     assert.equal(nativeMetrics.upload.radius,nativeMetrics.url.radius);
     assert.equal(nativeMetrics.upload.font,nativeMetrics.url.font);
+    const gaps = await unifiedDropzone.evaluate(node => {
+      const box = s => node.querySelector(s)?.getBoundingClientRect();
+      const first=box('.filepond--drop-label label');
+      const second=box('.bp-brand-media-picker button');
+      const third=box('.bp-brand-media-url-action button');
+      return { first:second.left-first.right, second:third.left-second.right };
+    });
+    assert.ok(Math.abs(gaps.first-gaps.second) <= 2 && gaps.first>=8 && gaps.second>=8,
+      'Native desktop controls must have equal horizontal gaps: '+JSON.stringify(gaps));
     assert.equal(nativeMetrics.upload.height, nativeMetrics.url.height,
       'Upload and URL source controls must have exactly equal box height.');
     assert.equal(nativeMetrics.library.height, nativeMetrics.url.height,
@@ -666,6 +803,80 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.equal(saveResponse.status(), 200, 'Save must complete before navigating away.');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const savedPanel = page.locator('.bp-brand-media-current-layout');
+    await savedPanel.waitFor({ state:'visible', timeout:20_000 });
+    const currentSize=await savedPanel.evaluate(node => {
+      const frame=node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
+      const info=node.querySelector('.bp-brand-media-current-metadata')?.getBoundingClientRect();
+      const group=node.getBoundingClientRect();
+      return {frame:frame && {width:frame.width,height:frame.height},
+        metadata:info && {width:info.width},width:group.width};
+    });
+    assert.ok(currentSize.frame && currentSize.frame.width>=280
+      && currentSize.metadata && currentSize.metadata.width<=480
+      && currentSize.width<=900,
+      'Brand current image must be at least 280px and metadata compact: '+JSON.stringify(currentSize));
+    const fileLabel = savedPanel.getByText('Файл', {exact:true});
+    await fileLabel.waitFor({state:'visible',timeout:15_000});
+    const fileGeometry = await savedPanel.evaluate(node => {
+      const preview=node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
+      const label=Array.from(node.querySelectorAll('*'))
+        .find(e => e.textContent?.trim()==='Файл' && e.children.length===0)?.getBoundingClientRect();
+      const box=node.getBoundingClientRect();
+      return {preview:preview && {right:preview.right,top:preview.top},
+        label:label && {left:label.left,top:label.top},
+        row:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}};
+    });
+    assert.ok(fileGeometry.preview && fileGeometry.label
+      && fileGeometry.label.left >= fileGeometry.preview.right + 8
+      && fileGeometry.label.left <= fileGeometry.preview.right + 72
+      && fileGeometry.label.top >= fileGeometry.row.top
+      && fileGeometry.label.top < fileGeometry.row.bottom,
+      'Saved metadata must start alongside image: '+JSON.stringify(fileGeometry));
+    await savedPanel.getByRole('button', { name: 'Прибрати логотип' })
+      .waitFor({state:'visible',timeout:20_000});
+    await savedPanel.screenshot({path: `${root}/brand-media-current-saved.png`});
+    await page.locator('.bp-brand-media-section').screenshot({path: `${root}/brand-media-current-full-section.png`});
+    await page.setViewportSize({width:390,height:844});
+    const mobileSaved = await savedPanel.evaluate(node => {
+      const frame = node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
+      const close = node.querySelector('.bp-brand-media-current-dismiss button')?.getBoundingClientRect();
+      const metadata = node.querySelector('.bp-brand-media-current-metadata')?.getBoundingClientRect();
+      const previewImage = node.querySelector('.bp-media-preview-frame--brand-form img')?.getBoundingClientRect();
+      const rows = [...node.querySelectorAll('.bp-brand-media-current-metadata .fi-in-entry')].map(entry => {
+        const labelNode = entry.querySelector('.fi-in-entry-label');
+        const valueNode = entry.querySelector('.fi-in-entry-content');
+        const label = labelNode?.getBoundingClientRect();
+        const value = valueNode?.getBoundingClientRect();
+        return label && value ? {
+          text: labelNode.textContent?.trim(),
+          label: { x:label.x, y:label.y, right:label.right },
+          value: { x:value.x, y:value.y, right:value.right },
+          align: getComputedStyle(valueNode).textAlign,
+        } : null;
+      });
+      return { frame:frame && { x:frame.x,y:frame.y,right:frame.right,bottom:frame.bottom },
+        close:close && { x:close.x,y:close.y,right:close.right,bottom:close.bottom },
+        metadata:metadata && { x:metadata.x,right:metadata.right },
+        previewImage:previewImage && {x:previewImage.x,right:previewImage.right}, rows };
+    });
+    assert.ok(mobileSaved.frame && mobileSaved.close && mobileSaved.metadata && mobileSaved.previewImage
+      && mobileSaved.close.x >= mobileSaved.frame.x + 8
+      && mobileSaved.close.y >= mobileSaved.frame.y + 8
+      && mobileSaved.close.right <= mobileSaved.frame.right - 8
+      && mobileSaved.close.bottom < mobileSaved.frame.bottom
+      && mobileSaved.rows.length === 5
+      && mobileSaved.rows.every(row => row && row.label.x >= mobileSaved.metadata.x + 7
+        && row.value.right <= mobileSaved.metadata.right - 7
+        && row.label.right < row.value.x
+        && Math.abs(row.label.y - row.value.y) <= 8
+        && row.value.right <= mobileSaved.metadata.right + 2
+        && row.align === 'right'),
+      'Mobile saved Brand needs native top-right X and same-line left/right metadata: '+JSON.stringify(mobileSaved));
+    assert.ok(mobileSaved.rows.every((row,i) => i===0 || row.label.y-mobileSaved.rows[i-1].label.y <= 36),
+      'Narrow metadata rows should not retain the roomy desktop row gap: '+JSON.stringify(mobileSaved.rows));
+    await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
+    await page.setViewportSize({width:1440,height:900});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
     const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
@@ -685,6 +896,22 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    // Saved-logo X stages unlink, never deletion of the canonical Original.
+    const savedRemove = page.locator('.bp-brand-media-current-layout')
+      .getByRole('button', { name: 'Прибрати логотип' });
+    await savedRemove.waitFor({ state: 'visible', timeout: 20_000 });
+    await savedRemove.click();
+    await page.locator('.bp-brand-media-current-layout').waitFor({ state: 'hidden', timeout: 20_000 });
+    const removeSave = page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && response.url().includes('/livewire-')
+      && response.request().postData()?.includes('"method":"save"'),
+      { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
+    assert.equal((await removeSave).status(), 200);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    assert.equal(await page.locator('.bp-brand-media-current-layout').count(), 0,
+      'Saved Brand logo must remain unlinked after Save/reopen.');
     assert.deepEqual(jsErrors, []);
     succeeded = true;
   } finally {

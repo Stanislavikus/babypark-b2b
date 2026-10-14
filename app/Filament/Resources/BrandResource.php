@@ -79,14 +79,33 @@ class BrandResource extends Resource
                             ->weight(FontWeight::SemiBold)
                             ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
                         Group::make([
-                            MediaPreviewFrame::entry(
-                                ImageEntry::make('logo_preview')
-                                    ->label('Поточне зображення')
-                                    ->hiddenLabel()
-                                    ->state(fn (Get $get, ?Brand $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference(self::formLogoAsset($get, $record)))
-                                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
-                                MediaPreviewFrame::BRAND_FORM,
-                            ),
+                            Group::make([
+                                MediaPreviewFrame::entry(
+                                    ImageEntry::make('logo_preview')
+                                        ->label('Поточне зображення')
+                                        ->hiddenLabel()
+                                        ->state(fn (Get $get, ?Brand $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference(self::formLogoAsset($get, $record)))
+                                        ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(160))),
+                                    MediaPreviewFrame::BRAND_FORM,
+                                ),
+                                Actions::make([
+                                    Action::make('remove_logo')
+                                        ->label('Прибрати логотип')
+                                        ->tooltip('Прибрати логотип')
+                                        ->icon('heroicon-m-x-mark')
+                                        ->iconButton()
+                                        ->color('gray')
+                                        ->visible(fn (Get $get, ?Brand $record): bool => $record instanceof Brand
+                                            && filled($get('logo_media_asset_id'))
+                                            && (string) $get('logo_media_asset_id') === (string) $record->logo_media_asset_id
+                                            && blank($get('logo_upload')))
+                                        ->action(function (Set $set): void {
+                                            // Stage an unlink on Save; do not delete the MediaAsset Original.
+                                            $set('logo_media_asset_id', null);
+                                            $set('logo_upload', null);
+                                        }),
+                                ])->extraAttributes(['class' => 'bp-brand-media-current-dismiss']),
+                            ])->columns(1)->extraAttributes(['class' => 'bp-brand-media-current-image']),
                             Group::make([
                                 TextEntry::make('logo_file')
                                     ->label('Файл')
@@ -124,12 +143,14 @@ class BrandResource extends Resource
 
                                         return $asset instanceof MediaAsset && filled($asset->mime_type) ? (string) $asset->mime_type : '—';
                                     }),
-                            ])->columns(2),
+                            ])->columns(2)
+                                ->extraAttributes(['class' => 'bp-brand-media-current-metadata']),
                         ])
                             ->columns([
                                 'default' => 1,
                                 'md' => 2,
                             ])
+                            ->extraAttributes(['class' => 'bp-brand-media-current-layout'])
                             ->columnSpanFull()
                             ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
                         Group::make([
@@ -168,8 +189,9 @@ class BrandResource extends Resource
                             Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
-                                    ->panelLayout('compact')
-                                    ->imagePreviewHeight('96')
+                                    // Native default panel layout can accommodate a 320px
+                                    // preview without compact-mode scroller clipping.
+                                    ->imagePreviewHeight('320')
                                     ->hiddenLabel()
                                     ->placeholder(__('media_ui.upload'))
                                     ->storeFiles(false)
@@ -270,17 +292,6 @@ class BrandResource extends Resource
                                 : null)
                             ->visible(fn (Component $livewire): bool => $livewire instanceof EditBrand
                                 && filled($livewire->logoPostSaveNotice)),
-                        Actions::make([
-                            Action::make('remove_logo')
-                                ->label('Прибрати логотип')
-                                ->visible(fn (Get $get, ?Brand $record): bool => filled($get('logo_upload')) || self::formLogoAsset($get, $record) instanceof MediaAsset)
-                                ->icon('heroicon-o-x-mark')
-                                ->color('gray')
-                                ->action(function (Set $set): void {
-                                    $set('logo_media_asset_id', null);
-                                    $set('logo_upload', null);
-                                }),
-                        ]),
                     ])
                     ->columnSpanFull(),
                 Textarea::make('short_description')
@@ -473,6 +484,12 @@ class BrandResource extends Resource
     private static function formLogoAsset(Get $get, ?Brand $record): ?MediaAsset
     {
         if ($record instanceof Brand) {
+            // Keep the persisted preview during replacement, but not after
+            // an explicit pending unlink from its native remove action.
+            if (blank($get('logo_media_asset_id')) && blank($get('logo_upload'))) {
+                return null;
+            }
+
             return $record->logo;
         }
 

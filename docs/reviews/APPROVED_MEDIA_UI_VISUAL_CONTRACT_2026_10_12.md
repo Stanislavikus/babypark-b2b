@@ -62,3 +62,131 @@ FilePond's image preview has a default dark surface **and a separate idle shadin
 ## [Resolved implementation evidence 2026-10-13 — source-action stroke and baseline polish]
 
 Real Chromium on the preceding HEAD measured equal 46px CSS box heights but a visual mismatch: Filament's outlined URL action carried an **additional inset 1px box-shadow ring**, a stronger multi-layer shadow, and a slightly different border color. The native FilePond browse label was **2.421875px lower only in local selected state** (empty-state drift 0.109375px; library-state 0.03125px). Restrict the fix to (a) the URL action's non-focus-visible resting shadow/border, preserving native keyboard focus ring, and (b) a 0.15rem selected-local desktop label position adjustment. Retain existing library/mobile geometry and all image preview/cancel behavior. Exact DOM/Chrome regressions should assert <=1px aligned tops and equal visible shadows in empty, library and local selected states. No new behavior, table, library or media writer.
+
+## [Resolved 2026-10-13 — production correction for readable Brand Media]
+
+The production acceptance after #294 rejects the 96px selected FilePond image preview and the 9rem (144px) saved logo preview as unsuitable for inspecting images. Reuse native Filament/FilePond capabilities with 320px selected-file preview and a 320×320px saved Brand form image frame, source aspect ratio preserved (contain) without cropping Original files. Constrain saved-image and its five technical properties to a compact 56rem side-by-side row on wide screens, stacked in narrow containers; preserve existing Asset list/detail variants. Use a three-column native action row with equal 12px gaps, falling back to stacked equal-width controls in narrow containers; keep the full native FilePond drag target without any synthetic uploader or new runtime packages. URL import stays direct HTTP(S) only; file:/// references and HTML photo stock pages are out of scope, and label 'Додати за URL' remains unchanged at owner request. Future multiple product image URLs belong to a separate catalog import campaign. Gate: real Chromium with portrait, landscape, square samples; compare empty/local/library/saved/mobile states, metadata readability, drop and X behavior; final MySQL/Pint/build at frozen HEAD, owner acceptance before merge and separate deploy approval.
+
+## [OPEN GAP, evidence 2026-10-13 — native same-source local replacement]
+
+Owner-approved selected-media UX remains the goal. FilePond v5.7.6 as shipped by Filament / Livewire v4.3.5 **does not complete a second upload for an already processed local file** in this form: original processed item receives `removeUploadedFile`, then `getUploadedFiles`, but the new `upload-file` request never starts. Reproduced independently on browser-selection #135–#137 and on native drop #138, including after network idle and removal of a redundant `live()` (the latter experiment was reverted). The original successful upload, current saved-image preview, library picker and other browser tests were not affected. Temporary local selection replacement currently requires native FilePond X then browse; this is a known deviation from the desired no-X local-to-local experience, and must be disclosed at visual acceptance. Do not patch third-party FilePond internals or introduce a new custom uploader in this campaign. A later focused upstream-backed GAP study may examine a supported vendor fix; no claim of seamless local-to-local replacement or silent user acceptance is permitted.
+
+## [Verification hardening 2026-10-13 — actual visible preview, not just file item]
+
+A 320px FilePond item box can misleadingly pass while its inner image-preview viewport is visibly clipped to the old ~256px; manually inspected Chromium #139 landscape/square/portrait screenshots show incomplete lower image. The old `panelLayout('compact')` predates the new 320px preview and is removed in favor of FilePond's native default layout (no new uploader). Browser acceptance now requires an actual visible image preview of at least 310px, not only a 320px item shell, and full image visibility across orientations. The selected-image-to-actions gap is reduced from ~92px toward a 24–32px target through existing native layout spacing. Saved Brand metadata max-width tightens from 56rem to 44rem to place labels closer to the 320px current image; desktop browser measures <=72px image-to-label separation. All changes remain subject to fresh Chromium screenshots and review.
+
+## [Verification 2026-10-13 — FilePond list-scroller cropping]
+
+Even when `imagePreviewHeight('320')` and the FilePond image-preview DOM report >=310px, the internal FilePond `.filepond--list-scroller` was auto-sized to ~282px while the real image item plus native top inset needed ~344px. Chromium #141 screenshot of known aspect-ratio test content proved ~64px of the lower image was clipped. Scope a CSS min-height/height correction to the existing selected-file FilePond scroller only: `320px + 24px`, preserving the stock FilePond JS, actions, asset identity and upload state. Browser test measures scroller bottom against item bottom and confirms whole visible height; manually inspect updated landscape/square/portrait PNGs before accepting.
+
+
+## [Resolved 2026-10-14 — saved-logo X and compact mobile metadata]
+
+Owner accepted the 320px previews and asks for the saved Brand logo's remove
+button to be a visible top-right X on its image container. Reuse the native
+Filament `remove_logo` action and existing Save-based Brand unlink, **never**
+delete the canonical MediaAsset Original. Pending removal hides the current
+image panel before Save; pending source replacement still shows the previous
+saved logo until Save. FilePond's cancel-only X remains a separate control;
+do not mistake the white sun in synthetic image fixtures for a remove icon.
+
+At narrow Brand containers, show five native metadata TextEntries as compact
+label-left/value-right rows. The desktop 2-column metadata grid remains
+unchanged. Chromium must check label/value geometry, saved X bounds, and
+unlink-on-Save persistence; PR remains Draft until owner review and gates.
+
+
+## [Verification polish 2026-10-14 — native local X vs success indicator]
+
+Real Playwright trace #143 identified the apparent gray circle as FilePond's
+`.filepond--processing-complete-indicator`, not the white fixture sun or
+the actual `revert-item-processing` X. In Brand Media's processed local
+preview only, hide this redundant idle success indicator and expose the
+**enabled** native FilePond cancel/revert action via scoped CSS. Never enable
+a disabled button, mutate upload state, or alter non-complete/error states.
+Browser acceptance must check computed native X visibility, existing SVG,
+and absence of visible success ring. The saved-logo X uses the same
+34px native Filament icon-action styling as the pending library selection;
+its desktop screenshot must wait for actual visible action.
+
+
+## [Resolved 2026-10-14 — one visible media dismiss icon across sources]
+
+Owner accepts the Brand Media layout but flags a visual inconsistency:
+FilePond's processed local-file control appears as a small gray ring/dot,
+while library pending and saved-brand dismiss controls show a clear white
+X on a dark circular 34px native Filament action. Keep all three native
+actions and their distinct semantics. For the enabled FilePond
+processing-complete cancel/revert action only, adjust its existing native
+button's visual metrics through scoped CSS: 34px, black/white contrast,
+enlarged native SVG X glyph, 12px inner-frame offset, and keyboard-visible
+focus. Hide no actual error/progress state, add no fake button, change no
+upload transport. Chrome must assert exact action class, size, contrast,
+position and file cancel/reselect; visually inspect landscape, portrait,
+square, library pending, saved desktop and mobile screenshots before merge.
+
+
+## [Verification correction 2026-10-14 — completed FilePond progress arc]
+
+Manual screenshot review of Chromium #146 after a green 4/4 run exposed
+a residual white arc behind the enlarged native X. Historical Playwright
+trace confirms a distinct FilePond `.filepond--process-indicator` may retain
+a nonzero opacity after the file reaches `processing-complete`, even though
+`.filepond--processing-complete-indicator` was already hidden. Suppress
+**only** this completed-state process ring inside Brand Media; preserve
+normal progress visibility for processing, busy, failure and error states.
+Browser gate now asserts computed hidden/zero-opacity progress indicator
+for landscape, square and portrait processed files. Passing geometry
+alone does not substitute manual screenshot review.
+
+
+## [Verification correction 2026-10-14 — redundant native remove circle]
+
+Chromium #147 screenshot exposed a small offset gray circle behind the new
+native revert X. FilePond provides separate `remove-item` and
+`revert-item-processing` actions; the earlier scoped rule displayed both
+on `processing-complete`. Show only the enabled native revert X for that
+state; suppress the redundant remove-item button only after processing
+has completed, preserving normal remove behavior before upload completes.
+Chrome must assert that inactive remove-item is hidden, revert X is
+visible and functional, and progress/status rings remain hidden.
+
+
+## [Owner visual feedback 2026-10-14 — align mobile metadata inset]
+
+Owner accepts overall Brand Media composition but requests narrow-screen
+technical metadata to use the **same side insets** as the visible saved
+logo. Native ImageEntry leaves an 8px inset inside the responsive image
+panel. Add precisely `0.5rem` horizontal padding to the existing metadata
+Group inside the narrow `brand-media-current` CSS container query.
+Keep five label/value inline rows and preserve approved desktop layout.
+Browser regression must assert that all labels/values start/end at least
+7px inside the metadata container, without changing image size or aspect.
+
+A remaining small gray circular mark underneath the FilePond local-file X
+is still visible in Chromium #148 screenshots despite the preceding
+indicator/remove-button suppression. The exact owner of that mark requires
+DOM evidence, not further guesses; a targeted synthetic browser diagnostic
+will list all native control/indicator bounds and computed styles before
+any follow-up fix.
+
+
+## [Resolved 2026-10-14 — eliminate post-upload ghost ring via native action state]
+
+Chromium #149 diagnostic captured every FilePond action on the same synthetic
+processed image. The enabled native 34px revert X is positioned at
+`left=1129, top=422`. Multiple **disabled** 26px default actions, including
+abort/retry/process, share `left=1140, top=419`, exactly the offset of
+the gray circle photographed behind the new X. The settled DOM reported
+them hidden, but the immediate square/portrait screenshots captured a
+transient previous button during FilePond's native opacity animation.
+
+In `processing-complete` ONLY, hide all FilePond native file-action
+buttons **except** the enabled `revert-item-processing` action via
+scoped visibility/opacity/pointer-events CSS. Do not alter JS, native file
+state, processing/error UI, or touch/keyboard behavior of the revert X.
+Browser gate measures all other action buttons invisible immediately after
+processing-complete on landscape/square/portrait, followed by screenshot
+inspection. This replaces the previously incomplete one-button
+`remove-item` filter. Mobile metadata 8px inset already verified on
+Playwright #149.

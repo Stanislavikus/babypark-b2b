@@ -56,9 +56,66 @@
 }
 
 .bp-media-preview-frame--brand-form {
-    --bp-media-preview-width: 9rem;
+    --bp-media-preview-width: min(100%, 20rem);
 }
 
+/* Bound the saved Brand image/metadata pair, not the entire form.
+   On wide screens the metadata stays directly alongside the 320px image. */
+/* Overlay the existing native remove action inside the saved 320px frame. */
+.bp-brand-media-current-layout {
+    width: 100%;
+    max-width: 44rem;
+    container: brand-media-current / inline-size;
+}
+.bp-brand-media-current-image {
+    position: relative;
+    width: min(100%, 20rem);
+}
+.bp-brand-media-current-dismiss {
+    position: absolute;
+    /* Filament's image frame has 8px internal inset from this Group wrapper:
+       20px on the wrapper yields the agreed 12px inside the frame. */
+    top: 20px;
+    right: 20px;
+    z-index: 5;
+}
+.bp-brand-media-current-dismiss button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    border-radius: 9999px;
+    background: rgb(17 17 17 / 90%) !important;
+    color: white !important;
+}
+.bp-brand-media-current-dismiss button svg { color: white !important; }
+.bp-brand-media-current-metadata { width: 100%; max-width: 30rem; }
+/* Narrow containers: five native Filament entries, one compact label/value
+   row each. Keep the existing desktop metadata two-column arrangement. */
+@container brand-media-current (max-width: 35rem) {
+    /* Avoid Filament's roomy desktop row gap on a 390px device. */
+    .bp-brand-media-current-metadata {
+        /* Same 8px visual inset as the native saved-image preview. */
+        box-sizing: border-box;
+        padding-inline: 0.5rem;
+    }
+    .bp-brand-media-current-metadata > .fi-grid { row-gap: 0.75rem; }
+    .bp-brand-media-current-metadata .fi-in-entry {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+        align-items: start;
+        column-gap: 1rem;
+        row-gap: 0;
+    }
+    .bp-brand-media-current-metadata .fi-in-entry-label-col,
+    .bp-brand-media-current-metadata .fi-in-entry-content-col { min-width: 0; }
+    .bp-brand-media-current-metadata .fi-in-entry-content {
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+}
 .bp-media-preview-frame--detail {
     --bp-media-preview-width: min(100%, 18rem);
 }
@@ -255,11 +312,15 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-subheading { @apply text-base text-gray-500 dark:text-gray-400; font-size: 1.1rem; }
 
 .bp-brand-media-actions { width: 100%; min-width: 0; }
+/* Shared three-column action geometry; all three native controls remain.
+   FilePond still provides the full native dashed-area drop target. */
 .bp-brand-media-actions > .fi-grid {
-    display: flex;
+    display: grid;
+    grid-template-columns: 10.75rem 17.25rem 14.5rem;
+    width: min(100%, 44rem);
+    margin-inline: auto;
     justify-content: center;
     align-items: center;
-    flex-wrap: wrap;
     gap: 0.75rem;
 }
 .bp-brand-media-actions > .fi-grid > .fi-grid-col {
@@ -267,12 +328,35 @@ button.bp-category-tree-header-cell {
     flex: 0 1 auto;
     align-items: center;
     justify-content: center;
-    width: auto;
+    width: 100%;
     min-width: 0;
 }
 .bp-brand-media-actions .fi-fo-file-upload {
-    width: 172px;
+    width: 100%;
     min-height: 46px;
+}
+.bp-brand-media-actions .bp-brand-media-picker,
+.bp-brand-media-actions .bp-brand-media-picker > *,
+.bp-brand-media-actions .bp-brand-media-picker .fi-btn,
+.bp-brand-media-actions .bp-brand-media-url-action,
+.bp-brand-media-actions .bp-brand-media-url-action .fi-ac,
+.bp-brand-media-actions .bp-brand-media-url-action .fi-btn {
+    width: 100%;
+    min-width: 0;
+}
+/* The Filament field/action wrapper is shrink-to-fit by default, even when
+   its button is width:100%. Stretch the existing wrapper to its grid cell:
+   equal 12px gaps, no measured 30px/50px visual gaps. */
+@container (min-width: 44.01rem) {
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col > *,
+    .bp-brand-media-actions > .fi-grid > .fi-grid-col :is(
+        .fi-sc-component, .fi-fo-field-wrp, .fi-fo-field-wrp-input,
+        .fi-fo-modal-table-select, .fi-ac, .fi-ac-action, .fi-btn
+    ) {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100%;
+    }
 }
 .bp-brand-media-actions .filepond--root {
     /* Expand the native FilePond drop target to the exact visible dashed area.
@@ -308,10 +392,10 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-actions .filepond--drop-label label {
     @apply rounded-lg border border-gray-300 bg-white px-3 font-semibold text-gray-950 shadow-sm dark:border-white/20 dark:bg-gray-900 dark:text-white;
     position: absolute;
-    left: max(0px, calc(50% - 19.75rem));
+    left: max(0px, calc(50% - 22rem));
     top: calc(50% + 1.25rem);
     transform: none !important;
-    width: 172px;
+    width: 10.75rem;
     height: 46px;
     line-height: normal;
     font-size: 1rem;
@@ -384,8 +468,8 @@ button.bp-category-tree-header-cell {
     font-size: 1rem;
 }
 
-@container (max-width: 38rem) {
-    .bp-brand-media-actions > .fi-grid { flex-direction: column; }
+@container (max-width: 44rem) {
+    .bp-brand-media-actions > .fi-grid { display: flex; flex-direction: column; width: 100%; }
     /* A narrow Filament drawer must size the real button wrappers, not only
        their flex columns. Otherwise the picker keeps its intrinsic width and
        the URL action shrink-wraps to its label. */
@@ -446,7 +530,7 @@ button.bp-category-tree-header-cell {
     }
 }
 
-/* Keep FilePond's native full-area drag surface and 96px image preview.
+/* Keep FilePond's native full-area drag surface and legible 320px preview.
    Collapse obsolete empty-state copy instead of reserving an invisible blank
    block; actions start below the native image preview. */
 .bp-brand-media-dropzone:has(.filepond--item) {
@@ -467,7 +551,15 @@ button.bp-category-tree-header-cell {
    occupies the Media area (rather than a fixed 15rem centered thumbnail),
    leaving the three actions in their separate row underneath. */
 .bp-brand-media-dropzone:has(.filepond--item) .bp-brand-media-actions > .fi-grid {
-    padding-top: 5rem;
+    padding-top: 19.25rem;
+}
+/* FilePond defaults its internal list scroller to ~282px despite a 320px
+   image-preview item. With the native 24px top inset this clips ~64px from
+   the bottom of the image. Reserve 320px + the 24px inset in that one native
+   scroller, without changing FilePond's upload JS or form state. */
+.bp-brand-media-dropzone .filepond--root:has(.filepond--item) .filepond--list-scroller {
+    height: calc(20rem + 1.5rem) !important;
+    min-height: calc(20rem + 1.5rem) !important;
 }
 .bp-brand-media-actions .filepond--root:has(.filepond--item) .filepond--item {
     width: calc(100% - 3rem) !important;
@@ -479,10 +571,13 @@ button.bp-category-tree-header-cell {
 /* Only after a local file is selected, the native absolute browse label is
    2.42px lower than the two Filament buttons. Adjust the selected-desktop
    position by precisely 0.15rem (2.4px); keep empty/mobile/library untouched. */
-@container (min-width: 38.01rem) {
+@container (min-width: 44.01rem) {
     .bp-brand-media-dropzone:has(.filepond--item)
         .bp-brand-media-actions .filepond--drop-label label {
-        top: calc(50% + 1.10rem) !important;
+        /* 320px preview makes 50% point to the middle of the image.
+           Align to the bottom action row, not the middle of FilePond's root. */
+        top: auto !important;
+        bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.68rem) !important;
     }
 }
 /* FilePond hides its browse label after selecting one file. With single-file
@@ -536,7 +631,7 @@ button.bp-category-tree-header-cell {
 /* Empty desktop state uses FilePond's absolute label. Align it with the
    two native Filament controls; measured Chromium difference was 3.296875px.
    Pending-file and pending-asset states keep their verified positions. */
-@container (min-width: 38.01rem) {
+@container (min-width: 44.01rem) {
     .bp-brand-media-dropzone:not(:has(.filepond--item)):not(:has(.bp-brand-media-candidate))
         .bp-brand-media-actions .filepond--drop-label label {
         top: calc(50% + 1.45rem) !important;
@@ -614,7 +709,7 @@ button.bp-category-tree-header-cell {
     /* Align with Filament's buttons; actual selected desktop drift was 10.84px. */
     bottom: calc(clamp(1rem, 3%, 1.75rem) + 2.93rem) !important;
 }
-@container (max-width: 38rem) {
+@container (max-width: 44rem) {
     .bp-brand-media-dropzone:has(.bp-brand-media-candidate) .filepond--drop-label label {
         /* FilePond's absolute label is the FIRST of three stacked actions.
            At 5.25rem it overlaps URL. Position it above the native library
@@ -655,7 +750,7 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss button svg {
     color: white !important;
 }
-@container (max-width: 38rem) {
+@container (max-width: 44rem) {
     .bp-brand-media-dropzone .bp-brand-media-candidate-dismiss {
         /* Mobile maintains the same 12px inset from preview bounds. */
         top: calc(clamp(1rem, 3%, 1.75rem) + 1.25rem);
@@ -668,6 +763,68 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--item-panel,
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--image-preview-overlay-success {
     opacity: 0 !important;
+}
+/* FilePond transitions several old action buttons out after upload. Its
+   disabled 26px button at the stock right inset can remain visible for a
+   frame, behind the 34px revert X, looking like a second gray circle.
+   In completed state ONLY the real revert X may be displayed; keep the
+   native controls unchanged during processing, cancellation and errors. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
+    .filepond--file-action-button:not(.filepond--action-revert-item-processing) {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+/* The completed native revert action remains clickable and keyboard-usable. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--processing-complete-indicator {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] :is(
+    .filepond--action-revert-item-processing
+):not([disabled]) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 5;
+}
+/* FilePond's progress SVG sometimes remains visible even after the item
+   reaches processing-complete, drawing a gray/white arc behind the native X.
+   Suppress only that completed-state progress ring, not live upload progress. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--process-indicator {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+/* FilePond's stock processed-file X is only 26px, with a tiny 8px SVG
+   glyph and its own hollow-ring appearance. Harmonize the ENABLED native
+   action with Filament's 34px dark X, without adding a second control or
+   changing its cancel/revert behavior. Keep a visible keyboard focus ring. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
+    .filepond--file-action-button.filepond--action-revert-item-processing:not([disabled]) {
+    width: 34px !important;
+    height: 34px !important;
+    min-height: 34px;
+    top: 12px !important;
+    right: 12px !important;
+    border-radius: 9999px !important;
+    background-color: rgb(17 17 17 / 90%) !important;
+    color: white !important;
+    box-shadow: none !important;
+}
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
+    .filepond--file-action-button.filepond--action-revert-item-processing:not([disabled]) svg {
+    /* The native SVG is already an X; enlarge its small central path.
+       Disable only the decorative one-shot FilePond fall animation. */
+    animation: none !important;
+    transform: scale(1.4) !important;
+    color: white !important;
+}
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
+    .filepond--file-action-button.filepond--action-revert-item-processing:not([disabled]):focus-visible {
+    outline: 2px solid var(--primary-500, #2563eb) !important;
+    outline-offset: 3px;
 }
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-info,
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-status {
