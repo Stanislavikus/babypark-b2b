@@ -353,18 +353,3 @@ user-facing `Assets` as `Медіатека` (RU `Медиатека`, EN `Media
 one notice by `Зображення вже є в медіатеці. Використано файл з медіатеки.`.
 The SHA-based deduplication behavior and existing Asset/Brand transactional
 semantics are unchanged. See `docs/reviews/BRAND_MEDIA_UNIFIED_AUTHORING_2026_10_11.md`.
-
-
-## [Resolved owner visual feedback 2026-10-14 — mobile Asset footer metadata]
-
-Owner's production screenshot shows the bottom Asset fields `Зберігання`,
-`Технічний стан`, `Додано` as three vertically stretched label/value
-pairs on a phone, while the desktop three-column arrangement is accepted.
-Reuse the approved compact mobile Brand image metadata pattern: native
-Filament TextEntries, one row per field, label aligned left, value (including
-badges/date) aligned right, 0.5rem horizontal padding matching the picture
-inset, and 0.75rem row gaps. Keep desktop native three-column layout.
-The same shared presentation class belongs to both Asset View and Edit
-footer groups; do not change semantics, storage, permissions or record state.
-Real isolated GitHub Chromium acceptance must prove two mobile screens and
-unchanged three-column desktop grouping.

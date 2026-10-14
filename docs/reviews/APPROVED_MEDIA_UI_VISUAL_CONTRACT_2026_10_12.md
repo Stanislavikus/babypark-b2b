@@ -190,3 +190,22 @@ processing-complete on landscape/square/portrait, followed by screenshot
 inspection. This replaces the previously incomplete one-button
 `remove-item` filter. Mobile metadata 8px inset already verified on
 Playwright #149.
+
+
+## [Resolved — 2026-10-14 owner production feedback: compact Brand footer on mobile]
+
+Following verified deployment of PR #295, owner accepted the final Brand media
+section (native FilePond upload, library and URL source controls, cancel X inside
+preview, and five image details on mobile), but the three technical properties
+under the Brand short description still render as vertically expanded entries
+on phones: `Зберігання`, `Технічний стан`, `Додано`.
+
+Reuse the **same final BrandResource card**, changing only these three bottom
+TextEntries' narrow-screen presentation: left label/right value in one row per
+entry, 0.5rem symmetric inner inset, 0.75rem row gap, native Filament badges,
+full-width desktop three-column layout unchanged. Do not alter the
+standalone MediaAsset Edit/View layouts (they are not the approved Brand Media
+form), the native picker/URL/FilePond controls, saved preview, image metadata,
+Asset identity, or persistence. Browser acceptance MUST run on the approved
+BrandResource edit form, assert both upper preview/X and footer, and capture
+a FULL Brand mobile form screenshot; Asset-only screenshots cannot prove it.

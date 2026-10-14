@@ -145,13 +145,14 @@ jobs:
             test-results/browser-smoke/brand-media-current-saved.png
             test-results/browser-smoke/brand-media-current-full-section.png
             test-results/browser-smoke/brand-media-current-mobile.png
+            test-results/browser-smoke/brand-media-final-card-mobile.png
+            test-results/browser-smoke/brand-media-final-card-desktop.png
             test-results/browser-smoke/brand-media-library-preview.png
             test-results/browser-smoke/brand-media-library-mobile.png
             test-results/browser-smoke/brand-media-picker-layout.png
             test-results/browser-smoke/brand-media-picker-filters.png
             test-results/browser-smoke/brand-media-picker-selected.png
             test-results/browser-smoke/brand-media-picker-list-layout.png
-            test-results/browser-smoke/asset-footer-*.png
           if-no-files-found: ignore
           retention-days: 7
 

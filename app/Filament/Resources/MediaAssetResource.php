@@ -155,8 +155,7 @@ class MediaAssetResource extends Resource
                 ])->columns([
                     'default' => 1,
                     'md' => 3,
-                ])->columnSpanFull()
-                    ->extraAttributes(['class' => 'bp-media-asset-footer-metadata']),
+                ])->columnSpanFull(),
             ]),
             Section::make('Використовується в')->schema([
                 TextEntry::make('usage_items_edit')
@@ -238,8 +237,7 @@ class MediaAssetResource extends Resource
                 ])->columns([
                     'default' => 1,
                     'md' => 3,
-                ])->columnSpanFull()
-                    ->extraAttributes(['class' => 'bp-media-asset-footer-metadata']),
+                ])->columnSpanFull(),
                 TextEntry::make('diagnosis_help')
                     ->label('Що це означає')
                     ->state(fn (MediaAsset $record): ?string => self::diagnosisHelp($record))

@@ -335,7 +335,8 @@ class BrandResource extends Resource
                         'default' => 1,
                         'md' => 3,
                     ])
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->extraAttributes(['class' => 'bp-brand-media-footer-metadata']),
                 Toggle::make('is_active')
                     ->label('Активний')
                     ->helperText('Неактивний бренд залишається у Master і на існуючих товарах, але не пропонується для нового призначення.')
