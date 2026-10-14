@@ -761,6 +761,37 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await savedPanel.screenshot({path: `${root}/brand-media-current-saved.png`});
     await page.locator('.bp-brand-media-section').screenshot({path: `${root}/brand-media-current-full-section.png`});
     await page.setViewportSize({width:390,height:844});
+    const mobileSaved = await savedPanel.evaluate(node => {
+      const frame = node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
+      const close = node.querySelector('.bp-brand-media-current-dismiss button')?.getBoundingClientRect();
+      const metadata = node.querySelector('.bp-brand-media-current-metadata')?.getBoundingClientRect();
+      const rows = [...node.querySelectorAll('.bp-brand-media-current-metadata .fi-in-entry')].map(entry => {
+        const labelNode = entry.querySelector('.fi-in-entry-label');
+        const valueNode = entry.querySelector('.fi-in-entry-content');
+        const label = labelNode?.getBoundingClientRect();
+        const value = valueNode?.getBoundingClientRect();
+        return label && value ? {
+          text: labelNode.textContent?.trim(),
+          label: { x:label.x, y:label.y, right:label.right },
+          value: { x:value.x, y:value.y, right:value.right },
+          align: getComputedStyle(valueNode).textAlign,
+        } : null;
+      });
+      return { frame:frame && { x:frame.x,y:frame.y,right:frame.right,bottom:frame.bottom },
+        close:close && { x:close.x,y:close.y,right:close.right,bottom:close.bottom },
+        metadata:metadata && { x:metadata.x,right:metadata.right }, rows };
+    });
+    assert.ok(mobileSaved.frame && mobileSaved.close && mobileSaved.metadata
+      && mobileSaved.close.x >= mobileSaved.frame.x + 8
+      && mobileSaved.close.y >= mobileSaved.frame.y + 8
+      && mobileSaved.close.right <= mobileSaved.frame.right - 8
+      && mobileSaved.close.bottom < mobileSaved.frame.bottom
+      && mobileSaved.rows.length === 5
+      && mobileSaved.rows.every(row => row && row.label.right < row.value.x
+        && Math.abs(row.label.y - row.value.y) <= 8
+        && row.value.right <= mobileSaved.metadata.right + 2
+        && row.align === 'right'),
+      'Mobile saved Brand needs native top-right X and same-line left/right metadata: '+JSON.stringify(mobileSaved));
     await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
     await page.setViewportSize({width:1440,height:900});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
@@ -782,6 +813,22 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('other.png', { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    // Saved-logo X stages unlink, never deletion of the canonical Original.
+    const savedRemove = page.locator('.bp-brand-media-current-layout')
+      .getByRole('button', { name: 'Прибрати логотип' });
+    await savedRemove.waitFor({ state: 'visible', timeout: 20_000 });
+    await savedRemove.click();
+    await page.locator('.bp-brand-media-current-layout').waitFor({ state: 'hidden', timeout: 20_000 });
+    const removeSave = page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && response.url().includes('/livewire-')
+      && response.request().postData()?.includes('"method":"save"'),
+      { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
+    assert.equal((await removeSave).status(), 200);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    assert.equal(await page.locator('.bp-brand-media-current-layout').count(), 0,
+      'Saved Brand logo must remain unlinked after Save/reopen.');
     assert.deepEqual(jsErrors, []);
     succeeded = true;
   } finally {

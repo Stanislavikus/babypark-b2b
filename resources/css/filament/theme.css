@@ -61,8 +61,52 @@
 
 /* Bound the saved Brand image/metadata pair, not the entire form.
    On wide screens the metadata stays directly alongside the 320px image. */
-.bp-brand-media-current-layout { width: 100%; max-width: 44rem; }
+/* Overlay the existing native remove action inside the saved 320px frame. */
+.bp-brand-media-current-layout {
+    width: 100%;
+    max-width: 44rem;
+    container: brand-media-current / inline-size;
+}
+.bp-brand-media-current-image {
+    position: relative;
+    width: min(100%, 20rem);
+}
+.bp-brand-media-current-dismiss {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+}
+.bp-brand-media-current-dismiss .fi-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    border-radius: 9999px;
+    background: rgb(17 17 17 / 90%);
+    color: white;
+}
+.bp-brand-media-current-dismiss .fi-btn svg { color: white; }
 .bp-brand-media-current-metadata { width: 100%; max-width: 30rem; }
+/* Narrow containers: five native Filament entries, one compact label/value
+   row each. Keep the existing desktop metadata two-column arrangement. */
+@container brand-media-current (max-width: 35rem) {
+    .bp-brand-media-current-metadata .fi-in-entry {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+        align-items: start;
+        column-gap: 1rem;
+        row-gap: 0;
+    }
+    .bp-brand-media-current-metadata .fi-in-entry-label-col,
+    .bp-brand-media-current-metadata .fi-in-entry-content-col { min-width: 0; }
+    .bp-brand-media-current-metadata .fi-in-entry-content {
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+}
 .bp-media-preview-frame--detail {
     --bp-media-preview-width: min(100%, 18rem);
 }

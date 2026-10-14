@@ -78,3 +78,19 @@ A 320px FilePond item box can misleadingly pass while its inner image-preview vi
 ## [Verification 2026-10-13 — FilePond list-scroller cropping]
 
 Even when `imagePreviewHeight('320')` and the FilePond image-preview DOM report >=310px, the internal FilePond `.filepond--list-scroller` was auto-sized to ~282px while the real image item plus native top inset needed ~344px. Chromium #141 screenshot of known aspect-ratio test content proved ~64px of the lower image was clipped. Scope a CSS min-height/height correction to the existing selected-file FilePond scroller only: `320px + 24px`, preserving the stock FilePond JS, actions, asset identity and upload state. Browser test measures scroller bottom against item bottom and confirms whole visible height; manually inspect updated landscape/square/portrait PNGs before accepting.
+
+
+## [Resolved 2026-10-14 — saved-logo X and compact mobile metadata]
+
+Owner accepted the 320px previews and asks for the saved Brand logo's remove
+button to be a visible top-right X on its image container. Reuse the native
+Filament `remove_logo` action and existing Save-based Brand unlink, **never**
+delete the canonical MediaAsset Original. Pending removal hides the current
+image panel before Save; pending source replacement still shows the previous
+saved logo until Save. FilePond's cancel-only X remains a separate control;
+do not mistake the white sun in synthetic image fixtures for a remove icon.
+
+At narrow Brand containers, show five native metadata TextEntries as compact
+label-left/value-right rows. The desktop 2-column metadata grid remains
+unchanged. Chromium must check label/value geometry, saved X bounds, and
+unlink-on-Save persistence; PR remains Draft until owner review and gates.
