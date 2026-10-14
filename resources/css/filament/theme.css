@@ -73,8 +73,10 @@
 }
 .bp-brand-media-current-dismiss {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    /* Filament's image frame has 8px internal inset from this Group wrapper:
+       20px on the wrapper yields the agreed 12px inside the frame. */
+    top: 20px;
+    right: 20px;
     z-index: 5;
 }
 .bp-brand-media-current-dismiss .fi-btn {
