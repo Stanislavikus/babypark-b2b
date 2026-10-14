@@ -195,7 +195,8 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           '.filepond--file-action-button:is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
         );
         const icon = button?.querySelector('svg');
-        if (!item || !button || !icon) return null;
+        const progress = item?.querySelector('.filepond--process-indicator');
+        if (!item || !button || !icon || !progress) return null;
         const a = item.getBoundingClientRect(), b = button.getBoundingClientRect();
         const s = getComputedStyle(button), t = getComputedStyle(icon);
         return {
@@ -205,6 +206,8 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           background:s.backgroundColor, color:s.color, opacity:s.opacity,
           focusable:button.tabIndex >= 0,
           iconScale:t.transform, iconColor:t.color,
+          progressOpacity:getComputedStyle(progress).opacity,
+          progressVisibility:getComputedStyle(progress).visibility,
         };
       });
       assert.ok(metrics && metrics.enabled && metrics.focusable
@@ -215,8 +218,11 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         && metrics.background === 'rgba(17, 17, 17, 0.9)'
         && metrics.color === 'rgb(255, 255, 255)'
         && metrics.iconColor === 'rgb(255, 255, 255)'
-        && metrics.iconScale.includes('1.4'),
-        'FilePond '+shape+' cancel X must match 34px Filament actions: '+JSON.stringify(metrics));
+        && metrics.iconScale.includes('1.4')
+        && metrics.progressOpacity === '0'
+        && metrics.progressVisibility === 'hidden',
+        'FilePond '+shape+' cancel X must match 34px Filament actions without a progress arc: '
+          + JSON.stringify(metrics));
     };
     await assertUnifiedLocalX('landscape');
     const visibleCrop = await area.evaluate(node => {

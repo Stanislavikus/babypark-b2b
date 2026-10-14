@@ -777,6 +777,14 @@ button.bp-category-tree-header-cell {
     pointer-events: auto !important;
     z-index: 5;
 }
+/* FilePond's progress SVG sometimes remains visible even after the item
+   reaches processing-complete, drawing a gray/white arc behind the native X.
+   Suppress only that completed-state progress ring, not live upload progress. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--process-indicator {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
 /* FilePond's stock processed-file X is only 26px, with a tiny 8px SVG
    glyph and its own hollow-ring appearance. Harmonize the ENABLED native
    action with Filament's 34px dark X, without adding a second control or

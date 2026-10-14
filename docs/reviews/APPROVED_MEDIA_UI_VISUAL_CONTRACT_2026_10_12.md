@@ -124,3 +124,17 @@ focus. Hide no actual error/progress state, add no fake button, change no
 upload transport. Chrome must assert exact action class, size, contrast,
 position and file cancel/reselect; visually inspect landscape, portrait,
 square, library pending, saved desktop and mobile screenshots before merge.
+
+
+## [Verification correction 2026-10-14 — completed FilePond progress arc]
+
+Manual screenshot review of Chromium #146 after a green 4/4 run exposed
+a residual white arc behind the enlarged native X. Historical Playwright
+trace confirms a distinct FilePond `.filepond--process-indicator` may retain
+a nonzero opacity after the file reaches `processing-complete`, even though
+`.filepond--processing-complete-indicator` was already hidden. Suppress
+**only** this completed-state process ring inside Brand Media; preserve
+normal progress visibility for processing, busy, failure and error states.
+Browser gate now asserts computed hidden/zero-opacity progress indicator
+for landscape, square and portrait processed files. Passing geometry
+alone does not substitute manual screenshot review.
