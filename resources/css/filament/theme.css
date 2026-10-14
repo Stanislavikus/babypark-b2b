@@ -120,6 +120,37 @@
     --bp-media-preview-width: min(100%, 18rem);
 }
 
+/* Asset technical summary (Storage / Status / Added).
+   Apply the existing compact label/value visual grammar to BOTH native
+   Asset View and Edit pages on phones, without altering desktop 3 columns. */
+@media (max-width: 640px) {
+    .bp-media-asset-footer-metadata {
+        box-sizing: border-box;
+        padding-inline: 0.5rem;
+    }
+    .bp-media-asset-footer-metadata > .fi-grid {
+        row-gap: 0.75rem;
+    }
+    .bp-media-asset-footer-metadata .fi-in-entry {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+        align-items: center;
+        column-gap: 1rem;
+        row-gap: 0;
+    }
+    .bp-media-asset-footer-metadata .fi-in-entry-label-col,
+    .bp-media-asset-footer-metadata .fi-in-entry-content-col {
+        min-width: 0;
+    }
+    .bp-media-asset-footer-metadata .fi-in-entry-content-col {
+        justify-self: end;
+    }
+    .bp-media-asset-footer-metadata .fi-in-entry-content {
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+}
+
 /* Category Tree: keep the package as the interaction engine, but present it
    with the same visual language as native Filament tables. */
 .bp-category-tree-frame {
