@@ -912,6 +912,12 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await savedPanel.getByRole('button', {name:'Прибрати логотип'})
       .waitFor({state:'visible'});
     await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
+    // Filament's sticky navigation is captured by Playwright fullPage at the
+    // CURRENT scrolled viewport Y. Previous full-page screenshots showed it
+    // across the preview rather than at document top; that was screenshot
+    // capture positioning, not an extra Brand component.
+    await page.evaluate(() => window.scrollTo({top:0,left:0,behavior:'instant'}));
+    await page.waitForFunction(() => Math.abs(window.scrollY) <= 1);
     await page.screenshot({path: `${root}/brand-media-final-card-mobile.png`,fullPage:true});
     await page.setViewportSize({width:1440,height:900});
     const desktopFooter = await footerGeometry();
@@ -923,6 +929,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && Math.abs(desktopFooter.rows[1].label.y-desktopFooter.rows[2].label.y) <= 12,
       'Final Brand footer keeps its native desktop 3-column row: '
         + JSON.stringify(desktopFooter));
+    await page.evaluate(() => window.scrollTo({top:0,left:0,behavior:'instant'}));
+    await page.waitForFunction(() => Math.abs(window.scrollY) <= 1);
     await page.screenshot({path: `${root}/brand-media-final-card-desktop.png`,fullPage:true});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
     const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
