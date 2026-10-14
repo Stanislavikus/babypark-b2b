@@ -108,3 +108,19 @@ Browser acceptance must check computed native X visibility, existing SVG,
 and absence of visible success ring. The saved-logo X uses the same
 34px native Filament icon-action styling as the pending library selection;
 its desktop screenshot must wait for actual visible action.
+
+
+## [Resolved 2026-10-14 — one visible media dismiss icon across sources]
+
+Owner accepts the Brand Media layout but flags a visual inconsistency:
+FilePond's processed local-file control appears as a small gray ring/dot,
+while library pending and saved-brand dismiss controls show a clear white
+X on a dark circular 34px native Filament action. Keep all three native
+actions and their distinct semantics. For the enabled FilePond
+processing-complete cancel/revert action only, adjust its existing native
+button's visual metrics through scoped CSS: 34px, black/white contrast,
+enlarged native SVG X glyph, 12px inner-frame offset, and keyboard-visible
+focus. Hide no actual error/progress state, add no fake button, change no
+upload transport. Chrome must assert exact action class, size, contrast,
+position and file cancel/reselect; visually inspect landscape, portrait,
+square, library pending, saved desktop and mobile screenshots before merge.

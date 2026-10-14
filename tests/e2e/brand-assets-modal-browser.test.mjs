@@ -186,6 +186,39 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       && completedAction.indicatorOpacity === '0',
       'Completed FilePond must show a real native cancel X, not the status ring: '
         + JSON.stringify(completedAction));
+    // Pixel contract for the real native FilePond X: equal to Filament's
+    // 34px black/white image-dismiss actions, not a 26px hollow status ring.
+    const assertUnifiedLocalX = async (shape) => {
+      const metrics = await area.evaluate(node => {
+        const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+        const button = item?.querySelector(
+          '.filepond--file-action-button:is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
+        );
+        const icon = button?.querySelector('svg');
+        if (!item || !button || !icon) return null;
+        const a = item.getBoundingClientRect(), b = button.getBoundingClientRect();
+        const s = getComputedStyle(button), t = getComputedStyle(icon);
+        return {
+          enabled: !button.disabled,
+          size: {width:b.width, height:b.height},
+          inset: {top:b.top-a.top, right:a.right-b.right},
+          background:s.backgroundColor, color:s.color, opacity:s.opacity,
+          focusable:button.tabIndex >= 0,
+          iconScale:t.transform, iconColor:t.color,
+        };
+      });
+      assert.ok(metrics && metrics.enabled && metrics.focusable
+        && metrics.size.width >= 33 && metrics.size.width <= 35
+        && metrics.size.height >= 33 && metrics.size.height <= 35
+        && metrics.inset.top >= 9 && metrics.inset.top <= 15
+        && metrics.inset.right >= 9 && metrics.inset.right <= 15
+        && metrics.background === 'rgba(17, 17, 17, 0.9)'
+        && metrics.color === 'rgb(255, 255, 255)'
+        && metrics.iconColor === 'rgb(255, 255, 255)'
+        && metrics.iconScale.includes('1.4'),
+        'FilePond '+shape+' cancel X must match 34px Filament actions: '+JSON.stringify(metrics));
+    };
+    await assertUnifiedLocalX('landscape');
     const visibleCrop = await area.evaluate(node => {
       const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const scroller = node.querySelector('.filepond--list-scroller');
@@ -269,6 +302,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const frame=await area.locator('.filepond--item').first().boundingBox();
       assert.ok(frame && frame.height>=240 && frame.width>=280,
         'A '+shape+' image must stay legible: '+JSON.stringify(frame));
+      await assertUnifiedLocalX(shape);
       await area.screenshot({path:root+'/brand-media-'+shape+'-drop.png'});
     }
     await replaceViaNativeCancel('replacement.png');
