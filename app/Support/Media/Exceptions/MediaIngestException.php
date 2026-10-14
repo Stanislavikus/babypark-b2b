@@ -13,12 +13,12 @@ final class MediaIngestException extends RuntimeException
 
     public static function fileTooLarge(): self
     {
-        return new self('Файл завеликий. Максимальний розмір Original — 20 МіБ.');
+        return new self('Розмір файлу перевищує 20 МіБ.');
     }
 
     public static function pixelLimitExceeded(): self
     {
-        return new self('Зображення завелике за роздільною здатністю. Максимум — 25 мегапікселів.');
+        return new self('Роздільність зображення перевищує 25 МП.');
     }
 
     public static function svgUnsupported(): self
