@@ -230,6 +230,34 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           + JSON.stringify(metrics));
     };
     await assertUnifiedLocalX('landscape');
+    // Diagnostic is intentionally restricted to isolated synthetic Chromium.
+    // Identify the EXACT native control responsible for a secondary gray circle.
+    const circleProbe = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const nativeX = item?.querySelector('.filepond--action-revert-item-processing');
+      if (!item || !nativeX) return null;
+      const itemRect = item.getBoundingClientRect(), rect = nativeX.getBoundingClientRect();
+      const candidates = [...item.querySelectorAll('[class*="filepond--action-"], [class*="filepond--indicator"]')];
+      return {
+        x: {left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom},
+        item: {left:itemRect.left,top:itemRect.top,right:itemRect.right,bottom:itemRect.bottom},
+        elements: candidates.map(el => {
+          const b=el.getBoundingClientRect(), s=getComputedStyle(el);
+          return {tag:el.tagName, cls:el.className?.baseVal ?? el.className,
+            dataAlign:el.getAttribute('data-align'), disabled:el.hasAttribute('disabled'),
+            rect:{left:b.left,top:b.top,right:b.right,bottom:b.bottom,width:b.width,height:b.height},
+            opacity:s.opacity,visibility:s.visibility,display:s.display,
+            bg:s.backgroundColor,shadow:s.boxShadow,transform:s.transform,
+            inlineStyle:el.getAttribute('style')?.slice(0,180)};
+        }),
+        hits: [[-1,-2],[0,0],[7,-7],[9,-10],[13,-9],[15,-12],[17,-14]].map(([dx,dy]) => {
+          const px=rect.right+dx,py=rect.top+dy;
+          return {x:px,y:py,stack:document.elementsFromPoint(px,py).slice(0,9)
+            .map(el => ({tag:el.tagName,cls:el.className?.baseVal ?? el.className}))};
+        }),
+      };
+    });
+    console.log('# FILEPOND_CLOSE_DIAGNOSTIC '+JSON.stringify(circleProbe));
     const visibleCrop = await area.evaluate(node => {
       const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const scroller = node.querySelector('.filepond--list-scroller');
@@ -836,6 +864,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       const frame = node.querySelector('.bp-media-preview-frame--brand-form')?.getBoundingClientRect();
       const close = node.querySelector('.bp-brand-media-current-dismiss button')?.getBoundingClientRect();
       const metadata = node.querySelector('.bp-brand-media-current-metadata')?.getBoundingClientRect();
+      const previewImage = node.querySelector('.bp-media-preview-frame--brand-form img')?.getBoundingClientRect();
       const rows = [...node.querySelectorAll('.bp-brand-media-current-metadata .fi-in-entry')].map(entry => {
         const labelNode = entry.querySelector('.fi-in-entry-label');
         const valueNode = entry.querySelector('.fi-in-entry-content');
@@ -850,15 +879,18 @@ test('Brand picks an existing Original image from the native Assets visual libra
       });
       return { frame:frame && { x:frame.x,y:frame.y,right:frame.right,bottom:frame.bottom },
         close:close && { x:close.x,y:close.y,right:close.right,bottom:close.bottom },
-        metadata:metadata && { x:metadata.x,right:metadata.right }, rows };
+        metadata:metadata && { x:metadata.x,right:metadata.right },
+        previewImage:previewImage && {x:previewImage.x,right:previewImage.right}, rows };
     });
-    assert.ok(mobileSaved.frame && mobileSaved.close && mobileSaved.metadata
+    assert.ok(mobileSaved.frame && mobileSaved.close && mobileSaved.metadata && mobileSaved.previewImage
       && mobileSaved.close.x >= mobileSaved.frame.x + 8
       && mobileSaved.close.y >= mobileSaved.frame.y + 8
       && mobileSaved.close.right <= mobileSaved.frame.right - 8
       && mobileSaved.close.bottom < mobileSaved.frame.bottom
       && mobileSaved.rows.length === 5
-      && mobileSaved.rows.every(row => row && row.label.right < row.value.x
+      && mobileSaved.rows.every(row => row && row.label.x >= mobileSaved.metadata.x + 7
+        && row.value.right <= mobileSaved.metadata.right - 7
+        && row.label.right < row.value.x
         && Math.abs(row.label.y - row.value.y) <= 8
         && row.value.right <= mobileSaved.metadata.right + 2
         && row.align === 'right'),

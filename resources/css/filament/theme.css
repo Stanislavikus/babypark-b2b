@@ -96,6 +96,11 @@
    row each. Keep the existing desktop metadata two-column arrangement. */
 @container brand-media-current (max-width: 35rem) {
     /* Avoid Filament's roomy desktop row gap on a 390px device. */
+    .bp-brand-media-current-metadata {
+        /* Same 8px visual inset as the native saved-image preview. */
+        box-sizing: border-box;
+        padding-inline: 0.5rem;
+    }
     .bp-brand-media-current-metadata > .fi-grid { row-gap: 0.75rem; }
     .bp-brand-media-current-metadata .fi-in-entry {
         display: grid;

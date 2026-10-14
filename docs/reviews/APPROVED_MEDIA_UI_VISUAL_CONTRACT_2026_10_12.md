@@ -150,3 +150,22 @@ state; suppress the redundant remove-item button only after processing
 has completed, preserving normal remove behavior before upload completes.
 Chrome must assert that inactive remove-item is hidden, revert X is
 visible and functional, and progress/status rings remain hidden.
+
+
+## [Owner visual feedback 2026-10-14 — align mobile metadata inset]
+
+Owner accepts overall Brand Media composition but requests narrow-screen
+technical metadata to use the **same side insets** as the visible saved
+logo. Native ImageEntry leaves an 8px inset inside the responsive image
+panel. Add precisely `0.5rem` horizontal padding to the existing metadata
+Group inside the narrow `brand-media-current` CSS container query.
+Keep five label/value inline rows and preserve approved desktop layout.
+Browser regression must assert that all labels/values start/end at least
+7px inside the metadata container, without changing image size or aspect.
+
+A remaining small gray circular mark underneath the FilePond local-file X
+is still visible in Chromium #148 screenshots despite the preceding
+indicator/remove-button suppression. The exact owner of that mark requires
+DOM evidence, not further guesses; a targeted synthetic browser diagnostic
+will list all native control/indicator bounds and computed styles before
+any follow-up fix.
