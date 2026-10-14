@@ -138,3 +138,15 @@ normal progress visibility for processing, busy, failure and error states.
 Browser gate now asserts computed hidden/zero-opacity progress indicator
 for landscape, square and portrait processed files. Passing geometry
 alone does not substitute manual screenshot review.
+
+
+## [Verification correction 2026-10-14 — redundant native remove circle]
+
+Chromium #147 screenshot exposed a small offset gray circle behind the new
+native revert X. FilePond provides separate `remove-item` and
+`revert-item-processing` actions; the earlier scoped rule displayed both
+on `processing-complete`. Show only the enabled native revert X for that
+state; suppress the redundant remove-item button only after processing
+has completed, preserving normal remove behavior before upload completes.
+Chrome must assert that inactive remove-item is hidden, revert X is
+visible and functional, and progress/status rings remain hidden.

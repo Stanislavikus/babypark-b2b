@@ -192,11 +192,12 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const metrics = await area.evaluate(node => {
         const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
         const button = item?.querySelector(
-          '.filepond--file-action-button:is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
+          '.filepond--file-action-button.filepond--action-revert-item-processing:not([disabled])',
         );
         const icon = button?.querySelector('svg');
         const progress = item?.querySelector('.filepond--process-indicator');
-        if (!item || !button || !icon || !progress) return null;
+        const inactiveRemove = item?.querySelector('.filepond--action-remove-item');
+        if (!item || !button || !icon || !progress || !inactiveRemove) return null;
         const a = item.getBoundingClientRect(), b = button.getBoundingClientRect();
         const s = getComputedStyle(button), t = getComputedStyle(icon);
         return {
@@ -208,6 +209,8 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
           iconScale:t.transform, iconColor:t.color,
           progressOpacity:getComputedStyle(progress).opacity,
           progressVisibility:getComputedStyle(progress).visibility,
+          inactiveRemoveOpacity:getComputedStyle(inactiveRemove).opacity,
+          inactiveRemoveVisibility:getComputedStyle(inactiveRemove).visibility,
         };
       });
       assert.ok(metrics && metrics.enabled && metrics.focusable
@@ -220,7 +223,9 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
         && metrics.iconColor === 'rgb(255, 255, 255)'
         && metrics.iconScale.includes('1.4')
         && metrics.progressOpacity === '0'
-        && metrics.progressVisibility === 'hidden',
+        && metrics.progressVisibility === 'hidden'
+        && metrics.inactiveRemoveOpacity === '0'
+        && metrics.inactiveRemoveVisibility === 'hidden',
         'FilePond '+shape+' cancel X must match 34px Filament actions without a progress arc: '
           + JSON.stringify(metrics));
     };

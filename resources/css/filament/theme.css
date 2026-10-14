@@ -759,18 +759,22 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--image-preview-overlay-success {
     opacity: 0 !important;
 }
-/* Native FilePond shows a hollow successful-upload indicator in the top-right
-   and keeps its actual X action hidden. Once processing is complete, prefer
-   the enabled native cancel/revert X over the success circle. This does not
-   affect in-progress, failed or disabled FilePond actions. */
+/* Keep exactly one native processed-file control: the enabled revert action.
+   The ordinary remove-item button is another gray circle at a distinct
+   inset; hiding it here preserves its normal pre-processing behavior. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--action-remove-item {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+/* The completed native revert action remains clickable and keyboard-usable. */
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--processing-complete-indicator {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
 }
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] :is(
-    .filepond--action-revert-item-processing,
-    .filepond--action-remove-item
+    .filepond--action-revert-item-processing
 ):not([disabled]) {
     opacity: 1 !important;
     visibility: visible !important;
@@ -790,7 +794,7 @@ button.bp-category-tree-header-cell {
    action with Filament's 34px dark X, without adding a second control or
    changing its cancel/revert behavior. Keep a visible keyboard focus ring. */
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
-    .filepond--file-action-button:is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled]) {
+    .filepond--file-action-button.filepond--action-revert-item-processing:not([disabled]) {
     width: 34px !important;
     height: 34px !important;
     min-height: 34px;
@@ -802,7 +806,7 @@ button.bp-category-tree-header-cell {
     box-shadow: none !important;
 }
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
-    .filepond--file-action-button:is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled]) svg {
+    .filepond--file-action-button.filepond--action-revert-item-processing:not([disabled]) svg {
     /* The native SVG is already an X; enlarge its small central path.
        Disable only the decorative one-shot FilePond fall animation. */
     animation: none !important;
@@ -810,7 +814,7 @@ button.bp-category-tree-header-cell {
     color: white !important;
 }
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"]
-    .filepond--file-action-button:is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled]):focus-visible {
+    .filepond--file-action-button.filepond--action-revert-item-processing:not([disabled]):focus-visible {
     outline: 2px solid var(--primary-500, #2563eb) !important;
     outline-offset: 3px;
 }
