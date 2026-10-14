@@ -94,3 +94,17 @@ At narrow Brand containers, show five native metadata TextEntries as compact
 label-left/value-right rows. The desktop 2-column metadata grid remains
 unchanged. Chromium must check label/value geometry, saved X bounds, and
 unlink-on-Save persistence; PR remains Draft until owner review and gates.
+
+
+## [Verification polish 2026-10-14 — native local X vs success indicator]
+
+Real Playwright trace #143 identified the apparent gray circle as FilePond's
+`.filepond--processing-complete-indicator`, not the white fixture sun or
+the actual `revert-item-processing` X. In Brand Media's processed local
+preview only, hide this redundant idle success indicator and expose the
+**enabled** native FilePond cancel/revert action via scoped CSS. Never enable
+a disabled button, mutate upload state, or alter non-complete/error states.
+Browser acceptance must check computed native X visibility, existing SVG,
+and absence of visible success ring. The saved-logo X uses the same
+34px native Filament icon-action styling as the pending library selection;
+its desktop screenshot must wait for actual visible action.

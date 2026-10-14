@@ -79,7 +79,7 @@
     right: 20px;
     z-index: 5;
 }
-.bp-brand-media-current-dismiss .fi-btn {
+.bp-brand-media-current-dismiss button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -87,14 +87,16 @@
     height: 34px;
     min-height: 34px;
     border-radius: 9999px;
-    background: rgb(17 17 17 / 90%);
-    color: white;
+    background: rgb(17 17 17 / 90%) !important;
+    color: white !important;
 }
-.bp-brand-media-current-dismiss .fi-btn svg { color: white; }
+.bp-brand-media-current-dismiss button svg { color: white !important; }
 .bp-brand-media-current-metadata { width: 100%; max-width: 30rem; }
 /* Narrow containers: five native Filament entries, one compact label/value
    row each. Keep the existing desktop metadata two-column arrangement. */
 @container brand-media-current (max-width: 35rem) {
+    /* Avoid Filament's roomy desktop row gap on a 390px device. */
+    .bp-brand-media-current-metadata > .fi-grid { row-gap: 0.75rem; }
     .bp-brand-media-current-metadata .fi-in-entry {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
@@ -756,6 +758,24 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--item-panel,
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--image-preview-overlay-success {
     opacity: 0 !important;
+}
+/* Native FilePond shows a hollow successful-upload indicator in the top-right
+   and keeps its actual X action hidden. Once processing is complete, prefer
+   the enabled native cancel/revert X over the success circle. This does not
+   affect in-progress, failed or disabled FilePond actions. */
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--processing-complete-indicator {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+.bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] :is(
+    .filepond--action-revert-item-processing,
+    .filepond--action-remove-item
+):not([disabled]) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 5;
 }
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-info,
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-status {

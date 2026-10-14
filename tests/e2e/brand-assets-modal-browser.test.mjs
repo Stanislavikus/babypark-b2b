@@ -162,6 +162,30 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       && (!realPreview.statusOpacity || realPreview.statusOpacity === '0')
       && realPreview.removePresent,
       'Completed upload must show native image preview, not a green FilePond success slab: ' + JSON.stringify(realPreview));
+    // A completed upload should expose the enabled NATIVE FilePond X, not
+    // its success-status ring. Never replace the button with fake markup.
+    const completedX = area.locator(
+      '.filepond--item[data-filepond-item-state="processing-complete"] '
+        + ':is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
+    ).first();
+    await completedX.waitFor({ state: 'visible', timeout: 15_000 });
+    const completedAction = await area.evaluate(node => {
+      const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
+      const action = item?.querySelector(
+        ':is(.filepond--action-revert-item-processing, .filepond--action-remove-item):not([disabled])',
+      );
+      const indicator = item?.querySelector('.filepond--processing-complete-indicator');
+      const icon = action?.querySelector('svg path');
+      const style = action && getComputedStyle(action);
+      return { enabled:!!action && !action.disabled, iconPath:icon?.getAttribute('d') ?? null,
+        opacity:style?.opacity, visibility:style?.visibility,
+        indicatorOpacity:indicator && getComputedStyle(indicator).opacity };
+    });
+    assert.ok(completedAction.enabled && completedAction.iconPath?.length > 10
+      && completedAction.opacity === '1' && completedAction.visibility === 'visible'
+      && completedAction.indicatorOpacity === '0',
+      'Completed FilePond must show a real native cancel X, not the status ring: '
+        + JSON.stringify(completedAction));
     const visibleCrop = await area.evaluate(node => {
       const item = node.querySelector('.filepond--item[data-filepond-item-state="processing-complete"]');
       const scroller = node.querySelector('.filepond--list-scroller');
@@ -758,6 +782,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && fileGeometry.label.top >= fileGeometry.row.top
       && fileGeometry.label.top < fileGeometry.row.bottom,
       'Saved metadata must start alongside image: '+JSON.stringify(fileGeometry));
+    await savedPanel.getByRole('button', { name: 'Прибрати логотип' })
+      .waitFor({state:'visible',timeout:20_000});
     await savedPanel.screenshot({path: `${root}/brand-media-current-saved.png`});
     await page.locator('.bp-brand-media-section').screenshot({path: `${root}/brand-media-current-full-section.png`});
     await page.setViewportSize({width:390,height:844});
@@ -792,6 +818,8 @@ test('Brand picks an existing Original image from the native Assets visual libra
         && row.value.right <= mobileSaved.metadata.right + 2
         && row.align === 'right'),
       'Mobile saved Brand needs native top-right X and same-line left/right metadata: '+JSON.stringify(mobileSaved));
+    assert.ok(mobileSaved.rows.every((row,i) => i===0 || row.label.y-mobileSaved.rows[i-1].label.y <= 36),
+      'Narrow metadata rows should not retain the roomy desktop row gap: '+JSON.stringify(mobileSaved.rows));
     await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
     await page.setViewportSize({width:1440,height:900});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
