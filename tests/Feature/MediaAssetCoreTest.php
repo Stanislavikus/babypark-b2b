@@ -148,7 +148,7 @@ class MediaAssetCoreTest extends TestCase
             $service->prepare($this->pngUpload('over-pixels.png', 5001, 5000));
             $this->fail('Image over 25 MP must be rejected.');
         } catch (MediaIngestException $e) {
-            $this->assertStringContainsString('25 мегапікселів', $e->getMessage());
+            $this->assertSame('Роздільність зображення перевищує 25 МП.', $e->getMessage());
         }
 
         try {
