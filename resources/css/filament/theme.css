@@ -120,6 +120,38 @@
     --bp-media-preview-width: min(100%, 18rem);
 }
 
+/* Brand footer metadata: same approved compact mobile row grammar as the
+   five CURRENT-image technical fields, but keep native 3-column desktop.
+   Scope exclusively to the existing Brand edit form; Asset pages are not
+   restyled and native badge/date states remain untouched. */
+@media (max-width: 767px) {
+    .bp-brand-media-footer-metadata {
+        box-sizing: border-box;
+        padding-inline: 0.5rem;
+    }
+    .bp-brand-media-footer-metadata > .fi-grid {
+        row-gap: 0.75rem;
+    }
+    .bp-brand-media-footer-metadata .fi-in-entry {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+        align-items: center;
+        column-gap: 1rem;
+        row-gap: 0;
+    }
+    .bp-brand-media-footer-metadata .fi-in-entry-label-col,
+    .bp-brand-media-footer-metadata .fi-in-entry-content-col {
+        min-width: 0;
+    }
+    .bp-brand-media-footer-metadata .fi-in-entry-content-col {
+        justify-self: end;
+    }
+    .bp-brand-media-footer-metadata .fi-in-entry-content {
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+}
+
 /* Category Tree: keep the package as the interaction engine, but present it
    with the same visual language as native Filament tables. */
 .bp-category-tree-frame {

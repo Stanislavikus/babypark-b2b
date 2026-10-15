@@ -190,3 +190,36 @@ processing-complete on landscape/square/portrait, followed by screenshot
 inspection. This replaces the previously incomplete one-button
 `remove-item` filter. Mobile metadata 8px inset already verified on
 Playwright #149.
+
+
+## [Resolved — 2026-10-14 owner production feedback: compact Brand footer on mobile]
+
+Following verified deployment of PR #295, owner accepted the final Brand media
+section (native FilePond upload, library and URL source controls, cancel X inside
+preview, and five image details on mobile), but the three technical properties
+under the Brand short description still render as vertically expanded entries
+on phones: `Зберігання`, `Технічний стан`, `Додано`.
+
+Reuse the **same final BrandResource card**, changing only these three bottom
+TextEntries' narrow-screen presentation: left label/right value in one row per
+entry, 0.5rem symmetric inner inset, 0.75rem row gap, native Filament badges,
+full-width desktop three-column layout unchanged. Do not alter the
+standalone MediaAsset Edit/View layouts (they are not the approved Brand Media
+form), the native picker/URL/FilePond controls, saved preview, image metadata,
+Asset identity, or persistence. Browser acceptance MUST run on the approved
+BrandResource edit form, assert both upper preview/X and footer, and capture
+a FULL Brand mobile form screenshot; Asset-only screenshots cannot prove it.
+
+## [Resolved — 2026-10-14 owner confirmation: retain truthful Brand Media count]
+
+Keep the existing right-of-title image count in the **Brand** `Медіа`
+section: `0 зображень` without a selected logo and `1 зображення`
+when a canonical logo is selected. This is a truthful 0/1 count, not a
+claim that multiple Brand assets, videos, or galleries already exist.
+Owner explicitly approved retaining the counter after discussing future
+media possibilities. Brand has one logo in V1; no schema, file-type, or
+media cardinality change is authorized by this UI decision. A future
+multi-image/video Brand media capability requires its own researched
+contract and explicit implementation campaign. Product galleries remain
+an independent scope. **Do not remove the count merely because Brand V1
+has only one slot.**

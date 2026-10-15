@@ -875,8 +875,63 @@ test('Brand picks an existing Original image from the native Assets visual libra
       'Mobile saved Brand needs native top-right X and same-line left/right metadata: '+JSON.stringify(mobileSaved));
     assert.ok(mobileSaved.rows.every((row,i) => i===0 || row.label.y-mobileSaved.rows[i-1].label.y <= 36),
       'Narrow metadata rows should not retain the roomy desktop row gap: '+JSON.stringify(mobileSaved.rows));
+    // The footer is on this SAME final Brand edit card, after the Brand
+    // description; it is not the legacy standalone MediaAsset Edit/View UI.
+    const brandFooter = page.locator('.bp-brand-media-footer-metadata');
+    await brandFooter.waitFor({state:'visible'});
+    const footerGeometry = async () => brandFooter.evaluate(node => {
+      const area = node.getBoundingClientRect(), style = getComputedStyle(node);
+      const rows = [...node.querySelectorAll('.fi-in-entry')].map(entry => {
+        const label = entry.querySelector('.fi-in-entry-label')?.getBoundingClientRect();
+        const value = entry.querySelector('.fi-in-entry-content')?.getBoundingClientRect();
+        return label && value
+          ? {label:{x:label.x,y:label.y,right:label.right},
+            value:{x:value.x,y:value.y,right:value.right},
+            labelText:entry.querySelector('.fi-in-entry-label')?.textContent?.trim(),
+            valueText:entry.querySelector('.fi-in-entry-content')?.textContent?.trim()}
+          : null;
+      });
+      return {box:{x:area.x,right:area.right},inset:{
+        left:parseFloat(style.paddingLeft),right:parseFloat(style.paddingRight)},rows};
+    });
+    const mobileFooter = await footerGeometry();
+    assert.ok(mobileFooter.rows.length === 3
+      && mobileFooter.inset.left >= 7 && mobileFooter.inset.right >= 7
+      && mobileFooter.rows.every((row,i) => row
+        && row.label.x >= mobileFooter.box.x+7
+        && row.value.right <= mobileFooter.box.right-7
+        && row.label.right < row.value.x
+        && Math.abs(row.label.y-row.value.y) <= 8
+        && (i === 0 || row.label.y-mobileFooter.rows[i-1].label.y < 65))
+      && mobileFooter.rows.map(row=>row.labelText).join('|')
+        === 'Зберігання|Технічний стан|Додано',
+      'Final Brand form needs three compact footer metadata rows on phone: '
+        + JSON.stringify(mobileFooter));
+    assert.ok(await page.locator('.bp-brand-media-dropzone').getByRole('button',
+      {name:'Додати за URL'}).isVisible(), 'The APPROVED Brand form must keep URL import.');
+    await savedPanel.getByRole('button', {name:'Прибрати логотип'})
+      .waitFor({state:'visible'});
     await savedPanel.screenshot({path: `${root}/brand-media-current-mobile.png`});
+    // Filament's sticky navigation is captured by Playwright fullPage at the
+    // CURRENT scrolled viewport Y. Previous full-page screenshots showed it
+    // across the preview rather than at document top; that was screenshot
+    // capture positioning, not an extra Brand component.
+    await page.evaluate(() => window.scrollTo({top:0,left:0,behavior:'instant'}));
+    await page.waitForFunction(() => Math.abs(window.scrollY) <= 1);
+    await page.screenshot({path: `${root}/brand-media-final-card-mobile.png`,fullPage:true});
     await page.setViewportSize({width:1440,height:900});
+    const desktopFooter = await footerGeometry();
+    assert.ok(desktopFooter.rows.length === 3
+      && desktopFooter.rows.every(row=>row)
+      && desktopFooter.rows[0].label.x < desktopFooter.rows[1].label.x
+      && desktopFooter.rows[1].label.x < desktopFooter.rows[2].label.x
+      && Math.abs(desktopFooter.rows[0].label.y-desktopFooter.rows[1].label.y) <= 12
+      && Math.abs(desktopFooter.rows[1].label.y-desktopFooter.rows[2].label.y) <= 12,
+      'Final Brand footer keeps its native desktop 3-column row: '
+        + JSON.stringify(desktopFooter));
+    await page.evaluate(() => window.scrollTo({top:0,left:0,behavior:'instant'}));
+    await page.waitForFunction(() => Math.abs(window.scrollY) <= 1);
+    await page.screenshot({path: `${root}/brand-media-final-card-desktop.png`,fullPage:true});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
     const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
     await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
