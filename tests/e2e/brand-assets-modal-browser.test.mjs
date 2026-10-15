@@ -502,7 +502,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.keyboard.press('Escape');
     // Narrow DevTools device widths can reflow guidance independently of the
     // absolutely positioned native FilePond browse label. Measure every width.
-    const narrowBreakpoints = [320, 360, 375, 390];
+    const narrowBreakpoints = [320, 360, 375, 390, 414, 430, 440, 460, 480, 520, 560, 640, 700];
     const narrowRects = [];
     for (const viewportWidth of narrowBreakpoints) {
       await page.setViewportSize({ width: viewportWidth, height: 844 });
@@ -529,7 +529,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       && row.upload.y >= row.guide.bottom + 6
       && row.library.y >= row.upload.bottom + 6
       && row.url.y >= row.library.bottom + 6),
-    'Every 320–390px width must place three Media controls without collision: '
+    'Every 320–700px width must place three Media controls without collision: '
       + JSON.stringify(narrowRects));
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileRects = await unifiedDropzone.evaluate(element => {
