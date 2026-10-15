@@ -562,6 +562,20 @@ button.bp-category-tree-header-cell {
     }
 }
 
+/* Responsive Brand empty state: when the guidance shrinks from three lines to
+   two at intermediate container widths, the full-area FilePond label remains
+   absolutely centered and can intrude 12px into the native library button.
+   Browser #160 reproduced the exact collision at 460/480/520px; widths
+   <=390px and >=560px were already clear. Shift only that empty-state
+   FilePond LABEL 20px upward in the affected content-width band, without
+   touching FilePond's full-area native drop target or other media states. */
+@container (min-width: 15rem) and (max-width: 23rem) {
+    .bp-brand-media-dropzone:not(:has(.filepond--item)):not(:has(.bp-brand-media-candidate))
+        .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% - 0.95rem);
+    }
+}
+
 /* Keep FilePond's native full-area drag surface and legible 320px preview.
    Collapse obsolete empty-state copy instead of reserving an invisible blank
    block; actions start below the native image preview. */

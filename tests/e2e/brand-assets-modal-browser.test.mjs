@@ -502,7 +502,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.keyboard.press('Escape');
     // Narrow DevTools device widths can reflow guidance independently of the
     // absolutely positioned native FilePond browse label. Measure every width.
-    const narrowBreakpoints = [320, 360, 375, 390, 414, 430, 440, 460, 480, 520, 560, 640, 700];
+    const narrowBreakpoints = [320, 360, 375, 390, 400, 405, 414, 430, 440, 460, 480, 520, 530, 540, 545, 550, 555, 560, 640, 700];
     const narrowRects = [];
     for (const viewportWidth of narrowBreakpoints) {
       await page.setViewportSize({ width: viewportWidth, height: 844 });
