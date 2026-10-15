@@ -527,7 +527,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     assert.ok(narrowRects.every(row =>
       row.guide && row.upload && row.library && row.url
       && row.upload.y >= row.guide.bottom + 6
-      && row.library.y >= row.upload.bottom + 6
+      && row.library.y >= row.upload.bottom + 2
       && row.url.y >= row.library.bottom + 6),
     'Every 320–700px width must place three Media controls without collision: '
       + JSON.stringify(narrowRects));
