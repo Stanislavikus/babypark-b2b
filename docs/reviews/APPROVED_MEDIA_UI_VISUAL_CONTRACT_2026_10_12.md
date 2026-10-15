@@ -223,3 +223,22 @@ multi-image/video Brand media capability requires its own researched
 contract and explicit implementation campaign. Product galleries remain
 an independent scope. **Do not remove the count merely because Brand V1
 has only one slot.**
+
+## [Resolved — 2026-10-15 owner mobile feedback: avoid intermediate-width action overlap]
+
+After #296 production deployment, owner reported native `Завантажити`
+visually covering `Обрати з медіатеки` in the current Brand edit form
+at a mobile DevTools viewport. Existing 390px Chromium coverage did not
+expose the issue. PR #299 browser #160 reproduced actual overlapping
+bounding rectangles: at viewport 460px, upload bottom 673.42px vs library
+top 661.56px (11.86px overlap), also failing at 414/430/440/480/520px.
+The existing container rule places FilePond's absolute label below its
+natural action row when the helper text reflows.
+
+Scope a narrowly bounded **presentation-only** adjustment to the
+empty Brand Media dropzone at the intermediate container width. Preserve
+the same native FilePond input/full-area drag surface, picker/URL actions,
+preview, pending-file and library-selected states, and desktop layout.
+Chromium regression must test actual action rectangles across intermediate
+breakpoints; a single 390px test is insufficient. No custom JavaScript
+or new upload state is authorized.
