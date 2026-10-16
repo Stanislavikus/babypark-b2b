@@ -10,6 +10,7 @@ use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\ConnectorTransportLimits;
+use App\Support\Connectors\Transport\TransportFailureReason;
 use App\Support\Workspace\WorkspacePermissions;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Uri;
@@ -63,9 +64,11 @@ final class OriginalImageUrlIngestService
                         maxResponseBodyBytes: OriginalImageIngestService::MAX_BYTES,
                     ),
                 ));
-            } catch (ConnectorTransportException) {
+            } catch (ConnectorTransportException $exception) {
                 throw ValidationException::withMessages([
-                    self::ERROR_FIELD => 'Не вдалося безпечно завантажити зображення. Перевірте публічну адресу та спробуйте ще раз.',
+                    self::ERROR_FIELD => $exception->reason === TransportFailureReason::ResponseSizeExceeded
+                        ? 'Розмір файлу перевищує 20 МіБ.'
+                        : 'Не вдалося безпечно завантажити зображення. Перевірте публічну адресу та спробуйте ще раз.',
                 ]);
             }
 

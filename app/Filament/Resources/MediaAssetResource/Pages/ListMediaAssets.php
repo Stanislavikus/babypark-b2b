@@ -86,7 +86,14 @@ class ListMediaAssets extends ListRecords
                             (string) $data['url'],
                         );
                     } catch (MediaIngestException $e) {
-                        throw ValidationException::withMessages(['url' => $e->getMessage()]);
+                        throw ValidationException::withMessages([
+                            'mountedActions.0.data.url' => $e->getMessage(),
+                        ]);
+                    } catch (ValidationException $e) {
+                        throw ValidationException::withMessages([
+                            'mountedActions.0.data.url' => $e->errors()['url'][0]
+                                ?? 'Не вдалося завантажити зображення.',
+                        ]);
                     }
 
                     Notification::make()

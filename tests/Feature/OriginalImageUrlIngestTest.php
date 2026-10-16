@@ -12,6 +12,8 @@ use App\Services\Media\OriginalImageUrlIngestService;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+use App\Support\Connectors\Transport\ConnectorTransportException;
+use App\Support\Connectors\Transport\TransportFailureReason;
 use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -133,6 +135,63 @@ final class OriginalImageUrlIngestTest extends TestCase
     }
 
     #[Test]
+    public function excessively_large_remote_image_reports_the_25_mp_limit_inline_in_brand_modal(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        // A valid 400x300 PNG with IHDR dimensions changed to 6000x5000,
+        // recalculating its header CRC. getimagesize reads the dimensions;
+        // canonical Media ingest MUST reject >25MP before decoding/storing.
+        // Avoid allocating a 30-million-pixel bitmap in CI.
+        $file = UploadedFile::fake()->image('original.png', 400, 300);
+        $png = (string) file_get_contents($file->getRealPath());
+        $png = substr_replace($png, pack('N2', 6000, 5000), 16, 8);
+        $png = substr_replace($png, hex2bin(hash('crc32b', substr($png, 12, 17))), 29, 4);
+        $this->fakeTransport([
+            new ConnectorHttpResult(200, ['content-type' => ['image/png']], $png),
+        ]);
+        $brand = app(BrandManager::class)->create($this->actor, $this->workspace, 'Oversized Remote Logo Brand');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->mountAction(TestAction::make('import_logo_from_url')->schemaComponent('brand_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://example.net/oversized.png')
+            ->callMountedAction()
+            ->assertHasErrors([
+                'mountedActions.0.data.url' => 'Роздільність зображення перевищує 25 МП.',
+            ]);
+
+        $this->assertNull($brand->fresh()?->logo_media_asset_id);
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)->count());
+    }
+
+    #[Test]
+    public function url_response_exceeding_body_limit_has_a_specific_short_20_mib_message(): void
+    {
+        $this->fakeTransport([
+            new ConnectorTransportException(TransportFailureReason::ResponseSizeExceeded),
+        ]);
+
+        try {
+            app(OriginalImageUrlIngestService::class)->ingest(
+                $this->actor,
+                $this->workspace,
+                'https://images.example.net/excessive.jpg',
+            );
+            $this->fail('Expected bounded response error.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Розмір файлу перевищує 20 МіБ.'],
+                $exception->errors()['url'] ?? null,
+            );
+        }
+
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)->count());
+    }
+
+    #[Test]
     public function brand_url_action_imports_and_persists_a_managed_logo(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -159,7 +218,7 @@ final class OriginalImageUrlIngestTest extends TestCase
         $this->assertCount(1, $transport->requests);
     }
 
-    /** @param list<ConnectorHttpResult> $responses */
+    /** @param list<ConnectorHttpResult|ConnectorTransportException> $responses */
     private function fakeTransport(array $responses): ConnectorHttpTransport
     {
         $transport = new MediaUrlFakeTransport($responses);
@@ -176,14 +235,20 @@ final class MediaUrlFakeTransport implements ConnectorHttpTransport
     /** @var list<ConnectorOutboundRequest> */
     public array $requests = [];
 
-    /** @param list<ConnectorHttpResult> $responses */
+    /** @param list<ConnectorHttpResult|ConnectorTransportException> $responses */
     public function __construct(private array $responses) {}
 
     public function send(ConnectorOutboundRequest $request): ConnectorHttpResult
     {
         $this->requests[] = $request;
 
-        return array_shift($this->responses)
+        $response = array_shift($this->responses)
             ?? throw new LogicException('Unexpected outbound request.');
+
+        if ($response instanceof ConnectorTransportException) {
+            throw $response;
+        }
+
+        return $response;
     }
 }
