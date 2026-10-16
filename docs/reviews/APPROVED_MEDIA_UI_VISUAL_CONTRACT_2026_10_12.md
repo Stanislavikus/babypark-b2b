@@ -242,3 +242,26 @@ preview, pending-file and library-selected states, and desktop layout.
 Chromium regression must test actual action rectangles across intermediate
 breakpoints; a single 390px test is insufficient. No custom JavaScript
 or new upload state is authorized.
+
+
+## [2026-10-14 — URL import error messaging acceptance, isolated campaign]
+
+The 10,109x4,542 Wikimedia JPEG contains 45,915,078 pixels and exceeds
+the existing 25MP canonical limit, even though its 14.7MB size is below
+20MiB. A small HTTPS JPEG succeeds, proving the basic URL pipeline.
+The existing `MediaIngestException` carried pixel-size messaging, but
+the URL-import modal mapped service validation failures to bare `url`,
+not to Filament v5's mounted-action field state. This loses actionable
+inline feedback in the modal.
+
+Preserve the fail-closed 25MP and 20MiB caps, SSRF-safe transport,
+permissions, media identity and action contract. Distinguish download
+body cap from other transport failures; report succinct merchant messages
+`Розмір файлу перевищує 20 МіБ.` and
+`Роздільність зображення перевищує 25 МП.`.
+Attach both canonical ingest and transport validation failures to the
+real mounted action `mountedActions.0.data.url` in the Brand and Assets
+URL dialogs. Add targeted Livewire tests proving a 30MP synthetic PNG
+is rejected with an actionable modal field error and no MediaAsset
+persisted, and that oversized transport bodies produce the precise
+20MiB message. This is a separate PR from the Brand mobile footer.
