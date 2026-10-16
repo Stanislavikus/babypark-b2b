@@ -74,6 +74,14 @@ final class OriginalImageUrlIngestTest extends TestCase
         $this->assertNull($one->source_url);
         $this->assertCount(2, $transport->requests);
         $this->assertSame('images.example.net', $transport->requests[0]->request->getUri()->getHost());
+        $this->assertSame(
+            'BabyPark-MediaImporter/1.0 (https://babypark.ua)',
+            $transport->requests[0]->request->getHeaderLine('User-Agent'),
+        );
+        $this->assertSame(
+            'BabyPark-MediaImporter/1.0 (https://babypark.ua)',
+            $transport->requests[1]->request->getHeaderLine('User-Agent'),
+        );
     }
 
     #[Test]
@@ -106,6 +114,10 @@ final class OriginalImageUrlIngestTest extends TestCase
             $this->assertArrayHasKey('url', $exception->errors());
             $this->assertCount(2, $transport->requests);
             $this->assertSame('/photo.png', $transport->requests[1]->request->getUri()->getPath());
+            $this->assertSame(
+                $transport->requests[0]->request->getHeaderLine('User-Agent'),
+                $transport->requests[1]->request->getHeaderLine('User-Agent'),
+            );
         }
     }
 
@@ -122,6 +134,35 @@ final class OriginalImageUrlIngestTest extends TestCase
                 $this->assertSame([], $transport->requests);
             }
         }
+    }
+
+    #[Test]
+    public function upstream_403_remains_fail_closed_without_persisting_an_asset(): void
+    {
+        $transport = $this->fakeTransport([
+            new ConnectorHttpResult(403, ['content-type' => ['text/html']], 'Request blocked'),
+        ]);
+
+        try {
+            app(OriginalImageUrlIngestService::class)->ingest(
+                $this->actor,
+                $this->workspace,
+                'https://upload.wikimedia.org/wikipedia/commons/3/3f/Fronalpstock_big.jpg',
+            );
+            $this->fail('Expected non-200 response to be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Сервер зображення не повернув файл. Перевірте URL.'],
+                $exception->errors()['url'] ?? null,
+            );
+        }
+
+        $this->assertSame(
+            'BabyPark-MediaImporter/1.0 (https://babypark.ua)',
+            $transport->requests[0]->request->getHeaderLine('User-Agent'),
+        );
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)->count());
     }
 
     #[Test]
