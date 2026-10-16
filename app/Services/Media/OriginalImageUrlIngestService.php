@@ -23,6 +23,10 @@ final class OriginalImageUrlIngestService
 {
     private const MAX_REDIRECTS = 3;
 
+    // Identify the importer to public image hosts that reject anonymous/default HTTP clients.
+    // Keep this on the media boundary; the shared SSRF-safe connector transport is unchanged.
+    private const USER_AGENT = 'BabyPark-MediaImporter/1.0 (https://babypark.ua)';
+
     private const ERROR_FIELD = 'url';
 
     public function __construct(
@@ -57,7 +61,10 @@ final class OriginalImageUrlIngestService
                 // transport boundary: pinned public DNS, no automatic redirects or
                 // proxies, capped decoded response, TLS verification and deadlines.
                 $response = $this->transport->send(new ConnectorOutboundRequest(
-                    new Request('GET', $current, ['Accept' => 'image/avif,image/webp,image/png,image/jpeg,image/gif']),
+                    new Request('GET', $current, [
+                        'Accept' => 'image/avif,image/webp,image/png,image/jpeg,image/gif',
+                        'User-Agent' => self::USER_AGENT,
+                    ]),
                     new ConnectorTransportLimits(
                         connectTimeoutSeconds: 3.0,
                         totalTimeoutSeconds: 15.0,
