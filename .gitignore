@@ -28,3 +28,6 @@ yarn-error.log
 # Docker SSL certs (generated on server)
 /docker/nginx/ssl/
 
+
+# Trae generated preview artifacts
+.trae-html-share-packages/

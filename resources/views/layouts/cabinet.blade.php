@@ -9,7 +9,7 @@
 </head>
 <body class="h-full">
 
-@auth('contractor')
+@auth('customer')
 <nav class="bg-white border-b border-gray-200 shadow-sm">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 items-center justify-between">
@@ -31,7 +31,7 @@
                 @livewire('cabinet.cart-indicator')
 
                 <span class="text-sm text-gray-600">
-                    {{ auth('contractor')->user()->short_name ?? auth('contractor')->user()->name }}
+                    {{ auth('customer')->user()->short_name ?? auth('customer')->user()->name }}
                 </span>
                 <form method="POST" action="{{ route('cabinet.logout') }}">
                     @csrf

@@ -17,10 +17,10 @@ class DeliverySetting extends Model
     protected function casts(): array
     {
         return [
-            'free_from'      => 'decimal:2',
+            'free_from' => 'decimal:2',
             'delivery_price' => 'decimal:2',
-            'is_active'      => 'boolean',
-            'sort_order'     => 'integer',
+            'is_active' => 'boolean',
+            'sort_order' => 'integer',
         ];
     }
 }

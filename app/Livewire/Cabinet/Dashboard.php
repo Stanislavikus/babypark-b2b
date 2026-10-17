@@ -19,9 +19,9 @@ class Dashboard extends Component
      */
     public function repeatOrder(int $orderId): void
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
 
-        $order = Order::where('contractor_id', $contractor->id)->find($orderId);
+        $order = Order::where('customer_id', $customer->id)->find($orderId);
 
         if (! $order) {
             return;
@@ -35,19 +35,19 @@ class Dashboard extends Component
 
     public function render()
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
 
-        $contractor->loadMissing(['accountManager', 'backupManager']);
+        $customer->loadMissing(['accountManager', 'backupManager']);
 
-        $recentOrders = Order::where('contractor_id', $contractor->id)
+        $recentOrders = Order::where('customer_id', $customer->id)
             ->with('items')
             ->latest()
             ->take(10)
             ->get();
 
         return view('livewire.cabinet.dashboard', [
-            'contractor' => $contractor,
-            'manager' => $contractor->effectiveManager(),
+            'customer' => $customer,
+            'manager' => $customer->effectiveManager(),
             'recentOrders' => $recentOrders,
         ]);
     }
