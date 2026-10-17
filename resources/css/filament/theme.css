@@ -551,31 +551,6 @@ button.bp-category-tree-header-cell {
 
 
 
-/* Small Brand drawers use multi-line guidance. Reserve a real action row
-   before the absolute native FilePond browse label to avoid text overlap. */
-@container (max-width: 23rem) {
-    .bp-brand-media-actions > .fi-grid {
-        padding-top: 2.15rem;
-    }
-    .bp-brand-media-actions .filepond--drop-label label {
-        top: calc(50% + 0.3rem);
-    }
-}
-
-/* Responsive Brand empty state: when the guidance shrinks from three lines to
-   two at intermediate container widths, the full-area FilePond label remains
-   absolutely centered and can intrude 12px into the native library button.
-   Browser #160 reproduced the exact collision at 460/480/520px; widths
-   <=390px and >=560px were already clear. Shift only that empty-state
-   FilePond LABEL 20px upward in the affected content-width band, without
-   touching FilePond's full-area native drop target or other media states. */
-@container (min-width: 15rem) and (max-width: 23rem) {
-    .bp-brand-media-dropzone:not(:has(.filepond--item)):not(:has(.bp-brand-media-candidate))
-        .bp-brand-media-actions .filepond--drop-label label {
-        top: calc(50% - 0.95rem);
-    }
-}
-
 /* Keep FilePond's native full-area drag surface and legible 320px preview.
    Collapse obsolete empty-state copy instead of reserving an invisible blank
    block; actions start below the native image preview. */
@@ -876,6 +851,62 @@ button.bp-category-tree-header-cell {
 .bp-brand-media-dropzone .filepond--item[data-filepond-item-state="processing-complete"] .filepond--file-status {
     opacity: 0 !important;
     pointer-events: none;
+}
+
+
+/* Brand Media source actions: normal-flow Filament grid with the official
+   FilePond browse API. The FilePond root still covers the whole dashed
+   drop target, but its internal label is NOT a floating UI button.
+   The new trigger's position comes entirely from the grid (zero top/bottom
+   offsets and zero viewport/container-size correction bands). */
+.bp-brand-media-upload-slot,
+.bp-brand-media-upload-slot > .fi-grid,
+.bp-brand-media-upload-slot .bp-brand-media-browse-button {
+    width: 100%;
+    min-width: 0;
+}
+.bp-brand-media-upload-slot > .fi-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+}
+.bp-brand-media-upload-slot > .fi-grid > .fi-grid-col:has(.fi-fo-file-upload),
+.bp-brand-media-upload-slot .fi-fo-file-upload,
+.bp-brand-media-upload-slot .fi-fo-field-wrp {
+    height: 0;
+    min-height: 0;
+    margin: 0;
+}
+.bp-brand-media-upload-slot .bp-brand-media-browse-button {
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+    min-height: 46px;
+    height: 46px;
+    border: 1px solid rgb(209 213 219);
+    border-radius: .75rem;
+    background: white;
+    color: rgb(17 24 39);
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+}
+@container (max-width: 44rem) {
+    .bp-brand-media-upload-slot .bp-brand-media-browse-button {
+        font-size: .875rem;
+    }
+}
+.dark .bp-brand-media-upload-slot .bp-brand-media-browse-button {
+    background: rgb(17 24 39);
+    color: white;
+    border-color: rgb(75 85 99);
+}
+/* Keep FilePond itself visible to Alpine/Livewire and drag/drop. Only the
+   redundant visual caption is hidden; all FilePond file items, status/error,
+   preview, and native pending cancel/revert actions remain operational. */
+.bp-brand-media-dropzone .filepond--drop-label label {
+    display: none !important;
+    pointer-events: none !important;
 }
 
 /* Filament itself uses an absolutely positioned, closable filter panel on

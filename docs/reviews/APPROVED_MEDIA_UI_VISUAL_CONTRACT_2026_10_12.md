@@ -265,3 +265,31 @@ URL dialogs. Add targeted Livewire tests proving a 30MP synthetic PNG
 is rejected with an actionable modal field error and no MediaAsset
 persisted, and that oversized transport bodies produce the precise
 20MiB message. This is a separate PR from the Brand mobile footer.
+
+## [Acceptance candidate — 2026-10-17 production regression; owner approval pending]
+
+The owner reproduced overlap between `Завантажити` and the other Brand source
+controls after the successful production deployment of #299. Passing Chromium
+geometry at selected viewport widths did **not** establish owner acceptance.
+Brand Media V1 remains **NOT ACCEPTED** pending a fresh real-UI review.
+
+The repeated defect comes from positioning FilePond's internal caption using
+absolute `top: calc(50% + ...)` offsets while the Filament guidance and sibling
+buttons reflow independently. Further pixel-shifting that caption is prohibited
+as a remediation for this issue.
+
+PR #302 candidate preserves the frozen visual/functional goal (one dashed
+full-area native FilePond drop target, three equal real source actions,
+single Original identity, native upload state/X/preview, picker and URL).
+The visible Upload action is a Filament button in the same normal responsive
+grid as the other two, calling the **official existing** FilePond instance's
+`find(root).browse()` synchronously on user click. Only FilePond's floating
+internal caption is visually suppressed; no second uploader, alternate
+transport, runtime package, database change or new media authority is added.
+
+Acceptance requires exact-HEAD GitHub-hosted Chromium coverage of real local
+browse, full-area edge drop, desktop/mobile layout with the three actual
+visible buttons at intermediate widths, selected-image previews, picker/URL
+and persistence, plus final MySQL/style gates and owner visual sign-off.
+The existing separate local-to-local replacement GAP (X before new selection)
+remains OPEN and must not be represented as fixed.

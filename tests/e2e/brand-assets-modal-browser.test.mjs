@@ -76,8 +76,8 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const root = element.querySelector('.filepond--root');
       const pickButton = element.querySelector('.bp-brand-media-picker button');
       const urlRect = element.querySelector('.bp-brand-media-url-action button')?.getBoundingClientRect();
-      const uploadLabel = element.querySelector('.filepond--drop-label label');
-      const uploadParent = uploadLabel?.closest('.filepond--drop-label');
+      const uploadLabel = element.querySelector('.bp-brand-media-browse-button');
+      const uploadParent = uploadLabel; // Visible Filament button; the internal FilePond caption is intentionally hidden.
       const uploadRect = uploadLabel?.getBoundingClientRect();
       const pickRect = pickButton?.getBoundingClientRect();
       const itemRect = item?.getBoundingClientRect();
@@ -263,7 +263,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       'Selected preview requires balanced 24px insets: ' + JSON.stringify(inset));
     const matchedMetrics = await area.evaluate(node => {
       const items = [
-        node.querySelector('.filepond--drop-label label'),
+        node.querySelector('.bp-brand-media-browse-button'),
         node.querySelector('.bp-brand-media-picker button'),
         node.querySelector('.bp-brand-media-url-action button'),
       ];
@@ -305,7 +305,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       await oldItem.waitFor({state:'hidden',timeout:20_000});
       await page.waitForLoadState('networkidle',{timeout:20_000});
       const chooser=page.waitForEvent('filechooser',{timeout:10_000});
-      await area.locator('.filepond--drop-label label').click();
+      await area.locator('.bp-brand-media-browse-button').click();
       await (await chooser).setFiles(resolve(root,path));
       await page.waitForFunction(expected => {
         const items=Array.from(document.querySelectorAll('.bp-brand-media-dropzone .filepond--item'));
@@ -327,7 +327,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       'Native X + browse must yield exactly one processed local file.');
     await page.reload();
     const fileChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
-    await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
+    await page.locator('.bp-brand-media-dropzone .bp-brand-media-browse-button').click();
     const chooser = await fileChooser;
     await chooser.setFiles(filePath);
     await page.locator('.bp-brand-media-dropzone .filepond--item').first()
@@ -423,7 +423,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
         area: rect(element),
         heading: rect(element.querySelector('.bp-brand-media-heading')),
         guidance: rect(element.querySelector('.bp-brand-media-subheading')),
-        upload: rect(element.querySelector('.filepond--drop-label label')),
+        upload: rect(element.querySelector('.bp-brand-media-browse-button')),
         library: rect(element.querySelector('.bp-brand-media-picker button')),
         url: rect(element.querySelector('.bp-brand-media-url-action button')),
         hint: rect(element.querySelector('.bp-brand-media-format')),
@@ -451,7 +451,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.screenshot({ path: `${root}/brand-media-desktop-page.png`, fullPage: true });
     await mediaSection.screenshot({ path: `${root}/brand-media-layout.png` });
     const nativeMetrics = await unifiedDropzone.evaluate(node => {
-      const upload=node.querySelector('.filepond--drop-label label');
+      const upload=node.querySelector('.bp-brand-media-browse-button');
       const uploadText=upload?.querySelector('.filepond--label-action') || upload;
       const library=node.querySelector('.bp-brand-media-picker button');
       const url=node.querySelector('.bp-brand-media-url-action button');
@@ -472,12 +472,13 @@ test('Brand picks an existing Original image from the native Assets visual libra
       'All Media buttons must have identical corner radius.');
     assert.equal(nativeMetrics.upload.color, nativeMetrics.library.color,
       'All Media buttons must have the same text color.');
-    assert.ok(nativeMetrics.icon.includes('9ca3af'), 'Upload icon must be muted gray: '+nativeMetrics.icon);
+    assert.ok(await unifiedDropzone.locator('.bp-brand-media-browse-button svg').count() > 0,
+      'The native Filament upload action must show a real SVG icon.');
     assert.equal(nativeMetrics.upload.radius,nativeMetrics.url.radius);
     assert.equal(nativeMetrics.upload.font,nativeMetrics.url.font);
     const gaps = await unifiedDropzone.evaluate(node => {
       const box = s => node.querySelector(s)?.getBoundingClientRect();
-      const first=box('.filepond--drop-label label');
+      const first=box('.bp-brand-media-browse-button');
       const second=box('.bp-brand-media-picker button');
       const third=box('.bp-brand-media-url-action button');
       return { first:second.left-first.right, second:third.left-second.right };
@@ -515,7 +516,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
         };
         return {
           guide: bounds('.bp-brand-media-subheading'),
-          upload: bounds('.filepond--drop-label label'),
+          upload: bounds('.bp-brand-media-browse-button'),
           library: bounds('.bp-brand-media-picker button'),
           url: bounds('.bp-brand-media-url-action button'),
           dropzone: bounds(null),
@@ -541,7 +542,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       };
       return {
         guidance: bounds('.bp-brand-media-subheading'),
-        upload: bounds('.filepond--drop-label label'),
+        upload: bounds('.bp-brand-media-browse-button'),
         choose: bounds('.bp-brand-media-picker button'),
         url: bounds('.bp-brand-media-url-action button'),
         zone: bounds('.bp-brand-media-dropzone') ?? (() => {
@@ -686,7 +687,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     const placement = await unifiedDropzone.evaluate(node => {
       const zone=node.getBoundingClientRect();
       const image=node.querySelector('.bp-brand-media-candidate img')?.getBoundingClientRect();
-      const upload=node.querySelector('.filepond--drop-label label')?.getBoundingClientRect();
+      const upload=node.querySelector('.bp-brand-media-browse-button')?.getBoundingClientRect();
       const library=node.querySelector('.bp-brand-media-picker button')?.getBoundingClientRect();
       const outer = node.querySelector('.bp-brand-media-candidate');
       const chain = [];
@@ -718,7 +719,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       'Library preview must have equal ~24px top and side insets and aligned buttons: '
         + JSON.stringify(placement));
     const libraryActionMetrics = await unifiedDropzone.evaluate(node => [
-      '.filepond--drop-label label', '.bp-brand-media-picker button',
+      '.bp-brand-media-browse-button', '.bp-brand-media-picker button',
       '.bp-brand-media-url-action button',
     ].map(selector => {
       const el=node.querySelector(selector);
@@ -740,7 +741,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
         return r ? {x:r.x,y:r.y,right:r.right,width:r.width,height:r.height}:null;
       };
       return {frame:rect('.bp-brand-media-candidate'),x:rect('.bp-brand-media-candidate-dismiss button'),
-        upload:rect('.filepond--drop-label label'),library:rect('.bp-brand-media-picker button'),
+        upload:rect('.bp-brand-media-browse-button'),library:rect('.bp-brand-media-picker button'),
         url:rect('.bp-brand-media-url-action button')};
     });
     assert.ok(bounds.frame && bounds.x && bounds.upload && bounds.library && bounds.url
@@ -775,7 +776,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
       return {
         zone: bounds(null),
         preview: bounds('.bp-brand-media-candidate img'),
-        upload: bounds('.filepond--drop-label label'),
+        upload: bounds('.bp-brand-media-browse-button'),
         library: bounds('.bp-brand-media-picker button'),
         url: bounds('.bp-brand-media-url-action button'),
         cancel: bounds('.bp-brand-media-candidate-dismiss button'),
@@ -808,7 +809,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await pending.locator('img').waitFor({ state: 'visible' });
     // Replacing a pending library Original with a local upload must not require X.
     const localChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
-    await unifiedDropzone.locator('.filepond--drop-label label').click();
+    await unifiedDropzone.locator('.bp-brand-media-browse-button').click();
     await (await localChooser).setFiles(resolve(root, 'replacement.png'));
     await unifiedDropzone.locator('.filepond--item[data-filepond-item-state="processing-complete"]')
       .first().waitFor({ state: 'visible', timeout: 20_000 });
@@ -965,7 +966,7 @@ test('Brand picks an existing Original image from the native Assets visual libra
     await page.screenshot({path: `${root}/brand-media-final-card-desktop.png`,fullPage:true});
     // A pending local upload removed with X is NOT an explicit Brand logo deletion.
     const discardChooser = page.waitForEvent('filechooser', { timeout: 10_000 });
-    await page.locator('.bp-brand-media-dropzone .filepond--drop-label label').click();
+    await page.locator('.bp-brand-media-dropzone .bp-brand-media-browse-button').click();
     await (await discardChooser).setFiles(resolve(root, 'replacement.png'));
     const uploadedItem = page.locator('.bp-brand-media-dropzone .filepond--item');
     await uploadedItem.first().waitFor({ state: 'visible', timeout: 20_000 });
