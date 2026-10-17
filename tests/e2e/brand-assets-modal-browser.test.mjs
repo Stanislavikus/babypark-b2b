@@ -77,7 +77,7 @@ test('Brand Media accepts real Chromium file drop near the dashed edge and nativ
       const pickButton = element.querySelector('.bp-brand-media-picker button');
       const urlRect = element.querySelector('.bp-brand-media-url-action button')?.getBoundingClientRect();
       const uploadLabel = element.querySelector('.bp-brand-media-browse-button');
-      const uploadParent = uploadLabel?.closest('.filepond--drop-label');
+      const uploadParent = uploadLabel; // Visible Filament button; the internal FilePond caption is intentionally hidden.
       const uploadRect = uploadLabel?.getBoundingClientRect();
       const pickRect = pickButton?.getBoundingClientRect();
       const itemRect = item?.getBoundingClientRect();
