@@ -30,6 +30,7 @@ use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -187,6 +188,7 @@ class BrandResource extends Resource
                                     }),
                             ])->extraAttributes(['class' => 'bp-brand-media-candidate-dismiss']),
                             Group::make([
+                                Group::make([
                                 FileUpload::make('logo_upload')
                                     ->label(__('media_ui.upload'))
                                     // Native default panel layout can accommodate a 320px
@@ -220,6 +222,8 @@ class BrandResource extends Resource
                                             $set('logo_media_asset_id', $record->logo_media_asset_id);
                                         }
                                     }),
+                                    View::make('filament.brand-media-upload-trigger'),
+                                ])->extraAttributes(['class' => 'bp-brand-media-upload-slot']),
                                 OriginalImageAssetPicker::make('logo_media_asset_id')
                                     ->label(__('media_ui.select_existing'))
                                     ->hiddenLabel()
