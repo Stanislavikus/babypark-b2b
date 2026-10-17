@@ -37,7 +37,7 @@ upload API and store display optimizer must not be equated.
 | --- | --- | --- |
 | Shopify Admin Files (images) | Max **20 MB**, **25 MP** | Comparable basic DAM intake. `MB` as vendor states it, not BabyPark's MiB; vendor also imposes aspect ratio 100:1–1:100. |
 | Shopify Files account storage | **100 GB** Starter/Basic; **300 GB** Grow; **500 GB** Advanced; **1 TB** Plus; **10 TB** Enterprise | Account storage is separate from file admission. Paid storage increases are *early access* and available only on Plus/Enterprise, not proof every merchant can freely buy extra space. |
-| Cloudinary image upload / plans | Free **10 MB/25 MP**, Plus **20 MB/25 MP**, Advanced **40 MB/50 MP**, Enterprise custom | Relevant precedent for tier-dependent admission. Cloudinary separately bills and budgets transforms, storage and bandwidth, so quota economics are not storage-only. |
+| Cloudinary image upload / plans | Free **10 MB/25 MP**, Plus **20 MB/25 MP**, Advanced **40 MB/50 MP**, Enterprise custom | Relevant precedent for tier-dependent admission. Cloudinary meters transformations, storage and bandwidth separately, but self-service plans consume one shared credit pool across these resources simultaneously; quota economics are not storage-only. |
 | Google Merchant Center product image URL | Up to **16 MB**, **64 MP** | A downstream channel acceptance rule, **not** a general asset-storage upload ceiling. Beginning 2027-01-31 Google will enforce a 500×500 minimum for all categories; this is distinct from the maximum. |
 | Adobe Commerce Product image / Media Gallery | Configurable frontend resizing; default maximum processed dimensions **1920×1200**; Media Gallery inserts optimized copies | This is an optimization workflow, **not proof** of a 1920×1200 raw admission cap. Useful for Original vs channel derivative separation. |
 | Akeneo Supplier Data Manager import | Media files up to **500 MB**, unless asset family has a lower configured maximum | Specific supplier-media import capability; **not evidence** that every Akeneo PIM asset import or delivery path accepts 500 MB. |
@@ -65,9 +65,15 @@ Separate at least three mechanisms:
    compression/memory amplification, decompression limits, URL fetch deadlines,
    count/concurrency, format validation. This must remain bounded even when the
    workspace purchases more capacity.
-2. **Workspace storage allowance:** accounted GB/TB for immutable Originals,
-   derivatives, retained old versions and recoverable storage; include
-   same-workspace dedup, deletion/replacement, usage attribution and cleanup.
+2. **Workspace storage allowance:** account for currently stored Original
+   bytes under the stable `MediaAsset.id`, derivative files if separately
+   approved, and temporarily retained physical paths. Under the resolved V1
+   Replace lifecycle, the same Asset identity receives new Original content;
+   the previous path remains for a 14-day **operational recovery buffer**, not
+   merchant-facing version history or permanently immutable Original content.
+   Distinguish physical usage from any future billable allowance, and account
+   for same-workspace SHA reuse, replacement, deferred cleanup and recovery
+   without assuming that retired bytes must be charged as additional versions.
    Avoid promising a billable feature before accurate metering and lifecycle
    definitions exist.
 3. **Downstream delivery profile:** normalized/optimized derivatives for Magento,
