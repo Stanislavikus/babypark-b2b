@@ -1210,15 +1210,30 @@ The AI is prohibited from:
 
 ---
 
-## Production deployment authorization (Resolved — Stage 3E-OPS-0)
+## Production deployment authorization (Resolved — Stage 3E-OPS-0; amended 2026-10-15)
 
-Merge authorization and production deployment authorization are separate decisions.
+Merge authorization and production deployment authorization remain **distinct authorizations**. The Product Owner may grant both explicitly **in a single message** for an eligible low-risk PR; two separate conversations or confirmations are not required.
 
-A user OK to merge a pull request into `develop` never implicitly authorizes production deployment.
+- `OK merge PR #N` authorizes **only merge**; it never implicitly authorizes production deployment.
+- `OK deploy` / `OK deploy PR #N` authorizes **only a specifically identified production deployment**; it is not merge approval.
+- `OK merge + deploy PR #N` explicitly authorizes **both operations** for that one reviewed PR, conditional on the gates below. This is not a blanket or standing approval for later PRs.
+- The agent must offer the combined one-message instruction by default for ordinary, low-risk PRs where both merge and production delivery are intended. The Owner can still choose merge-only.
 
-Production deployment requires a separate explicit user instruction to run the production deployment workflow.
+### Combined approval execution gate (Resolved — 2026-10-15; Owner sign-off required on this amendment PR)
 
-The production deployment workflow must not automatically trigger on push or merge to `develop`. It is available only through manual `workflow_dispatch`.
+The combined instruction is eligible only when the change is low risk (e.g., display-only UI, documentation, or other reversible application changes) and **does not** involve new or pending database migrations, auth/RBAC, tenant isolation, security controls, money/pricing, orders/transactions, consequential external WRITE, or another destructive/hard-to-reverse production side effect. Higher-risk PRs require a **separate explicit post-merge deployment OK** after a risk-specific migration/recovery/deployment review. This exclusion applies even if the owner initially uses combined wording.
+
+Once the Owner gives a valid combined instruction, execute the shortest safe end-to-end path without asking for the same permission again:
+
+1. Verify exact PR head, base `origin/develop`, mergeability, blocking review threads, the final relevant diff, and the **real required CI results at that head**. Failure or ambiguous evidence stops the sequence; no merge.
+2. Perform the authorized PR merge, preferably using the project's established squash strategy and the expected-head SHA guard. Re-read the actual merged commit and confirm `develop` points to it.
+3. Reconfirm production eligibility and that the deploy target is **exactly the intended merged `develop` SHA**. If the branch advances unexpectedly, a risk classification changes, required checks regress, or another blocker arises, stop and report; do not silently deploy a different commit.
+4. Invoke the **existing manual `workflow_dispatch`** for `.github/workflows/deploy.yml` on `refs/heads/develop` with that exact SHA. Await the real deployment result; check the workflow's server-reported `Deployed Git HEAD`, availability and relevant production smoke. Never claim deployed on merge or workflow dispatch alone.
+5. Report the merged PR/head, production deployed SHA, CI, workflow result, smoke evidence and any remaining limitations. A subsequent deployment is a separate operation, not covered by the original command.
+
+The combined permission **does not change** GitHub Actions automation: the production deployment workflow must **not** trigger on push, merge, or CI success. It stays manual-only via `workflow_dispatch`; no workflow configuration, server permissions, deploy keys or CI checks may be weakened to accommodate combined consent. Do not introduce a custom deployment mechanism to bypass the native workflow.
+
+If available GitHub tools **cannot dispatch** the already authorized workflow, report that execution blocker precisely and provide the exact GitHub Actions manual Run workflow path; **do not ask for a second authorization** and do not claim completion. User-run manual dispatch must be checked against the authorized merged SHA before reporting success.
 
 Agent handoffs must distinguish:
 
