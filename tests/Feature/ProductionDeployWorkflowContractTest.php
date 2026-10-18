@@ -56,6 +56,43 @@ class ProductionDeployWorkflowContractTest extends TestCase
     }
 
     #[Test]
+    public function production_frontend_build_is_sha_bound_and_off_host(): void
+    {
+        $workflow = File::get(base_path('.github/workflows/deploy.yml'));
+        $deployScript = File::get(base_path('deploy.sh'));
+
+        $this->assertStringContainsString('actions/checkout@v4', $workflow);
+        $this->assertStringContainsString('actions/setup-node@v7', $workflow);
+        $this->assertStringContainsString('npm ci', $workflow);
+        $this->assertStringContainsString('npm run build', $workflow);
+        $this->assertStringContainsString("public/build/.release-sha", $workflow);
+        $this->assertStringContainsString('sha256sum', $workflow);
+        $this->assertStringContainsString('scp -B', $workflow);
+        $this->assertStringContainsString('StrictHostKeyChecking=yes', $workflow);
+        $this->assertStringContainsString('ssh-ed25519', $workflow);
+        $this->assertStringContainsString('steps.package.outputs.digest', $workflow);
+
+        $this->assertStringContainsString('DEPLOY_BUILD_ARCHIVE', $deployScript);
+        $this->assertStringContainsString('DEPLOY_BUILD_SHA256', $deployScript);
+        $this->assertStringContainsString('Prebuilt archive SHA256 does not match', $deployScript);
+        $this->assertStringContainsString('build/.release-sha', $deployScript);
+        $this->assertStringContainsString('tar -xzf', $deployScript);
+        $this->assertStringContainsString('mv "$STAGED_BUILD_DIR/build" public/build', $deployScript);
+        $this->assertDoesNotMatchRegularExpression('/^\\s*npm\\s+(?:ci|run build)\\s*$/m', $deployScript);
+
+        $this->assertLessThan(
+            strpos($deployScript, 'php artisan down'),
+            strpos($deployScript, 'EXPECTED_ARCHIVE='),
+            'Archive validation must fail closed before maintenance begins.',
+        );
+        $this->assertLessThan(
+            strpos($deployScript, 'php artisan migrate --force'),
+            strpos($deployScript, 'mv "$STAGED_BUILD_DIR/build" public/build'),
+            'Frontend assets must be installed before migrations run.',
+        );
+    }
+
+    #[Test]
     public function deploy_script_requires_exact_develop_sha_and_runs_migration_aware_steps_in_order(): void
     {
         $content = File::get(base_path('deploy.sh'));
