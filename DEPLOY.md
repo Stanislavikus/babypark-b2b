@@ -68,10 +68,37 @@ cd /var/www/babypark-b2b
 ./deploy.sh
 ```
 
-`deploy.sh` checks out the explicitly authorized `origin/develop` SHA, runs
-`composer install --no-dev`, `npm ci`, `npm run build`, migrations, the additive
-canonical Workspace RBAC permission catalogue sync, `php artisan optimize:clear`,
-and **`php artisan queue:restart`** while the application remains in maintenance mode.
+**Off-host Vite delivery (2026-10-18, candidate; not production until separately approved).**
+The manual-only `Deploy to production` GitHub Actions workflow checks out the
+exact authorized `develop` SHA and runs Composer **for frontend build inputs**,
+`npm ci` and `npm run build` on a GitHub-hosted runner. It packages `public/build`
+with an embedded `.release-sha`, computes SHA256 and uses built-in OpenSSH
+`scp` to stage the bundle using the pinned production SSH ED25519 host public
+key. Unexpected host identity fails closed (rotate the reviewed pin if the
+production host key intentionally changes).
+
+The host `deploy.sh` still requires the exact `origin/develop` commit,
+but checks the expected archive location, SHA256, embedded commit marker and
+Vite manifest **before** entering maintenance mode. Inside maintenance it
+fast-forwards the code, installs locked Composer production dependencies,
+moves the verified prebuilt `public/build` into place, runs migrations,
+the canonical Workspace RBAC and Active Field seeders, storage link, cache
+clear, and **`php artisan queue:restart`**, then exits maintenance.
+`npm ci` and Vite compilation are **never run on production**.
+Missing, mismatched or corrupt release bundles fail closed before maintenance.
+As with the existing guarded deployment contract, database migration errors
+remain fail-closed; there is no automatic database rollback.
+
+**Incident motivating this change:** On 2026-10-17 a direct `deploy.sh` run
+for merged PR #302 exhausted the pilot's 2 GiB memory / swap during on-host
+`npm ci` / Vite build, caused prolonged unavailability and required manual
+recovery. Production was returned to commit `c82e661abac9414f0092698defaadf062f46914a`
+with maintenance off. PR #302 and URL-import fixes are merged but await a
+separately authorized deployment. The owner must review both live Brand and
+MediaAsset screens before declaring either accepted.
+
+Do not substitute this CI build change for eventual production OS/hardening
+work. Avoid extending this capability into an unrelated infrastructure migration.
 
 **`queue:restart` dependencies (must be true on the host):**
 
