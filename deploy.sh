@@ -59,6 +59,40 @@ if ! git merge-base --is-ancestor HEAD "$DEPLOY_SHA"; then
     exit 1
 fi
 
+# Fail closed BEFORE maintenance if GitHub-hosted CI has not delivered the
+# immutable frontend output from this exact authorized commit.
+EXPECTED_ARCHIVE="/tmp/babypark-build-${DEPLOY_SHA}.tar.gz"
+if [[ "${DEPLOY_BUILD_ARCHIVE:-}" != "$EXPECTED_ARCHIVE" || ! -f "$EXPECTED_ARCHIVE" ]]; then
+    echo "A prebuilt Vite archive for authorized DEPLOY_SHA is required." >&2
+    exit 1
+fi
+if ! [[ "${DEPLOY_BUILD_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "A valid expected SHA256 for the CI archive is required." >&2
+    exit 1
+fi
+ACTUAL_ARCHIVE_SHA256="$(sha256sum "$EXPECTED_ARCHIVE" | cut -d ' ' -f 1)"
+if [[ "$ACTUAL_ARCHIVE_SHA256" != "$DEPLOY_BUILD_SHA256" ]]; then
+    echo "Prebuilt archive SHA256 does not match the CI-provided digest." >&2
+    exit 1
+fi
+
+STAGED_BUILD_DIR="$(mktemp -d /tmp/babypark-build-verified.XXXXXXXX)"
+tar -xzf "$EXPECTED_ARCHIVE" -C "$STAGED_BUILD_DIR"
+if [[ ! -s "$STAGED_BUILD_DIR/build/manifest.json" \
+   || ! -s "$STAGED_BUILD_DIR/build/.release-sha" \
+   || "$(cat "$STAGED_BUILD_DIR/build/.release-sha")" != "$DEPLOY_SHA" ]]; then
+    echo "Prebuilt Vite bundle is invalid or belongs to another commit." >&2
+    exit 1
+fi
+if ! php -r 'json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);' "$STAGED_BUILD_DIR/build/manifest.json"; then
+    echo "Prebuilt Vite manifest is not valid JSON." >&2
+    exit 1
+fi
+if [[ ! -d public/build ]]; then
+    echo "Existing public/build is missing; refusing an unreviewed deploy." >&2
+    exit 1
+fi
+
 php artisan down
 MAINTENANCE_ACTIVE=1
 trap on_deploy_error ERR
@@ -66,8 +100,10 @@ trap on_deploy_error ERR
 git merge --ff-only "$DEPLOY_SHA"
 
 composer install --no-dev --optimize-autoloader
-npm ci
-npm run build
+# The compiled Vite bundle was created on the GitHub-hosted runner.
+# On-host npm ci / vite build caused an outage on this 2 GiB pilot droplet.
+mv public/build "$STAGED_BUILD_DIR/previous-build"
+mv "$STAGED_BUILD_DIR/build" public/build
 php artisan migrate --force
 php artisan db:seed --class=WorkspaceRbacPermissionSeeder --force
 php artisan db:seed --class=CanonicalActiveFieldSeeder --force
@@ -81,6 +117,8 @@ php artisan queue:restart
 php artisan up
 MAINTENANCE_ACTIVE=0
 trap - ERR
+rm -rf "$STAGED_BUILD_DIR"
+rm -f "$EXPECTED_ARCHIVE"
 
 echo "Authorized DEPLOY_SHA: ${DEPLOY_SHA}"
 echo "Deployed Git HEAD: $(git rev-parse HEAD)"
