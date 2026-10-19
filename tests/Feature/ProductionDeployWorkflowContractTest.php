@@ -65,7 +65,7 @@ class ProductionDeployWorkflowContractTest extends TestCase
         $this->assertStringContainsString('actions/setup-node@v7', $workflow);
         $this->assertStringContainsString('npm ci', $workflow);
         $this->assertStringContainsString('npm run build', $workflow);
-        $this->assertStringContainsString("public/build/.release-sha", $workflow);
+        $this->assertStringContainsString('public/build/.release-sha', $workflow);
         $this->assertStringContainsString('sha256sum', $workflow);
         $this->assertStringContainsString('scp -B', $workflow);
         $this->assertStringContainsString('StrictHostKeyChecking=yes', $workflow);
