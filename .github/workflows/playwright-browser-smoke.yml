@@ -1,0 +1,169 @@
+name: Playwright browser smoke
+
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: playwright-smoke-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootsecret
+          MYSQL_DATABASE: babypark_e2e
+          MYSQL_USER: babypark_e2e
+          MYSQL_PASSWORD: test-secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootsecret"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      CI: 'true'
+      APP_ENV: e2e
+      APP_URL: http://127.0.0.1:18767
+      APP_DEBUG: 'false'
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_DATABASE: babypark_e2e
+      DB_USERNAME: babypark_e2e
+      DB_PASSWORD: test-secret
+      DB_SOCKET: ''
+      CACHE_STORE: array
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      E2E_BASE_URL: http://127.0.0.1:18767
+      E2E_ADMIN_EMAIL: admin@babypark.ua
+      E2E_ADMIN_PASSWORD: password
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, sqlite3, pdo_sqlite, pdo_mysql, bcmath, intl, gd
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install official Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare isolated test application
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+          php artisan config:clear
+          php artisan migrate:fresh --seed --force
+          php artisan storage:link
+
+      - name: Focused URL Media ingest regressions
+        run: |
+          set -euo pipefail
+          STYLE_FILES=(
+            app/Services/Media/OriginalImageUrlIngestService.php
+            app/Filament/Resources/BrandResource.php
+            app/Filament/Resources/MediaAssetResource/Pages/ListMediaAssets.php
+            tests/Feature/OriginalImageUrlIngestTest.php
+          )
+          if ! vendor/bin/pint --test "${STYLE_FILES[@]}"; then
+            echo "::error::Pint formatting failed; exact isolated-runner diff follows."
+            vendor/bin/pint "${STYLE_FILES[@]}"
+            git diff -- "${STYLE_FILES[@]}"
+            exit 1
+          fi
+          php artisan test tests/Feature/OriginalImageUrlIngestTest.php --no-ansi
+
+      - name: Restore isolated browser fixtures after RefreshDatabase tests
+        run: |
+          set -euo pipefail
+          php artisan migrate:fresh --seed --force
+          php tests/e2e/seed-shared-media.php
+          test -s test-results/browser-smoke/fixture.json
+
+      - name: Start local application
+        run: |
+          set -euo pipefail
+          nohup php artisan serve --host=127.0.0.1 --port=18767 > /tmp/babypark-browser-smoke-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:18767/admin/login || true)
+            if [ "$STATUS" = '200' ]; then
+              echo "Isolated application is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/babypark-browser-smoke-server.log
+          exit 1
+
+      - name: Run real Chromium smoke tests
+        run: node --test --test-concurrency=1 tests/e2e/*.test.mjs
+
+      - name: Upload Brand Media visual acceptance screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brand-media-visual-acceptance
+          path: |
+            test-results/browser-smoke/brand-media-layout.png
+            test-results/browser-smoke/brand-media-desktop-page.png
+            test-results/browser-smoke/brand-media-mobile.png
+            test-results/browser-smoke/brand-media-real-drop.png
+            test-results/browser-smoke/brand-media-square-drop.png
+            test-results/browser-smoke/brand-media-portrait-drop.png
+            test-results/browser-smoke/brand-media-current-saved.png
+            test-results/browser-smoke/brand-media-current-full-section.png
+            test-results/browser-smoke/brand-media-current-mobile.png
+            test-results/browser-smoke/brand-media-final-card-mobile.png
+            test-results/browser-smoke/brand-media-final-card-desktop.png
+            test-results/browser-smoke/brand-media-library-preview.png
+            test-results/browser-smoke/brand-media-library-mobile.png
+            test-results/browser-smoke/brand-media-picker-layout.png
+            test-results/browser-smoke/brand-media-picker-filters.png
+            test-results/browser-smoke/brand-media-picker-selected.png
+            test-results/browser-smoke/brand-media-picker-list-layout.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-failure-evidence
+          path: |
+            test-results/browser-smoke/
+            /tmp/babypark-browser-smoke-server.log
+            storage/logs/
+          if-no-files-found: ignore
+          retention-days: 7

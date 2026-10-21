@@ -10,6 +10,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function ($schedule) {
+        $schedule->command('reservations:expire')->everyMinute()->withoutOverlapping();
+    })
     ->withMiddleware(function (Middleware $middleware) {
         //
     })

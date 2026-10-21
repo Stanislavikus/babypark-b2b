@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Filament\Cabinet\Resources\ProductResource\Pages;
+
+use App\Filament\Cabinet\Resources\ProductResource;
+use App\Models\ProductVariant;
+use App\Services\Availability\ReservationCreator;
+use App\Support\SessionCart;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\ListRecords;
+use Livewire\Attributes\On;
+
+class ListProducts extends ListRecords
+{
+    protected static string $resource = ProductResource::class;
+
+    /** Margin column display format: 'percent' or 'uah' */
+    public string $marginFormat = 'percent';
+
+    /** Quantity inputs keyed by variant_id */
+    public array $quantities = [];
+
+    protected function getHeaderActions(): array
+    {
+        return [];
+    }
+
+    public function toggleMarginFormat(): void
+    {
+        $this->marginFormat = $this->marginFormat === 'percent' ? 'uah' : 'percent';
+    }
+
+    public function incrementQty(int $variantId, int $step, int $maxQty): void
+    {
+        $current = (int) ($this->quantities[$variantId] ?? 0);
+        $this->quantities[$variantId] = min($maxQty, $current + $step);
+    }
+
+    public function decrementQty(int $variantId, int $step): void
+    {
+        $current = (int) ($this->quantities[$variantId] ?? 0);
+        $this->quantities[$variantId] = max(0, $current - $step);
+    }
+
+    public function addToCart(int $variantId, int $minQty): void
+    {
+        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? 0));
+        SessionCart::add($variantId, $qty);
+
+        Notification::make()
+            ->title('Додано до кошика')
+            ->success()
+            ->send();
+
+        $this->dispatch('cart-updated');
+    }
+
+    public function reserve(int $variantId, int $minQty): void
+    {
+        $customer = auth('customer')->user();
+        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? 0));
+
+        $variant = ProductVariant::query()->findOrFail($variantId);
+
+        app(ReservationCreator::class)->create($variant, $qty, customer: $customer);
+
+        Notification::make()
+            ->title('Бронювання створено')
+            ->success()
+            ->send();
+    }
+
+    #[On('cart-updated')]
+    public function refreshCartBadge(): void
+    {
+        // Trigger re-render for navigation badge refresh on next navigation.
+    }
+}
