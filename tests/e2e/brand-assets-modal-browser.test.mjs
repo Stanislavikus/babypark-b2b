@@ -373,8 +373,9 @@ test('Brand picks an existing Original image from the native Assets visual libra
       .waitFor({ state: 'visible', timeout: 20_000 });
     await unifiedDropzone.locator('input[type="file"]').first()
       .waitFor({ state: 'attached', timeout: 20_000 });
-    assert.ok(await unifiedDropzone.locator('.filepond--root').count() > 0,
-      'The canonical FilePond uploader must initialize inside the dashed Media area.');
+    // Filament may render the native input before Alpine initializes FilePond.
+    // Wait for the actual FilePond root instead of racing the next event-loop tick.
+    await unifiedDropzone.locator('.filepond--root').waitFor({ state: 'attached', timeout: 20_000 });
     const selectButton = unifiedDropzone.getByRole('button', { name: 'Обрати з медіатеки' });
     await selectButton.waitFor({ state: 'visible', timeout: 20_000 });
     const geometry = await unifiedDropzone.evaluate(element => {

@@ -3,6 +3,9 @@ name: Deploy to production
 on:
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -10,6 +13,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Require manual dispatch from develop
         run: |
@@ -19,6 +23,59 @@ jobs:
           fi
           echo "Authorized production source: develop @ ${{ github.sha }}"
 
+      - name: Checkout exact authorized commit
+        uses: actions/checkout@v4
+
+      - name: Setup PHP for Filament Vite inputs
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, bcmath, intl
+          coverage: none
+
+      - name: Install build-only PHP vendor files on GitHub runner
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Build production assets on GitHub runner
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+
+      - name: Create SHA-bound Vite release archive
+        id: package
+        run: |
+          set -euo pipefail
+          test -s public/build/manifest.json
+          printf '%s\n' "$GITHUB_SHA" > public/build/.release-sha
+          tar -czf "$RUNNER_TEMP/babypark-build-${GITHUB_SHA}.tar.gz" -C public build
+          digest="$(sha256sum "$RUNNER_TEMP/babypark-build-${GITHUB_SHA}.tar.gz" | cut -d ' ' -f 1)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Stage release archive using pinned SSH host key
+        env:
+          DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/bp-deploy-ssh"
+          printf '%s\n' "$DEPLOY_PRIVATE_KEY" > "$RUNNER_TEMP/bp-deploy-ssh/id_key"
+          # Compared with the public host key on the actual Babypark B2B Droplet
+          # on 2026-10-18; fail closed on an unexpected key or host rotation.
+          printf '%s %s\n' "$DEPLOY_HOST" 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINrVpdSmco8BkZvkFySV96zAM0o/bjUHdyU8tY6m+t59' > "$RUNNER_TEMP/bp-deploy-ssh/known_hosts"
+          scp -B -i "$RUNNER_TEMP/bp-deploy-ssh/id_key" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$RUNNER_TEMP/bp-deploy-ssh/known_hosts" \
+            "$RUNNER_TEMP/babypark-build-${GITHUB_SHA}.tar.gz" \
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/babypark-build-${GITHUB_SHA}.tar.gz"
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -28,4 +85,6 @@ jobs:
           script: |
             cd /var/www/babypark-b2b
             export DEPLOY_SHA='${{ github.sha }}'
+            export DEPLOY_BUILD_ARCHIVE='/tmp/babypark-build-${{ github.sha }}.tar.gz'
+            export DEPLOY_BUILD_SHA256='${{ steps.package.outputs.digest }}'
             ./deploy.sh
