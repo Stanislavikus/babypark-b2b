@@ -69,7 +69,6 @@ use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
-use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -87,6 +86,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
 use Livewire\Livewire;
 use LogicException;
 
