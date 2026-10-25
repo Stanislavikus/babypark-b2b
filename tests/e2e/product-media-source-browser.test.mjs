@@ -50,6 +50,7 @@ test('Master Product Media uses approved native source controls and persists a r
       };
       return {
         border: getComputedStyle(element).borderTopStyle,
+        containerWidth: element.getBoundingClientRect().width,
         box: rect('.filepond--root'),
         upload: rect('.bp-brand-media-browse-button'),
         library: rect('.bp-brand-media-picker button'),
@@ -59,9 +60,18 @@ test('Master Product Media uses approved native source controls and persists a r
     assert.equal(geometry.border, 'dashed');
     assert.ok(geometry.box && geometry.upload && geometry.library && geometry.url,
       'All three real source controls and native FilePond must be inside the common dashed block.');
-    assert.ok(geometry.upload.right <= geometry.library.left + 4
-      && geometry.library.right <= geometry.url.left + 4,
-    'Product Media source buttons must use the approved desktop order.');
+    // The Product editor is a two-thirds-width column at a 1440px viewport.
+    // The approved @container threshold (44rem) stacks controls there, while
+    // the full-width Brand editor keeps a single desktop row.
+    if (geometry.containerWidth > 704) {
+      assert.ok(geometry.upload.right <= geometry.library.left + 4
+        && geometry.library.right <= geometry.url.left + 4,
+      'Wide Product Media source actions must use the approved horizontal order.');
+    } else {
+      assert.ok(geometry.upload.bottom <= geometry.library.top + 4
+        && geometry.library.bottom <= geometry.url.top + 4,
+      'Narrow Product Media source actions must stack without overlap.');
+    }
 
     await mkdir(root, { recursive: true });
     await zone.screenshot({ path: `${root}/product-media-empty.png` });
