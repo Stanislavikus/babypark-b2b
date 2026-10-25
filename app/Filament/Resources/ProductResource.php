@@ -159,6 +159,7 @@ class ProductResource extends Resource
                         ->columns(2),
 
                     Section::make('Медіа')
+                        ->extraAttributes(['class' => 'bp-brand-media-section'])
                         ->description('Тут зберігаються вихідні зображення товару. Версії, підготовлені для окремих каналів, не дублюються в галереї.')
                         ->schema([
                             Placeholder::make('workspace_media')
