@@ -133,7 +133,7 @@ class MediaAssetResource extends Resource
                             View::make('filament.brand-media-upload-trigger'),
                         ])->extraAttributes(['class' => 'bp-brand-media-upload-slot']),
                     ])->extraAttributes(['class' => 'bp-brand-media-actions bp-asset-replacement-actions']),
-                ], 'bp-asset-replacement-source'),
+                ], 'bp-asset-replacement-source', 'або натисніть «Завантажити»'),
                 Callout::make(new HtmlString('<span class="font-semibold text-gray-950 dark:text-white">Зображення не змінено</span>'))
                     ->warning()
                     ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementBusinessWarning)
@@ -166,7 +166,7 @@ class MediaAssetResource extends Resource
                     'default' => 1,
                     'md' => 3,
                 ])->columnSpanFull(),
-            ]),
+            ])->columnSpanFull(),
             Section::make('Використовується в')->schema([
                 TextEntry::make('usage_items_edit')
                     ->label('Використання')
