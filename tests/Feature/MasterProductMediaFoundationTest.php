@@ -145,6 +145,90 @@ class MasterProductMediaFoundationTest extends TestCase
     }
 
     #[Test]
+    public function inline_media_library_reuses_only_same_workspace_original_and_preserves_gallery_order(): void
+    {
+        $product = $this->product();
+        $first = $this->externalAsset('https://cdn.example.test/reused-first.jpg');
+        $second = $this->externalAsset('https://cdn.example.test/reused-second.jpg');
+        $service = app(ProductMediaMutationService::class);
+
+        $initial = $service->addExistingImages($this->actor, $this->workspace, $product, [
+            (string) $first->id,
+            (string) $first->id,
+        ]);
+        $this->assertCount(1, $initial);
+        $this->assertSame(MediaRole::Primary, $initial->first()->role);
+        $this->assertSame(0, $initial->first()->sort_order);
+
+        $updated = $service->addExistingImages($this->actor, $this->workspace, $product, [
+            (string) $first->id,
+            (string) $second->id,
+        ]);
+        $this->assertCount(2, $updated);
+        $this->assertSame([(string) $first->id, (string) $second->id], $updated->pluck('media_asset_id')->map('strval')->all());
+        $this->assertSame(MediaRole::Primary, $updated->first()->role);
+        $this->assertSame(MediaRole::Gallery, $updated->last()->role);
+        $this->assertSame([0, 1], $updated->pluck('sort_order')->all());
+        $this->assertSame([
+            'https://cdn.example.test/reused-first.jpg',
+            'https://cdn.example.test/reused-second.jpg',
+        ], $product->fresh()->images);
+        $this->assertDatabaseCount('media_assets', 2);
+    }
+
+    #[Test]
+    public function inline_media_library_rejects_foreign_or_derived_asset_without_partial_association(): void
+    {
+        $product = $this->product();
+        $valid = $this->externalAsset('https://cdn.example.test/valid-original.jpg');
+        $foreign = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => Workspace::factory()->create()->id,
+            'parent_media_asset_id' => null,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/foreign.jpg',
+            'diagnosis_status' => MediaDiagnosisStatus::Pending,
+        ]);
+        $derivative = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'parent_media_asset_id' => $valid->id,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/derivative.jpg',
+            'diagnosis_status' => MediaDiagnosisStatus::Pending,
+        ]);
+
+        foreach ([$foreign, $derivative] as $invalid) {
+            try {
+                app(ProductMediaMutationService::class)->addExistingImages(
+                    $this->actor,
+                    $this->workspace,
+                    $product,
+                    [(string) $valid->id, (string) $invalid->id],
+                );
+                $this->fail('Foreign workspace and derived media must never be attached.');
+            } catch (ProductMediaException $exception) {
+                $this->assertSame(0, ProductMedia::withoutWorkspaceScope()->where('product_id', $product->id)->count());
+            }
+        }
+    }
+
+    #[Test]
+    public function inline_media_library_requires_manage_products_permission(): void
+    {
+        $product = $this->product();
+        $asset = $this->externalAsset('https://cdn.example.test/not-authorized.jpg');
+        $other = User::factory()->create();
+        $this->makeWorkspaceMembership($this->workspace, $other);
+
+        $this->expectException(AuthorizationException::class);
+        app(ProductMediaMutationService::class)->addExistingImages(
+            $other,
+            $this->workspace,
+            $product,
+            [(string) $asset->id],
+        );
+    }
+
+    #[Test]
     public function media_mutation_requires_manage_products_permission(): void
     {
         Storage::fake('public');
