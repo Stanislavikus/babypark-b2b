@@ -128,7 +128,7 @@ class MediaAssetResource extends Resource
                                 ->afterStateUpdated(function (EditMediaAsset $livewire): void {
                                     $livewire->replacementBusinessWarning = null;
                                     $livewire->replacementPostSaveNotice = null;
-                                })
+                                }),
                             View::make('filament.brand-media-upload-trigger'),
                         ])->extraAttributes(['class' => 'bp-brand-media-upload-slot']),
                     ])->extraAttributes(['class' => 'bp-brand-media-actions bp-asset-replacement-actions']),
