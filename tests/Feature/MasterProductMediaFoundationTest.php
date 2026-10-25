@@ -215,6 +215,25 @@ class MasterProductMediaFoundationTest extends TestCase
     }
 
     #[Test]
+    public function inline_product_page_action_attaches_existing_original_without_copying_it(): void
+    {
+        $product = $this->product();
+        $asset = $this->externalAsset('https://cdn.example.test/inline-selected.jpg');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->call('addExistingMediaFromForm', (string) $asset->id)
+            ->assertNotified()
+            ->assertSee('1 медіа');
+
+        $link = ProductMedia::withoutWorkspaceScope()->where('product_id', $product->id)->sole();
+        $this->assertSame((string) $asset->id, (string) $link->media_asset_id);
+        $this->assertSame(MediaRole::Primary, $link->role);
+        $this->assertSame(0, $link->sort_order);
+        $this->assertDatabaseHas('media_assets', ['id' => $asset->id]);
+    }
+
+    #[Test]
     public function inline_media_library_requires_manage_products_permission(): void
     {
         $product = $this->product();
