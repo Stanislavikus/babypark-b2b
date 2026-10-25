@@ -6,6 +6,7 @@ use App\Filament\Resources\BrandResource\Pages\CreateBrand;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Filament\Resources\BrandResource\Pages\ListBrands;
 use App\Filament\Support\MediaPreviewFrame;
+use App\Filament\Support\MediaSourceArea;
 use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\MediaAsset;
@@ -154,14 +155,7 @@ class BrandResource extends Resource
                             ->extraAttributes(['class' => 'bp-brand-media-current-layout'])
                             ->columnSpanFull()
                             ->visible(fn (Get $get, ?Brand $record): bool => self::formLogoAsset($get, $record) instanceof MediaAsset),
-                        Group::make([
-                            Text::make(new HtmlString('<svg aria-hidden="true" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="16" height="16" rx="2"/><circle cx="8" cy="10" r="1.3"/><path d="m5 18 4.5-5 3.5 3 2.5-3 2.5 3"/><path d="M20 1v8m-4-4h8"/></svg>'))
-                                ->extraAttributes(['class' => 'bp-brand-media-icon']),
-                            Text::make(__('media_ui.drop_heading'))
-                                ->weight(FontWeight::SemiBold)
-                                ->extraAttributes(['class' => 'bp-brand-media-heading']),
-                            Text::make(__('media_ui.drop_subheading'))
-                                ->extraAttributes(['class' => 'bp-brand-media-subheading']),
+                        MediaSourceArea::make([
                             // A library/URL selection previews its existing canonical Original,
                             // never creating a second upload or MediaAsset identity.
                             ImageEntry::make('pending_logo_source')
@@ -291,11 +285,7 @@ class BrandResource extends Resource
                                     ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                             ])
                                 ->extraAttributes(['class' => 'bp-brand-media-actions']),
-                            Text::make(__('media_ui.upload_hint'))
-                                ->extraAttributes(['class' => 'bp-brand-media-format']),
-                        ])
-                            ->extraAttributes(['class' => 'bp-brand-media-dropzone'])
-                            ->columnSpanFull(),
+                        ]),
                         Callout::make('Зверніть увагу')
                             ->info()
                             ->description(fn (Component $livewire): ?string => $livewire instanceof EditBrand
