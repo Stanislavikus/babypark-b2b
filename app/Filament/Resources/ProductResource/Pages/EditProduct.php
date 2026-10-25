@@ -186,6 +186,39 @@ class EditProduct extends EditRecord
                 : ProductLifecycleStatus::Archived);
     }
 
+    /**
+     * Native FilePond input from the inline Master Media section.
+     * Uploads are attached via the existing guarded ProductMedia writer, not
+     * through mass-assignment on the Product form.
+     *
+     * @param  list<UploadedFile>  $files
+     */
+    public function addUploadedMediaFromForm(array $files): bool
+    {
+        if ($files === []) {
+            return false;
+        }
+
+        return $this->runMediaMutation(
+            fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
+                ->addUploadedImages($actor, $workspace, $this->record, $files),
+            'Медіа додано',
+        );
+    }
+
+    public function addExistingMediaFromForm(string $assetId): bool
+    {
+        if ($assetId === '') {
+            return false;
+        }
+
+        return $this->runMediaMutation(
+            fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
+                ->addExistingImages($actor, $workspace, $this->record, [$assetId]),
+            'Медіа додано',
+        );
+    }
+
     private function mediaActions(): ActionGroup
     {
         return ActionGroup::make([
@@ -483,7 +516,7 @@ class EditProduct extends EditRecord
         return ($position === 1 ? 'Основне · ' : 'Кадр '.$position.' · ').$name;
     }
 
-    private function runMediaMutation(\Closure $mutation, string $successTitle): void
+    private function runMediaMutation(\Closure $mutation, string $successTitle): bool
     {
         $actor = auth()->user();
         abort_unless($actor instanceof User && $this->canManageProducts(), 403);
@@ -497,12 +530,16 @@ class EditProduct extends EditRecord
                 ->success()
                 ->title($successTitle)
                 ->send();
+
+            return true;
         } catch (ProductMediaException|MediaIngestException $e) {
             Notification::make()
                 ->danger()
                 ->title('Не вдалося змінити медіа')
                 ->body($e->getMessage())
                 ->send();
+
+            return false;
         }
     }
 
