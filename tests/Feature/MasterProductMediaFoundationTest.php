@@ -72,6 +72,9 @@ class MasterProductMediaFoundationTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertSee(__('media_ui.drop_heading'))
+            ->assertSee(__('media_ui.select_existing'))
+            ->assertSee(__('media_ui.add_from_url'))
             ->assertActionVisible('add_media')
             ->callAction('add_media', [
                 'files' => [UploadedFile::fake()->image('ui-original.jpg', 1000, 750)],
