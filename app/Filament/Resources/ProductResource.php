@@ -259,8 +259,7 @@ class ProductResource extends Resource
                                     ])->key('product_media_url_actions')
                                         ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                                 ])->extraAttributes(['class' => 'bp-brand-media-actions']),
-                            ])->visible(fn (?Product $record): bool => $record !== null)
-                                ->extraAttributes(['class' => 'bp-product-media-source']),
+                            ], 'bp-product-media-source')->visible(fn (?Product $record): bool => $record !== null),
                             SchemaActions::make([
                                 self::pendingCapabilityAction(
                                     'media_enhance',
