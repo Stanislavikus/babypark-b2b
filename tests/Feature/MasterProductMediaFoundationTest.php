@@ -185,7 +185,10 @@ class MasterProductMediaFoundationTest extends TestCase
         $product = $this->product();
         $valid = $this->externalAsset('https://cdn.example.test/valid-original.jpg');
         $foreign = MediaAsset::withoutWorkspaceScope()->create([
-            'workspace_id' => Workspace::factory()->create()->id,
+            'workspace_id' => Workspace::query()->create([
+                'name' => 'Other workspace for isolated Media test',
+                'is_default' => false,
+            ])->id,
             'parent_media_asset_id' => null,
             'asset_type' => MediaAssetType::Image,
             'source_url' => 'https://cdn.example.test/foreign.jpg',
