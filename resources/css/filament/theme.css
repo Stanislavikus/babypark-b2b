@@ -939,3 +939,22 @@ button.bp-category-tree-header-cell {
         background: var(--color-gray-900);
     }
 }
+
+/* Existing Asset edit: a single real Original replacement action. Selecting
+   another library Original cannot replace its identity; avoid fake source
+   controls and reuse the approved native FilePond drop surface instead. */
+.bp-asset-replacement-source .bp-brand-media-actions > .fi-grid {
+    grid-template-columns: minmax(10.75rem, 18rem);
+    width: min(100%, 18rem);
+}
+.bp-asset-replacement-source .bp-brand-media-actions .filepond--drop-label label {
+    left: 50%;
+    transform: translateX(-50%) !important;
+    width: min(18rem, calc(100% - 2rem));
+}
+@container (min-width: 44.01rem) {
+    .bp-asset-replacement-source.bp-brand-media-dropzone:not(:has(.filepond--item))
+        .bp-brand-media-actions .filepond--drop-label label {
+        top: calc(50% + 1.25rem) !important;
+    }
+}
