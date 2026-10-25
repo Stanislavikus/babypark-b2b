@@ -9,6 +9,8 @@ use App\Exceptions\Availability\InventoryMutationException;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Exceptions\Pricing\MasterOfferMutationException;
 use App\Filament\Concerns\HasProductLightbox;
+use App\Filament\Support\MediaSourceArea;
+use App\Filament\Support\OriginalImageAssetPicker;
 use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
@@ -29,6 +31,7 @@ use App\Services\Availability\MasterInventoryReadService;
 use App\Services\Catalog\BrandManager;
 use App\Services\Catalog\ProductCategoryTreeOptions;
 use App\Services\Catalog\ProductMediaReadService;
+use App\Services\Media\OriginalImageUrlIngestService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\MasterOfferMutationService;
@@ -40,6 +43,7 @@ use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Sync\ProductMagentoClassificationEditor;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
+use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
@@ -50,18 +54,22 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\View;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -75,8 +83,10 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use LogicException;
 
@@ -154,6 +164,103 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_media')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildMediaWorkspaceHtml($record)),
+                            MediaSourceArea::make([
+                                Group::make([
+                                    Group::make([
+                                        FileUpload::make('workspace_new_media_upload')
+                                            ->label(__('media_ui.upload'))
+                                            ->hiddenLabel()
+                                            ->multiple()
+                                            ->storeFiles(false)
+                                            ->appendFiles()
+                                            ->dehydrated(false)
+                                            ->imagePreviewHeight('320')
+                                            ->maxSize(20 * 1024)
+                                            ->acceptedFileTypes([
+                                                'image/jpeg',
+                                                'image/png',
+                                                'image/gif',
+                                                'image/webp',
+                                                'image/avif',
+                                            ])
+                                            ->live()
+                                            ->afterStateUpdated(function (Component $livewire, Set $set, mixed $state): void {
+                                                if (! $livewire instanceof EditProduct || ! is_array($state)) {
+                                                    return;
+                                                }
+
+                                                $files = array_values(array_filter(
+                                                    $state,
+                                                    fn ($file): bool => $file instanceof UploadedFile,
+                                                ));
+
+                                                if ($files !== [] && $livewire->addUploadedMediaFromForm($files)) {
+                                                    $set('workspace_new_media_upload', []);
+                                                }
+                                            }),
+                                        View::make('filament.brand-media-upload-trigger'),
+                                    ])->extraAttributes(['class' => 'bp-brand-media-upload-slot']),
+                                    OriginalImageAssetPicker::make('workspace_new_media_library')
+                                        ->label(__('media_ui.select_existing'))
+                                        ->hiddenLabel()
+                                        ->placeholder(null)
+                                        ->helperText(null)
+                                        ->dehydrated(false)
+                                        ->live()
+                                        ->afterStateUpdated(function (Component $livewire, Set $set, mixed $state): void {
+                                            if ($livewire instanceof EditProduct
+                                                && is_string($state)
+                                                && $state !== ''
+                                                && $livewire->addExistingMediaFromForm($state)) {
+                                                $set('workspace_new_media_library', null);
+                                            }
+                                        })
+                                        ->extraAttributes(['class' => 'bp-brand-media-picker']),
+                                    SchemaActions::make([
+                                        Action::make('add_product_image_url')
+                                            ->label(__('media_ui.add_from_url'))
+                                            ->icon('heroicon-o-link')
+                                            ->outlined()
+                                            ->color('gray')
+                                            ->modalHeading(__('media_ui.add_from_url'))
+                                            ->modalSubmitActionLabel(__('media_ui.add_from_url'))
+                                            ->schema([
+                                                TextInput::make('url')
+                                                    ->label(__('media_ui.image_url'))
+                                                    ->url()
+                                                    ->required()
+                                                    ->maxLength(2048),
+                                            ])
+                                            ->action(function (Component $livewire, array $data): void {
+                                                if (! $livewire instanceof EditProduct) {
+                                                    return;
+                                                }
+
+                                                $actor = auth()->user();
+
+                                                if (! $actor instanceof User) {
+                                                    throw new AuthorizationException('This action is unauthorized.');
+                                                }
+
+                                                try {
+                                                    $asset = app(OriginalImageUrlIngestService::class)->ingest(
+                                                        $actor,
+                                                        app(WorkspaceContext::class)->current(),
+                                                        (string) $data['url'],
+                                                    );
+                                                } catch (MediaIngestException $exception) {
+                                                    throw ValidationException::withMessages([
+                                                        'mountedActions.0.data.url' => $exception->getMessage(),
+                                                    ]);
+                                                }
+
+                                                $livewire->addExistingMediaFromForm((string) $asset->id);
+                                            }),
+                                    ])->key('product_media_url_actions')
+                                        ->extraAttributes(['class' => 'bp-brand-media-url-action']),
+                                ])->extraAttributes(['class' => 'bp-brand-media-actions']),
+                            ])->visible(fn (?Product $record): bool => $record !== null)
+                                ->extraAttributes(['class' => 'bp-product-media-source']),
                             SchemaActions::make([
                                 self::pendingCapabilityAction(
                                     'media_enhance',
@@ -2062,10 +2169,7 @@ class ProductResource extends Resource
 
         if ($urls === []) {
             return new HtmlString(
-                '<div style="padding:24px;border:1px dashed #d1d5db;border-radius:10px;text-align:center;color:#6b7280;">'.
-                '<strong style="display:block;color:#374151;margin-bottom:4px;">Медіа ще не додано</strong>'.
-                '<span>У Workspace буде один логічний кадр без технічних копій для каналів.</span>'.
-                '</div>'
+                '<div style="padding:0.5rem 0;color:#6b7280;">Медіа ще не додано. Додайте перше зображення нижче.</div>'
             );
         }
 
