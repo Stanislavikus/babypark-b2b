@@ -110,6 +110,7 @@ class MediaAssetResource extends Resource
                         Group::make([
                             FileUpload::make('replacement_upload')
                                 ->label('Нове зображення')
+                                ->hiddenLabel()
                                 ->storeFiles(false)
                                 ->maxSize(20 * 1024)
                                 ->acceptedFileTypes([
@@ -123,7 +124,7 @@ class MediaAssetResource extends Resource
                                     'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
                                     'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
                                 ])
-                                ->helperText('Перетягніть файл або виберіть його. Максимум 20 МіБ і 25 МП.')
+                                ->helperText(null)
                                 ->live()
                                 ->afterStateUpdated(function (EditMediaAsset $livewire): void {
                                     $livewire->replacementBusinessWarning = null;
