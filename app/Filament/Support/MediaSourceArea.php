@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support;
 
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Text;
 use Filament\Support\Enums\FontWeight;
@@ -16,7 +17,7 @@ use Illuminate\Support\HtmlString;
 final class MediaSourceArea
 {
     /**
-     * @param  array<int, \Filament\Schemas\Components\Component>  $controls
+     * @param  array<int, Component>  $controls
      */
     public static function make(array $controls, string $extraClass = '', ?string $subheading = null): Group
     {
