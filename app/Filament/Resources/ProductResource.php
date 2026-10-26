@@ -243,18 +243,30 @@ class ProductResource extends Resource
                                                 }
 
                                                 try {
-                                                    $asset = app(OriginalImageUrlIngestService::class)->ingest(
+                                                    // The URL transport only supplies a bounded temporary file.
+                                                    // Product's existing guarded upload writer atomically owns
+                                                    // Original ingest, ProductMedia and rollback cleanup.
+                                                    app(OriginalImageUrlIngestService::class)->withDownloadedFile(
                                                         $actor,
                                                         app(WorkspaceContext::class)->current(),
                                                         (string) $data['url'],
+                                                        function (UploadedFile $file) use ($livewire): void {
+                                                            if (! $livewire->addUploadedMediaFromForm([$file])) {
+                                                                throw ValidationException::withMessages([
+                                                                    'mountedActions.0.data.url' => 'Не вдалося додати зображення до товару. Перевірте повідомлення про помилку.',
+                                                                ]);
+                                                            }
+                                                        },
                                                     );
-                                                } catch (MediaIngestException $exception) {
+                                                } catch (MediaIngestException|ValidationException $exception) {
+                                                    $message = $exception instanceof ValidationException
+                                                        ? (collect($exception->errors())->flatten()->first() ?? $exception->getMessage())
+                                                        : $exception->getMessage();
+
                                                     throw ValidationException::withMessages([
-                                                        'mountedActions.0.data.url' => $exception->getMessage(),
+                                                        'mountedActions.0.data.url' => $message,
                                                     ]);
                                                 }
-
-                                                $livewire->addExistingMediaFromForm((string) $asset->id);
                                             }),
                                     ])->key('product_media_url_actions')
                                         ->extraAttributes(['class' => 'bp-brand-media-url-action']),
