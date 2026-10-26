@@ -48,6 +48,21 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     assert.equal(page.url(), assetUrl);
     await page.getByText('shared.png', { exact: false }).first().waitFor({ state: 'visible' });
 
+    const assetSource = page.locator('.bp-asset-replacement-source.bp-brand-media-dropzone');
+    await assetSource.getByText('Перетягніть зображення сюди', { exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await assetSource.locator('.filepond--root').waitFor({ state: 'attached', timeout: 20_000 });
+    const assetArea = await assetSource.boundingBox();
+    assert.ok(assetArea && assetArea.width >= 700,
+      'Asset editor source area must span its desktop Filament form, not one half-width column.');
+    assert.equal(await assetSource.getByRole('button', { name: 'Завантажити' }).count(), 1,
+      'Original replacement has one real, native upload action, not a fake library rebind.');
+    await mkdir(root, { recursive: true });
+    await assetSource.screenshot({ path: `${root}/asset-replacement-desktop.png` });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assetSource.screenshot({ path: `${root}/asset-replacement-mobile.png` });
+    await page.setViewportSize({ width: 1440, height: 960 });
+
     await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
 

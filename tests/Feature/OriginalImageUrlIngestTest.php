@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
+use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\MediaAsset;
+use App\Models\Product;
+use App\Models\ProductMedia;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\BrandManager;
@@ -257,6 +260,95 @@ final class OriginalImageUrlIngestTest extends TestCase
         $this->assertSame($this->workspace->id, $asset->workspace_id);
         $this->assertNull($asset->source_url);
         $this->assertCount(1, $transport->requests);
+    }
+
+    #[Test]
+    public function product_url_action_ingests_original_and_attaches_gallery_atomically(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $file = UploadedFile::fake()->image('remote-product.png', 400, 300);
+        $transport = $this->fakeTransport([
+            new ConnectorHttpResult(200, ['content-type' => ['image/png']], file_get_contents($file->getRealPath())),
+        ]);
+        $product = $this->product();
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction(TestAction::make('add_product_image_url')->schemaComponent('product_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/remote-product.png')
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        $link = ProductMedia::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('product_id', $product->id)
+            ->sole();
+        $asset = MediaAsset::withoutWorkspaceScope()->findOrFail($link->media_asset_id);
+        $this->assertSame($this->workspace->id, $asset->workspace_id);
+        $this->assertNull($asset->parent_media_asset_id);
+        $this->assertSame('remote-product.png', $asset->original_filename);
+        $this->assertSame(1, MediaAsset::withoutWorkspaceScope()->count());
+        $this->assertCount(1, $transport->requests);
+        Storage::disk('public')->assertExists((string) $asset->storage_path);
+        $this->assertCount(1, $product->fresh()->images);
+    }
+
+    #[Test]
+    public function product_url_action_rolls_back_new_original_when_legacy_gallery_blocks_association(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $file = UploadedFile::fake()->image('legacy-blocked.png', 400, 300);
+        $this->fakeTransport([
+            new ConnectorHttpResult(200, ['content-type' => ['image/png']], file_get_contents($file->getRealPath())),
+        ]);
+        $product = $this->product(['https://legacy.example.net/existing.png']);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction(TestAction::make('add_product_image_url')->schemaComponent('product_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/legacy-blocked.png')
+            ->callMountedAction()
+            ->assertHasErrors(['mountedActions.0.data.url']);
+
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()->count());
+        $this->assertSame(0, ProductMedia::withoutWorkspaceScope()->count());
+        $this->assertSame([], Storage::disk('public')->allFiles('media/originals/'.$this->workspace->id));
+        $this->assertSame(['https://legacy.example.net/existing.png'], $product->fresh()->images);
+    }
+
+    #[Test]
+    public function product_url_action_exposes_transport_validation_inline_without_persisting(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $transport = $this->fakeTransport([
+            new ConnectorHttpResult(403, ['content-type' => ['text/plain']], 'Request blocked'),
+        ]);
+        $product = $this->product();
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction(TestAction::make('add_product_image_url')->schemaComponent('product_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/blocked.png')
+            ->callMountedAction()
+            ->assertHasErrors([
+                'mountedActions.0.data.url' => 'Сервер зображення не повернув файл. Перевірте URL.',
+            ]);
+
+        $this->assertCount(1, $transport->requests);
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()->count());
+        $this->assertSame(0, ProductMedia::withoutWorkspaceScope()->count());
+    }
+
+    private function product(array $images = []): Product
+    {
+        return Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => null,
+            'sku' => null,
+            'name' => 'Remote Media Product '.uniqid(),
+            'images' => $images,
+            'is_active' => true,
+        ]);
     }
 
     /** @param list<ConnectorHttpResult|ConnectorTransportException> $responses */

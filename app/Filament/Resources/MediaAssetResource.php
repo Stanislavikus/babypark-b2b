@@ -9,6 +9,7 @@ use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Filament\Support\MediaAssetCardColumns;
 use App\Filament\Support\MediaPreviewFrame;
+use App\Filament\Support\MediaSourceArea;
 use App\Models\MediaAsset;
 use App\Models\User;
 use App\Services\Media\MediaAssetLibraryReadService;
@@ -26,6 +27,7 @@ use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
@@ -103,27 +105,35 @@ class MediaAssetResource extends Resource
                     'default' => 1,
                     'md' => 2,
                 ])->columnSpanFull(),
-                FileUpload::make('replacement_upload')
-                    ->label('Нове зображення')
-                    ->storeFiles(false)
-                    ->maxSize(20 * 1024)
-                    ->acceptedFileTypes([
-                        'image/jpeg',
-                        'image/png',
-                        'image/gif',
-                        'image/webp',
-                        'image/avif',
-                    ])
-                    ->validationMessages([
-                        'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
-                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
-                    ])
-                    ->helperText('Перетягніть файл або виберіть його. Максимум 20 МіБ і 25 МП.')
-                    ->live()
-                    ->afterStateUpdated(function (EditMediaAsset $livewire): void {
-                        $livewire->replacementBusinessWarning = null;
-                        $livewire->replacementPostSaveNotice = null;
-                    }),
+                MediaSourceArea::make([
+                    Group::make([
+                        Group::make([
+                            FileUpload::make('replacement_upload')
+                                ->label('Нове зображення')
+                                ->hiddenLabel()
+                                ->storeFiles(false)
+                                ->maxSize(20 * 1024)
+                                ->acceptedFileTypes([
+                                    'image/jpeg',
+                                    'image/png',
+                                    'image/gif',
+                                    'image/webp',
+                                    'image/avif',
+                                ])
+                                ->validationMessages([
+                                    'max' => 'Файл завеликий. Максимальний розмір зображення — 20 МіБ.',
+                                    'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
+                                ])
+                                ->helperText(null)
+                                ->live()
+                                ->afterStateUpdated(function (EditMediaAsset $livewire): void {
+                                    $livewire->replacementBusinessWarning = null;
+                                    $livewire->replacementPostSaveNotice = null;
+                                }),
+                            View::make('filament.brand-media-upload-trigger'),
+                        ])->extraAttributes(['class' => 'bp-brand-media-upload-slot']),
+                    ])->extraAttributes(['class' => 'bp-brand-media-actions bp-asset-replacement-actions']),
+                ], 'bp-asset-replacement-source', 'або натисніть «Завантажити»'),
                 Callout::make(new HtmlString('<span class="font-semibold text-gray-950 dark:text-white">Зображення не змінено</span>'))
                     ->warning()
                     ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementBusinessWarning)
@@ -156,7 +166,7 @@ class MediaAssetResource extends Resource
                     'default' => 1,
                     'md' => 3,
                 ])->columnSpanFull(),
-            ]),
+            ])->columnSpanFull(),
             Section::make('Використовується в')->schema([
                 TextEntry::make('usage_items_edit')
                     ->label('Використання')

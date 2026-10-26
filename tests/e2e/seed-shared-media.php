@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspacePermission;
@@ -89,6 +91,22 @@ $second = $brands->create($actor, $workspace, 'E2E Shared Brand Two', logoMediaA
 $third = $brands->create($actor, $workspace, 'E2E Different Brand', logoMediaAssetId: $other->id);
 $pickerBrand = $brands->create($actor, $workspace, 'E2E Visual Picker Brand');
 
+$product = Product::withoutWorkspaceScope()->create([
+    'workspace_id' => $workspace->id,
+    'onec_guid' => null,
+    'name' => 'E2E Master Media Product',
+    'images' => [],
+    'is_active' => true,
+]);
+ProductVariant::withoutWorkspaceScope()->create([
+    'workspace_id' => $workspace->id,
+    'product_id' => $product->id,
+    'onec_guid' => null,
+    'sku' => null,
+    'attributes' => [],
+    'is_active' => true,
+]);
+
 file_put_contents($dir.'/fixture.json', json_encode([
     'sharedAssetId' => $shared->id,
     'sharedHash' => $shared->content_sha256,
@@ -96,6 +114,7 @@ file_put_contents($dir.'/fixture.json', json_encode([
     'secondBrandId' => $second->id,
     'differentBrandId' => $third->id,
     'pickerBrandId' => $pickerBrand->id,
+    'mediaProductId' => $product->id,
 ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
 
 echo "Isolated shared-media fixture created.\n";

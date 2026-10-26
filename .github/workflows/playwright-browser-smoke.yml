@@ -115,7 +115,7 @@ jobs:
       - name: Start local application
         run: |
           set -euo pipefail
-          nohup php artisan serve --host=127.0.0.1 --port=18767 > /tmp/babypark-browser-smoke-server.log 2>&1 &
+          PHP_CLI_SERVER_WORKERS=1 nohup php artisan serve --no-reload --host=127.0.0.1 --port=18767 > /tmp/babypark-browser-smoke-server.log 2>&1 &
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:18767/admin/login || true)
             if [ "$STATUS" = '200' ]; then
@@ -128,7 +128,17 @@ jobs:
           exit 1
 
       - name: Run real Chromium smoke tests
-        run: node --test --test-concurrency=1 tests/e2e/*.test.mjs
+        run: |
+          set -uo pipefail
+          if node --test --test-concurrency=1 tests/e2e/*.test.mjs; then
+            exit 0
+          fi
+          echo "::group::Isolated Laravel server after Chromium failure"
+          ps -eo pid,ppid,rss,stat,comm,args | grep -E '[p]hp artisan serve|[p]hp -S' || true
+          curl -sS -o /dev/null --max-time 3 -w 'Local app HTTP: %{http_code}\n' http://127.0.0.1:18767/admin/login || true
+          tail -n 100 /tmp/babypark-browser-smoke-server.log || true
+          echo "::endgroup::"
+          exit 1
 
       - name: Upload Brand Media visual acceptance screenshots
         if: always()
@@ -137,6 +147,11 @@ jobs:
           name: brand-media-visual-acceptance
           path: |
             test-results/browser-smoke/brand-media-layout.png
+            test-results/browser-smoke/asset-replacement-desktop.png
+            test-results/browser-smoke/asset-replacement-mobile.png
+            test-results/browser-smoke/product-media-empty.png
+            test-results/browser-smoke/product-media-uploaded.png
+            test-results/browser-smoke/product-media-mobile.png
             test-results/browser-smoke/brand-media-desktop-page.png
             test-results/browser-smoke/brand-media-mobile.png
             test-results/browser-smoke/brand-media-real-drop.png
