@@ -18,12 +18,12 @@ if ($marker === '' || ! is_file($marker)) {
 
 if ($scenario === 'handler-throws') {
     $server = new LocalHttpServer(
-        fn (string $request): string => throw new \RuntimeException('Deliberate child failure.'),
+        fn (string $request): string => throw new RuntimeException('Deliberate child failure.'),
     );
 
     try {
         $server->serveOnceInBackground();
-    } catch (\Throwable $exception) {
+    } catch (Throwable $exception) {
         // Simulate PHPUnit catching a Throwable from an escaped fork child.
         if (getmypid() !== $originalPid) {
             file_put_contents($marker, "escaped-child\n", FILE_APPEND | LOCK_EX);
@@ -37,7 +37,7 @@ if ($scenario === 'handler-throws') {
     $client = stream_socket_client('tcp://'.$server->host().':'.$server->port(), $errorCode, $errorMessage, 3);
 
     if ($client === false) {
-        throw new \RuntimeException("Failed connecting to local fixture: {$errorMessage}");
+        throw new RuntimeException("Failed connecting to local fixture: {$errorMessage}");
     }
 
     fwrite($client, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -45,8 +45,8 @@ if ($scenario === 'handler-throws') {
 
     try {
         $server->waitForHandler();
-        throw new \RuntimeException('The parent ignored the failing child exit status.');
-    } catch (\RuntimeException $exception) {
+        throw new RuntimeException('The parent ignored the failing child exit status.');
+    } catch (RuntimeException $exception) {
         if ($exception->getMessage() !== 'Local HTTP fixture child exited unsuccessfully.') {
             throw $exception;
         }
@@ -63,7 +63,7 @@ if ($scenario === 'client-closes') {
 
     try {
         $server->serveInBackground(256 * 1024, 4096, 50_000);
-    } catch (\Throwable $exception) {
+    } catch (Throwable $exception) {
         if (getmypid() !== $originalPid) {
             file_put_contents($marker, "escaped-child\n", FILE_APPEND | LOCK_EX);
             exit(0);
@@ -76,7 +76,7 @@ if ($scenario === 'client-closes') {
     $client = stream_socket_client('tcp://'.$server->host().':'.$server->port(), $errorCode, $errorMessage, 3);
 
     if ($client === false) {
-        throw new \RuntimeException("Failed connecting to chunked fixture: {$errorMessage}");
+        throw new RuntimeException("Failed connecting to chunked fixture: {$errorMessage}");
     }
 
     fwrite($client, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -87,7 +87,7 @@ if ($scenario === 'client-closes') {
     $server->close();
 
     if ($server->completionMarkerExists()) {
-        throw new \RuntimeException('Chunked fixture unexpectedly completed after client close.');
+        throw new RuntimeException('Chunked fixture unexpectedly completed after client close.');
     }
 
     echo "benign-client-close\n";
