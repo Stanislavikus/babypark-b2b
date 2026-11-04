@@ -17,6 +17,8 @@ final class LocalHttpServer
 
     private ?int $handlerPid = null;
 
+    private bool $tls;
+
     public function __construct(
         callable $responder,
         string $bindHost = '127.0.0.1',
@@ -25,6 +27,7 @@ final class LocalHttpServer
         ?string $keyPath = null,
     ) {
         $this->responder = $responder;
+        $this->tls = $tls;
         $context = stream_context_create($tls ? [
             'ssl' => [
                 'local_cert' => $certPath,
@@ -73,9 +76,17 @@ final class LocalHttpServer
         }
 
         if ($pid === 0) {
-            $this->runSingleRequestFromExportedSocket($socketExport);
+            $exitCode = 0;
 
-            exit(0);
+            try {
+                $this->runSingleRequestFromExportedSocket($socketExport);
+            } catch (\Throwable $exception) {
+                $exitCode = 1;
+                fwrite(STDERR, 'LocalHttpServer child failed: '.get_debug_type($exception).PHP_EOL);
+            } finally {
+                // An exception must never return the forked PHPUnit child to the test runner.
+                exit($exitCode);
+            }
         }
 
         $this->handlerPid = $pid;
@@ -84,18 +95,31 @@ final class LocalHttpServer
 
     public function waitForHandler(): void
     {
-        if ($this->handlerPid !== null) {
-            pcntl_waitpid($this->handlerPid, $status);
-            $this->handlerPid = null;
+        if ($this->handlerPid === null) {
+            return;
+        }
+
+        $pid = $this->handlerPid;
+        $this->handlerPid = null;
+        $waitedPid = pcntl_waitpid($pid, $status);
+
+        if ($waitedPid !== $pid) {
+            throw new \RuntimeException('Failed waiting for local HTTP fixture child.');
+        }
+
+        if (! pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0) {
+            throw new \RuntimeException('Local HTTP fixture child exited unsuccessfully.');
         }
     }
 
     public function close(): void
     {
-        $this->waitForHandler();
-
-        if (is_resource($this->socket)) {
-            fclose($this->socket);
+        try {
+            $this->waitForHandler();
+        } finally {
+            if (is_resource($this->socket)) {
+                fclose($this->socket);
+            }
         }
     }
 
@@ -135,7 +159,14 @@ final class LocalHttpServer
         }
 
         $response = ($export['responder'])($request);
-        fwrite($client, $response);
+        if ($this->tls) {
+            // A rejected certificate can close the TLS connection before the response is sent.
+            // The client test verifies the rejection; a broken-pipe write is expected here.
+            @fwrite($client, $response);
+        } elseif (fwrite($client, $response) === false) {
+            throw new \RuntimeException('Local HTTP fixture could not write its response.');
+        }
+
         fclose($client);
     }
 }
