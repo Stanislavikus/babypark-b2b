@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stage 2B — Option Mapping (NON-RUNTIME)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand-row">
+        <div>
+          <div class="contract-badge">Non-runtime visual contract</div>
+          <h1>Зіставлення значень — Stage 2B</h1>
+        </div>
+        <button class="btn" id="theme-toggle" type="button">Тема</button>
+      </div>
+      <nav class="nav-tabs" aria-label="Стани Option Mapping">
+        <button type="button" data-screen="unmapped" class="active">Потрібно зіставити</button>
+        <button type="button" data-screen="mapped">Зіставлено</button>
+        <button type="button" data-screen="view-only">Перегляд</button>
+        <button type="button" data-screen="all-mapped">Усе зіставлено</button>
+        <button type="button" data-screen="external-unavailable">Значення недоступне</button>
+        <button type="button" data-screen="no-external">Немає зовнішніх значень</button>
+        <button type="button" data-screen="stale">Застарілі відповідності</button>
+        <button type="button" data-screen="preview">Preview remediation</button>
+        <button type="button" data-screen="mobile">Вузький екран</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <section id="screen-unmapped" class="screen active">
+      <div class="card">
+        <h2>Зіставлення значень</h2>
+        <p class="context-line">Колір → Color · Adobe Commerce · Main store</p>
+      </div>
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr><th>Значення у вашому каталозі</th><th>Adobe Commerce</th><th>Стан</th><th>Дії</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn">Змінити</button></td></tr>
+            <tr><td>Рожевий</td><td>—</td><td><span class="status warn">Потрібно зіставити</span></td><td><button class="btn primary">Зіставити</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-mapped" class="screen">
+      <div class="card"><h2>Зіставлення значень</h2><p class="context-line">Колір → Color</p></div>
+      <div class="card table-card">
+        <table>
+          <thead><tr><th>Значення у вашому каталозі</th><th>Adobe Commerce</th><th>Стан</th><th>Дії</th></tr></thead>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn">Змінити</button> <button class="btn danger">Видалити зіставлення</button></td></tr>
+            <tr><td>Рожевий</td><td>Pink</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn">Змінити</button> <button class="btn danger">Видалити зіставлення</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-view-only" class="screen">
+      <div class="card"><h2>Зіставлення значень</h2><p class="hint">Режим перегляду (view_sync_mappings)</p></div>
+      <div class="card table-card">
+        <table>
+          <thead><tr><th>Значення у вашому каталозі</th><th>Adobe Commerce</th><th>Стан</th></tr></thead>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td></tr>
+            <tr><td>Рожевий</td><td>—</td><td><span class="status warn">Потрібно зіставити</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-all-mapped" class="screen">
+      <div class="card table-card">
+        <table>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn">Змінити</button></td></tr>
+            <tr><td>Рожевий</td><td>Pink</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn">Змінити</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-external-unavailable" class="screen">
+      <div class="card table-card">
+        <table>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn">Змінити</button></td></tr>
+            <tr><td>Рожевий</td><td>Недоступне значення</td><td><span class="status warn">Значення більше недоступне</span></td><td><button class="btn">Змінити</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-no-external" class="screen">
+      <div class="card"><p>Не вдалося перевірити доступні значення Adobe Commerce. Поточні зіставлення залишаються видимими.</p></div>
+      <div class="card table-card">
+        <table>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td><td><button class="btn danger">Видалити зіставлення</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-stale" class="screen">
+      <div class="card table-card">
+        <h3>Застарілі відповідності</h3>
+        <table>
+          <thead><tr><th>Внутрішнє значення</th><th>Adobe Commerce</th><th>Стан</th><th>Дії</th></tr></thead>
+          <tbody>
+            <tr><td>Внутрішнє значення більше недоступне</td><td>Green</td><td><span class="status warn">Застаріла відповідність</span></td><td><button class="btn danger">Видалити зіставлення</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-preview" class="screen">
+      <div class="card">
+        <h3>Preview finding remediation</h3>
+        <p><strong>MissingOptionMapping</strong> → <a href="#">Зіставити значення</a> (manage_sync_mappings)</p>
+        <p><strong>MissingOptionMapping</strong> → <a href="#">Переглянути зіставлення значень</a> (view_sync_mappings)</p>
+        <p><strong>ExternalOptionMissingOrStale</strong> → <a href="#">Зіставити значення</a></p>
+        <p class="hint">Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз. (CURRENT_CONFIGURATION_CHANGED)</p>
+      </div>
+    </section>
+
+    <section id="screen-mobile" class="screen mobile">
+      <div class="card table-card">
+        <table>
+          <tbody>
+            <tr><td>Синій</td><td>Blue</td><td><span class="status ok">Зіставлено</span></td></tr>
+            <tr><td>Рожевий</td><td>—</td><td><span class="status warn">Потрібно зіставити</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    document.querySelectorAll('[data-screen]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-screen]').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('screen-' + btn.dataset.screen).classList.add('active');
+      });
+    });
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+  </script>
+</body>
+</html>
