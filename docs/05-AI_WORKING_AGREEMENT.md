@@ -1079,6 +1079,16 @@ The project optimizes test cadence for fast implementation **without reducing th
 - Pull-request CI must use PR-scoped concurrency with `cancel-in-progress: true` so a newer `synchronize` run cancels the obsolete run for the previous PR HEAD instead of consuming a second runner for stale evidence.
 - A PR must not be merged into `develop` until its required CI checks are green. Repository branch-protection / ruleset enforcement should require those checks where GitHub repository settings permit it; if enforcement is not verified, the green-CI-before-merge rule remains a mandatory project process rule.
 
+### CI and test-speed work guardrails (Resolved — 2026-11-04)
+
+- A CI or test-duration figure counts as a measurement only with its run id and a raw log excerpt. A figure reported by another agent, or read but not yet excerpted, is a hint for prioritisation, not a baseline.
+- Speeding up CI must not remove, skip, weaken or make non-required any test. For a CI-execution-only change the set of executed test IDs must equal the baseline; otherwise each added or removed ID is listed and explained. A new skip needs a stated reason.
+- A second run on the same HEAD is required only when the execution mode changes (parallel, matrix, test-database bootstrap). A fix for an intermittent failure is closed by an explained root cause and a removed hazard, not by a count of green runs.
+- Renaming or splitting CI jobs requires checking that required status checks still match; otherwise the owner updates the ruleset.
+- Test code must not let a forked or spawned child run PHPUnit's runner or hide its exit status: a child process used by a fixture must be unable to return into the test runner, and its exit status must be checked. A regression test for such a hazard runs it in an isolated subprocess with a timeout, so a regression fails the test instead of re-running the suite. (Basis: the 2026-11 `LocalHttpServer` fork-escape defect, `docs/reviews/REUSABLE_UI_DELIVERY_ACCELERATION_2026_11_04.md` §2a.)
+- Reusable UI behavior: centralize the part that is identical across contexts; keep context-specific state handling and writers separate; choose the smallest sufficient official Filament composition. A nested Livewire component for such a block needs explicit authorization and workspace-scoping tests, because it does not inherit the parent's scoping or authorization.
+- Until CI has a lightweight path for documentation-only changes, batch *documentation* changes into as few pull requests as practical: every pull request targeting `develop` currently pays the full gate (no `paths` filter in either workflow). This concerns documentation only; it does not relax the rule above that unrelated code mechanisms are not batched merely to reduce test runs. Remove this bullet when that path exists.
+
 ---
 
 ## Output Format for Planning Tasks
