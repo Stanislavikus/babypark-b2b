@@ -488,6 +488,7 @@ Availability, Customers, Orders, B2B Catalogue, Payment, Import, Export.
 - Regional and Compliance Rules;
 - Documentation Update Rules;
 - Testing Requirements, including the resolved risk-based Test Execution Cadence (focused/regression tests per risk-bearing mechanism; MySQL-specific proof where required; one mandatory broad/full local gate before slice/PR closure; green CI before merge);
+- CI and test-speed work guardrails (Resolved): a duration is a measurement only with run id and raw log excerpt; no test is removed, skipped, weakened or made non-required for speed (executed test-ID inventory); a second CI run only when the execution mode changes; required-check names preserved; a forked or spawned test child must never return into the test runner and its exit status is checked; reusable-UI composition rule; documentation (not code) changes are batched while CI has no docs-only path;
 - Output Format for Planning Tasks;
 - Output Format for Code Tasks;
 - Small Task Exception;
@@ -765,6 +766,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/reviews/BRAND_ASSETS_UX_CLOSURE_2026_10_08.md` — **[Resolved — 2026-10-08]** Product Owner-approved Brand/Assets UX closure: contain-fit previews, merchant storage/status wording, relational `Використовується в`, Brand upload/select/remove over canonical MediaAsset, and deployment storage-link bootstrap.
 - `docs/reviews/ASSETS_INTERACTION_STANDARD_2026_10_08.md` — **[Resolved — 2026-10-08]** Assets interaction closure before lifecycle work: shared stable Media Preview Frame, right-side quick-view drawer with full-page fallback, locally deferred native Filament filter drawer with explicit Apply, richer merchant details, and upload action wording; explicitly excludes physical delete/replace semantics.
 - `docs/reviews/MASTER_ASSETS_LIFECYCLE_REPLACE_DELETE_2026_10_09.md` — **[Resolved — Product Owner approved 2026-10-09 — option A]**; research-backed Assets lifecycle contract for same-identity Original replacement, guarded physical delete, post-commit filesystem cleanup and orphan recovery over the frozen MediaAsset authority.
+- `docs/reviews/REUSABLE_UI_DELIVERY_ACCELERATION_2026_11_04.md` — **[Resolved — 2026-11-04, Product Owner]** short-change contract for finishing PR #304, fixing the fork-escape defect in the test fixtures that re-runs the CI test suite, making the full MySQL gate cheap by measured levers and, only when triggered, a minimal shared Media-control extraction. Separates verified facts, Lead-read log values and hypotheses; numbers live only in its Measurement Log. Changes no domain contract and does not override the `[Resolved — 2026-10-25]` Media UI reuse decision.
 - `docs/reviews/MASTER_VARIANT_MEDIA_AUTHORING_IMPLEMENTATION_CONTRACT_2026_10_03.md` — **[Resolved — 2026-10-03]** Variant Media authoring UX/runtime contract: media-first assignment, axis-value bulk gestures expanded to concrete VariantIDs, explicit primary, locale-aware association uniqueness, and unchanged Magento Product media export.
 - `docs/reviews/MASTER_PRODUCT_FULL_UI_EXERCISE_ALIGNMENT_2026_10_02.md` — **[Resolved — 2026-10-02]** Product Owner sequencing: expose and exercise the complete non-SEO Master Product Workspace now; missing runtimes stay visible as «Чекає на підключення»; SEO/AI connects last.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_SONNET_CONTRACT_REVIEW_2026_09_13.md` — post-contract Sonnet adversarial review resolution; freezes physical PK/FK type, Customer bootstrap exclusion, `manage_product_structure`, out-of-type sync boundary, Basic Product post-create reconciliation, structure revision semantics, and mandatory MySQL gate without changing the ProductType/AttributeGroup architecture.
@@ -818,6 +820,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - 07-TECH_STACK.md
 - relevant sections of 03-DOMAIN_MODEL.md where domain data is displayed
 - `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` for Magento onboarding / connection / credential / permission / recovery surfaces
+- `docs/reviews/REUSABLE_UI_DELIVERY_ACCELERATION_2026_11_04.md` — read before changing the contract of `MediaSourceArea` or of the Brand/Asset/Product Media source controls, or the `bp-brand-media-*` CSS, while the campaign is open. Master Product layout work (#287), confirmed-defect fixes and security fixes are not blocked by it. Remove this bullet when the campaign is closed.
 
 ---
 
