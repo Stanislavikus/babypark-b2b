@@ -72,8 +72,17 @@ final class SlowChunkedBodyHttpServer
         }
 
         if ($pid === 0) {
-            self::runHandler($state);
-            exit(0);
+            $exitCode = 0;
+
+            try {
+                self::runHandler($state);
+            } catch (\Throwable $exception) {
+                $exitCode = 1;
+                @fwrite(STDERR, 'SlowChunkedBodyHttpServer child failed: '.get_debug_type($exception).PHP_EOL);
+            } finally {
+                // A child exception must never return into PHPUnit's inherited runner.
+                exit($exitCode);
+            }
         }
 
         $this->handlerPid = $pid;
@@ -82,18 +91,31 @@ final class SlowChunkedBodyHttpServer
 
     public function waitForHandler(): void
     {
-        if ($this->handlerPid !== null) {
-            pcntl_waitpid($this->handlerPid, $status);
-            $this->handlerPid = null;
+        if ($this->handlerPid === null) {
+            return;
+        }
+
+        $pid = $this->handlerPid;
+        $this->handlerPid = null;
+        $waitedPid = pcntl_waitpid($pid, $status);
+
+        if ($waitedPid !== $pid) {
+            throw new \RuntimeException('Failed waiting for chunked HTTP fixture child.');
+        }
+
+        if (! pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0) {
+            throw new \RuntimeException('Chunked HTTP fixture child exited unsuccessfully.');
         }
     }
 
     public function close(): void
     {
-        $this->waitForHandler();
-
-        if (is_resource($this->socket)) {
-            fclose($this->socket);
+        try {
+            $this->waitForHandler();
+        } finally {
+            if (is_resource($this->socket)) {
+                fclose($this->socket);
+            }
         }
     }
 
