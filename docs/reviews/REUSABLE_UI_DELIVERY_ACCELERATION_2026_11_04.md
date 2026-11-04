@@ -1,6 +1,6 @@
 # Reusable UI Delivery Acceleration — contract v2.3 (2026-11-04)
 
-**Status:** `[Resolved — 2026-11-04 — Product Owner]`. It enters git only after the owner's explicit D1 = yes, and then with status `[Resolved — <date> — Product Owner]`; it is never committed as Proposed. Supersedes v1 (2026-10-27), v2, v2.1 and v2.2 (all 2026-11-04 except v1); none was committed.
+**Status:** `[Resolved — 2026-11-04 — Product Owner]`. Approved by the Product Owner on 2026-11-04 (D1–D3 = yes, conditional on no danger to development; the Verifier check found no conflict). Supersedes v1 (2026-10-27), v2, v2.1 and v2.2 (all 2026-11-04 except v1); none was committed.
 
 **Type:** delivery-process campaign. No domain change: no new table, field, status, writer, storage owner or authorization rule. A set of **short, independent changes**, not a sequential programme.
 
@@ -163,11 +163,11 @@ Owner: D1–D3, visual sign-off, business decisions, final `OK` for merge / depl
 | TBD | Gate after the fixture fix: total, executed/skipped IDs, single summary | CI run | | |
 | TBD | Top-30 slowest classes + category (after the fix) | | | |
 
-## 8. Decisions for the Product Owner
+## 8. Decisions of the Product Owner (answered 2026-11-04)
 
-- **D1.** Approve this v2.3 as `[Resolved]`, **including** the standing process rules in `05` (*CI and test-speed work guardrails*) landing now in the same docs-only PR — yes / no / amend. On yes it is committed with status `[Resolved — <date> — Product Owner]`. The owner may answer "yes, without the `05` rules"; those rules then wait for closure through a separate governance PR.
-- **D2.** Freeze only an *uncoordinated change of the Media source-control contract* and any *repeated refactor* of those controls until M1 is triggered or declined. Still allowed: fixes for confirmed defects of PR #304; moving the Media section inside #287 without changing its behaviour; mandatory security / regression fixes; small in-place fixes of confirmed defects; every other area. *Recommendation: yes* (Lead and Verifier agree).
-- **D3.** Browser verification stays in CI Playwright + MySQL on the GitHub-hosted runner, measured, with a lightweight docs path; no second SQLite e2e environment. *Recommendation: yes* (Lead and Verifier agree).
+- **D1.** Approved 2026-11-04: this contract is `[Resolved]`, including the standing process rules in `05` (*CI and test-speed work guardrails*), landed in the same docs-only PR.
+- **D2.** Freeze only an *uncoordinated change of the Media source-control contract* and any *repeated refactor* of those controls until M1 is triggered or declined. Still allowed: fixes for confirmed defects of PR #304; moving the Media section inside #287 without changing its behaviour; mandatory security / regression fixes; small in-place fixes of confirmed defects; every other area. *Recommendation: yes* (Lead and Verifier agree). **Approved 2026-11-04.**
+- **D3.** Browser verification stays in CI Playwright + MySQL on the GitHub-hosted runner, measured, with a lightweight docs path; no second SQLite e2e environment. *Recommendation: yes* (Lead and Verifier agree). **Approved 2026-11-04.**
 
 ## 9. Closure
 
