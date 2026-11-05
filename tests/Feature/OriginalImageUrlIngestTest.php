@@ -15,7 +15,11 @@ use App\Services\Media\OriginalImageUrlIngestService;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+use App\Support\Connectors\Transport\ConnectorRequestSender;
 use App\Support\Connectors\Transport\ConnectorTransportException;
+use App\Support\Connectors\Transport\Dns\DnsResolutionResult;
+use App\Support\Connectors\Transport\Internal\ConnectorDestinationResolverImpl;
+use App\Support\Connectors\Transport\SsrfSafeConnectorHttpTransport;
 use App\Support\Connectors\Transport\TransportFailureReason;
 use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Workspace\WorkspacePermissions;
@@ -29,9 +33,11 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use LogicException;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
+use Tests\Unit\Connectors\Transport\FakeDnsResolver;
 
 final class OriginalImageUrlIngestTest extends TestCase
 {
@@ -122,6 +128,61 @@ final class OriginalImageUrlIngestTest extends TestCase
                 $transport->requests[1]->request->getHeaderLine('User-Agent'),
             );
         }
+    }
+
+    #[Test]
+    public function url_import_blocks_private_ip_before_any_http_send(): void
+    {
+        $sender = Mockery::mock(ConnectorRequestSender::class);
+        $sender->shouldNotReceive('send');
+
+        $this->app->instance(ConnectorHttpTransport::class, new SsrfSafeConnectorHttpTransport(
+            new ConnectorDestinationResolverImpl(new FakeDnsResolver([])),
+            $sender,
+        ));
+
+        try {
+            app(OriginalImageUrlIngestService::class)
+                ->ingest($this->actor, $this->workspace, 'https://169.254.169.254/latest/meta-data');
+            $this->fail('Private metadata IP must be denied before network I/O.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('url', $exception->errors());
+        }
+
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()->count());
+    }
+
+    #[Test]
+    public function url_import_rechecks_dns_policy_on_every_redirect_before_network_send(): void
+    {
+        $sender = Mockery::mock(ConnectorRequestSender::class);
+        $sender->shouldReceive('send')->once()->andReturn(
+            new ConnectorHttpResult(302, ['location' => ['https://internal.example.net/private.png']], ''),
+        );
+
+        $dns = new FakeDnsResolver([
+            'images.example.net' => DnsResolutionResult::ok(
+                'images.example.net', [], 'images.example.net', ['93.184.216.34'],
+            ),
+            'internal.example.net' => DnsResolutionResult::ok(
+                'internal.example.net', [], 'internal.example.net', ['10.0.0.8'],
+            ),
+        ]);
+
+        $this->app->instance(ConnectorHttpTransport::class, new SsrfSafeConnectorHttpTransport(
+            new ConnectorDestinationResolverImpl($dns),
+            $sender,
+        ));
+
+        try {
+            app(OriginalImageUrlIngestService::class)
+                ->ingest($this->actor, $this->workspace, 'https://images.example.net/redirect');
+            $this->fail('DNS-rebound private redirect target must never be fetched.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('url', $exception->errors());
+        }
+
+        $this->assertSame(0, MediaAsset::withoutWorkspaceScope()->count());
     }
 
     #[Test]

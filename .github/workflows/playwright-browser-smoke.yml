@@ -150,6 +150,7 @@ jobs:
             test-results/browser-smoke/asset-replacement-desktop.png
             test-results/browser-smoke/asset-replacement-mobile.png
             test-results/browser-smoke/product-media-empty.png
+            test-results/browser-smoke/product-media-library-reused.png
             test-results/browser-smoke/product-media-uploaded.png
             test-results/browser-smoke/product-media-mobile.png
             test-results/browser-smoke/brand-media-desktop-page.png

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
@@ -11,6 +12,14 @@ assert.equal(baseUrl.port, '18767');
 
 const root = 'test-results/browser-smoke';
 const fixture = JSON.parse(await readFile(`${root}/fixture.json`, 'utf8'));
+
+
+// Only read the synthetic CI MySQL database. Check actual persisted identity, not mocked UI state.
+const inspectProductMedia = () => JSON.parse(execFileSync(
+  'php',
+  ['tests/e2e/inspect-product-media.php', String(fixture.mediaProductId)],
+  { encoding: 'utf8', timeout: 15_000 },
+));
 
 test('Master Product Media uses approved native source controls and persists a real upload', { timeout: 115_000 }, async () => {
   const browser = await chromium.launch({ headless: true });
@@ -83,17 +92,56 @@ test('Master Product Media uses approved native source controls and persists a r
     await dialog.getByLabel('Посилання на зображення').waitFor({ state: 'visible' });
     await page.keyboard.press('Escape');
 
+    // Exercise the real picker and verify that a canonical existing Original was
+    // attached to ProductMedia, with zero new MediaAsset rows, even after reload.
+    const beforeLibrary = inspectProductMedia();
+    assert.equal(beforeLibrary.links.length, 0, 'The synthetic product starts with an empty gallery.');
+    await zone.getByRole('button', { name: 'Обрати з медіатеки' }).click();
+    const picker = page.locator('.fi-modal.fi-modal-open').filter({ hasText: 'Медіатека' });
+    await picker.getByRole('heading', { name: 'Медіатека', exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    const existingCard = picker.locator('.fi-ta-content-grid .fi-ta-record')
+      .filter({ hasText: 'other.png' }).first();
+    await existingCard.waitFor({ state: 'visible', timeout: 20_000 });
+    await existingCard.locator('input[type="checkbox"]').first().check();
+    await picker.getByRole('button', { name: 'Підтвердити вибір', exact: true }).click();
+    await picker.getByRole('heading', { name: 'Медіатека', exact: true })
+      .waitFor({ state: 'hidden', timeout: 20_000 });
+    await page.getByText('1 медіа', { exact: false }).first()
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('1 медіа', { exact: false }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    const reused = inspectProductMedia();
+    assert.equal(reused.assetCount, beforeLibrary.assetCount,
+      'The native picker must not create another MediaAsset.');
+    assert.deepEqual(reused.links, [{
+      media_asset_id: String(fixture.otherAssetId),
+      role: 'primary',
+      sort_order: 0,
+    }], 'The existing Original ID must persist as canonical ProductMedia after reload.');
+    await zone.screenshot({ path: root + '/product-media-library-reused.png' });
+
     // Use a real decodable CI-only PNG; the form's Livewire callback must route
     // it to ProductMediaMutationService, never Product.images mass assignment.
     const input = zone.locator('.filepond--root .filepond--browser').first();
     await input.waitFor({ state: 'attached' });
     await input.setInputFiles(`${root}/shared.png`);
-    await page.getByText('1 медіа', { exact: false }).first()
+    await page.getByText('2 медіа', { exact: false }).first()
       .waitFor({ state: 'visible', timeout: 25_000 });
-    await zone.screenshot({ path: `${root}/product-media-uploaded.png` });
+    await zone.screenshot({ path: root + '/product-media-uploaded.png' });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.getByText('1 медіа', { exact: false }).first()
+    await page.getByText('2 медіа', { exact: false }).first()
       .waitFor({ state: 'visible', timeout: 20_000 });
+
+    const afterUpload = inspectProductMedia();
+    assert.equal(afterUpload.assetCount, beforeLibrary.assetCount,
+      'Uploading duplicate fixture bytes must reuse its canonical Original.');
+    assert.deepEqual(afterUpload.links, [
+      { media_asset_id: String(fixture.otherAssetId), role: 'primary', sort_order: 0 },
+      { media_asset_id: String(fixture.sharedAssetId), role: 'gallery', sort_order: 1 },
+    ]);
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobile = page.locator('.bp-product-media-source.bp-brand-media-dropzone');

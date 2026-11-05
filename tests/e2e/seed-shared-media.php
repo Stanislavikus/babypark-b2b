@@ -109,6 +109,7 @@ ProductVariant::withoutWorkspaceScope()->create([
 
 file_put_contents($dir.'/fixture.json', json_encode([
     'sharedAssetId' => $shared->id,
+    'otherAssetId' => $other->id,
     'sharedHash' => $shared->content_sha256,
     'firstBrandId' => $first->id,
     'secondBrandId' => $second->id,
