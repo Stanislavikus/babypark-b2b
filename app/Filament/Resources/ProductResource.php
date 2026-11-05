@@ -17,6 +17,7 @@ use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Filament\Support\MediaSourceArea;
+use App\Filament\Support\MediaUrlSourceAction;
 use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\Product;
@@ -217,20 +218,7 @@ class ProductResource extends Resource
                                         })
                                         ->extraAttributes(['class' => 'bp-brand-media-picker']),
                                     SchemaActions::make([
-                                        Action::make('add_product_image_url')
-                                            ->label(__('media_ui.add_from_url'))
-                                            ->icon('heroicon-o-link')
-                                            ->outlined()
-                                            ->color('gray')
-                                            ->modalHeading(__('media_ui.add_from_url'))
-                                            ->modalSubmitActionLabel(__('media_ui.add_from_url'))
-                                            ->schema([
-                                                TextInput::make('url')
-                                                    ->label(__('media_ui.image_url'))
-                                                    ->url()
-                                                    ->required()
-                                                    ->maxLength(2048),
-                                            ])
+                                        MediaUrlSourceAction::make('add_product_image_url')
                                             ->action(function (Component $livewire, array $data): void {
                                                 if (! $livewire instanceof EditProduct) {
                                                     return;

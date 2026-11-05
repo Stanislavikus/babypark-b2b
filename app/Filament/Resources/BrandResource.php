@@ -7,6 +7,7 @@ use App\Filament\Resources\BrandResource\Pages\EditBrand;
 use App\Filament\Resources\BrandResource\Pages\ListBrands;
 use App\Filament\Support\MediaPreviewFrame;
 use App\Filament\Support\MediaSourceArea;
+use App\Filament\Support\MediaUrlSourceAction;
 use App\Filament\Support\OriginalImageAssetPicker;
 use App\Models\Brand;
 use App\Models\MediaAsset;
@@ -234,21 +235,7 @@ class BrandResource extends Resource
                                     ->helperText(null)
                                     ->extraAttributes(['class' => 'bp-brand-media-picker']),
                                 Actions::make([
-                                    Action::make('import_logo_from_url')
-                                        ->label(__('media_ui.add_from_url'))
-                                        ->icon('heroicon-o-link')
-                                        ->color('gray')
-                                        ->outlined()
-                                        ->modalHeading(__('media_ui.add_from_url'))
-                                        ->modalSubmitActionLabel(__('media_ui.add_from_url'))
-                                        ->schema([
-                                            TextInput::make('url')
-                                                ->label(__('media_ui.image_url'))
-                                                ->placeholder('https://example.com/photo.jpg')
-                                                ->url()
-                                                ->required()
-                                                ->maxLength(2048),
-                                        ])
+                                    MediaUrlSourceAction::make('import_logo_from_url')
                                         ->action(function (array $data, Set $set, Component $livewire): void {
                                             $actor = auth()->user();
                                             if (($actor instanceof User) === false) {

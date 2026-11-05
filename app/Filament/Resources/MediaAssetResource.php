@@ -10,6 +10,7 @@ use App\Filament\Resources\MediaAssetResource\Pages\ViewMediaAsset;
 use App\Filament\Support\MediaAssetCardColumns;
 use App\Filament\Support\MediaPreviewFrame;
 use App\Filament\Support\MediaSourceArea;
+use App\Filament\Support\MediaUrlSourceAction;
 use App\Models\MediaAsset;
 use App\Models\User;
 use App\Services\Media\MediaAssetLibraryReadService;
@@ -20,13 +21,17 @@ use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
@@ -126,14 +131,37 @@ class MediaAssetResource extends Resource
                                 ])
                                 ->helperText(null)
                                 ->live()
-                                ->afterStateUpdated(function (EditMediaAsset $livewire): void {
+                                ->afterStateUpdated(function (EditMediaAsset $livewire, Set $set, mixed $state): void {
                                     $livewire->replacementBusinessWarning = null;
                                     $livewire->replacementPostSaveNotice = null;
+
+                                    if (filled($state)) {
+                                        $set('replacement_url', null);
+                                    }
                                 }),
                             View::make('filament.brand-media-upload-trigger'),
                         ])->extraAttributes(['class' => 'bp-brand-media-upload-slot']),
+                        SchemaActions::make([
+                            MediaUrlSourceAction::make('stage_asset_replacement_url')
+                                ->modalHeading('Обрати URL нового зображення')
+                                ->modalSubmitActionLabel('Обрати URL')
+                                ->action(function (array $data, Set $set, EditMediaAsset $livewire): void {
+                                    $set('replacement_upload', null);
+                                    $set('replacement_url', (string) $data['url']);
+                                    $livewire->replacementBusinessWarning = null;
+                                    $livewire->replacementPostSaveNotice = null;
+                                }),
+                        ])->key('asset_media_url_actions')
+                            ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                     ])->extraAttributes(['class' => 'bp-brand-media-actions bp-asset-replacement-actions']),
-                ], 'bp-asset-replacement-source', 'або натисніть «Завантажити»'),
+                    TextInput::make('replacement_url')
+                        ->label('URL нового зображення (після «Зберегти»)')
+                        ->url()
+                        ->maxLength(2048)
+                        ->live()
+                        ->visible(fn (Get $get): bool => filled($get('replacement_url')))
+                        ->extraAttributes(['class' => 'bp-asset-replacement-pending-url']),
+                ], 'bp-asset-replacement-source'),
                 Callout::make(new HtmlString('<span class="font-semibold text-gray-950 dark:text-white">Зображення не змінено</span>'))
                     ->warning()
                     ->description(fn (EditMediaAsset $livewire): ?string => $livewire->replacementBusinessWarning)

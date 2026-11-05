@@ -940,21 +940,14 @@ button.bp-category-tree-header-cell {
     }
 }
 
-/* Existing Asset edit: a single real Original replacement action. Selecting
-   another library Original cannot replace its identity; avoid fake source
-   controls and reuse the approved native FilePond drop surface instead. */
+/* Asset Replace shares Brand's native upload and URL action geometry, but
+   never exposes the library rebind operation as a file replacement. */
 .bp-asset-replacement-source .bp-brand-media-actions > .fi-grid {
-    grid-template-columns: minmax(10.75rem, 18rem);
-    width: min(100%, 18rem);
+    grid-template-columns: 10.75rem 14.5rem;
+    width: min(100%, 26rem);
 }
-.bp-asset-replacement-source .bp-brand-media-actions .filepond--drop-label label {
-    left: 50%;
-    transform: translateX(-50%) !important;
-    width: min(18rem, calc(100% - 2rem));
-}
-@container (min-width: 44.01rem) {
-    .bp-asset-replacement-source.bp-brand-media-dropzone:not(:has(.filepond--item))
-        .bp-brand-media-actions .filepond--drop-label label {
-        top: calc(50% + 1.25rem) !important;
+@container (max-width: 44rem) {
+    .bp-asset-replacement-source .bp-brand-media-actions > .fi-grid {
+        width: 100%;
     }
 }

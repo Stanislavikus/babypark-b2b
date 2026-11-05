@@ -118,7 +118,7 @@ The first implementation is Draft PR #305 (`fix/ci-tls-fixture-fork-escape`); it
 |---|---|---|---|---|
 | Brand | upload · library · URL | one logo | deferred; Brand Save authoritative | Brand logo binding + `OriginalImageUrlIngestService` |
 | Master Product | upload · library · URL | gallery | immediate, under ProductMedia locking | `ProductMediaMutationService` + `OriginalImageUrlIngestService` |
-| Asset editor | upload only | replace *this same* Original | existing Replace lifecycle | Assets lifecycle (`[Resolved — 2026-10-09]`) |
+| Asset editor | upload · URL | replace *this same* Original | deferred; explicit Save owns mutation | Assets lifecycle (`[Resolved — 2026-10-09]`) |
 
 **Gate:** the 2026-10-25 acceptance evidence reproduced at that HEAD; no change to a writer, identity, storage or authorization (else Stop & Amend); final gate per `05`.
 
@@ -126,10 +126,30 @@ The first implementation is Draft PR #305 (`fix/ci-tls-fixture-fork-escape`); it
 
 **Guardrail for P3.** If #287 relocates the Media section, move its control definitions as they are (no edits), so a later M1 stays mechanical.
 
+### [Resolved — 2026-11-05 — Product Owner: URL as Asset replacement bytes source]
+
+The owner explicitly approved implementing a unified Brand-style source area in the existing Asset editor.
+The approved URL option means **download a temporary image** using the existing
+OriginalImageUrlIngestService::withDownloadedFile(), then pass it into the
+**same** MediaAssetLifecycleService::replaceOriginal() writer as the local file.
+The URL is staged in the EditRecord form; only the regular **Save** replaces the
+stored bytes. For shared assets, the existing shared-usage confirmation still
+applies. A failed download/validation or dedupe collision leaves the old
+canonical Original and its usages intact. No new Original UUID, remote hotlink,
+cross-Asset rebind, derivative behavior or storage authority is authorized.
+
+Brand and Master Product keep all three sources; existing Asset Replace has
+**two** real sources (native FilePond upload + URL). Library-as-Replace needs
+a separate approved merge/rebind contract and is not part of this campaign.
+Reuse the existing MediaSourceArea presentation and the smallest common
+native URL modal factory, keeping each context's state/commit writer separate.
+This amendment supersedes only the former "upload only"/"never URL" assertions
+in §4 and N2; all other [Resolved] safety invariants remain frozen.
+
 ## 5. Non-negotiables
 
 - **N1.** No change to MediaAsset identity, ProductMedia / VariantMedia persistence, the writer services, the Asset Replace lifecycle, the Brand logo binding, the storage owner or workspace authorization without Stop & Amend.
-- **N2.** Context semantics stay as in §4; the Asset editor never gains Library or URL sources.
+- **N2.** Context semantics stay as in §4; the Asset editor may use local upload or safely downloaded URL bytes, but never rebind an existing library Asset under Replace.
 - **N3.** No nested Livewire component for a shared Media block by default (F8).
 - **N4.** No test is removed, skipped, weakened or made non-required to gain speed (inventory rule, §3).
 - **N5.** Final gate on the frozen HEAD stays as in `05`: full MySQL suite, Pint, diff check, applicable Chromium, then owner `OK`. Merge never authorizes deployment.

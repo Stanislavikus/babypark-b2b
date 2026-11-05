@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Filament\Resources\BrandResource\Pages\EditBrand;
+use App\Filament\Resources\MediaAssetResource\Pages\EditMediaAsset;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\MediaAsset;
 use App\Models\Product;
@@ -11,6 +12,7 @@ use App\Models\ProductMedia;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\BrandManager;
+use App\Services\Media\OriginalImageIngestService;
 use App\Services\Media\OriginalImageUrlIngestService;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
@@ -321,6 +323,140 @@ final class OriginalImageUrlIngestTest extends TestCase
         $this->assertSame($this->workspace->id, $asset->workspace_id);
         $this->assertNull($asset->source_url);
         $this->assertCount(1, $transport->requests);
+    }
+
+    #[Test]
+    public function asset_url_is_staged_without_network_until_save_then_replaces_the_same_original(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $original = app(OriginalImageIngestService::class)->ingestStandalone(
+            $this->actor,
+            $this->workspace,
+            UploadedFile::fake()->image('before.png', 400, 300),
+        );
+        $beforePath = (string) $original->storage_path;
+        $beforeHash = (string) $original->content_sha256;
+        $replacement = UploadedFile::fake()->image('from-url.png', 850, 620);
+        $transport = $this->fakeTransport([
+            new ConnectorHttpResult(200, ['content-type' => ['image/png']], file_get_contents($replacement->getRealPath())),
+        ]);
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $original->getRouteKey()])
+            ->mountAction(TestAction::make('stage_asset_replacement_url')->schemaComponent('asset_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/from-url.png')
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
+            ->assertSet('data.replacement_url', 'https://cdn.example.net/from-url.png');
+
+        $this->assertSame([], $transport->requests, 'URL staging must not make an outbound request.');
+        $this->assertSame($beforeHash, (string) $original->fresh()->content_sha256);
+        $this->assertSame($beforePath, (string) $original->fresh()->storage_path);
+
+        $component->call('save')
+            ->assertHasNoFormErrors()
+            ->assertSet('data.replacement_url', null);
+
+        $fresh = $original->fresh();
+        $this->assertSame((string) $original->id, (string) $fresh->id);
+        $this->assertSame('from-url.png', $fresh->original_filename);
+        $this->assertNull($fresh->source_url);
+        $this->assertNotSame($beforeHash, (string) $fresh->content_sha256);
+        $this->assertNotSame($beforePath, (string) $fresh->storage_path);
+        $this->assertDatabaseCount('media_assets', 1);
+        $this->assertCount(1, $transport->requests);
+        Storage::disk('public')->assertExists((string) $fresh->storage_path);
+    }
+
+    #[Test]
+    public function url_replacement_of_shared_asset_requires_same_confirmed_save_as_local_upload(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $original = app(OriginalImageIngestService::class)->ingestStandalone(
+            $this->actor, $this->workspace, UploadedFile::fake()->image('shared-before.png', 400, 300),
+        );
+        $hash = (string) $original->content_sha256;
+        app(BrandManager::class)->create(
+            $this->actor, $this->workspace, 'URL Shared Brand One', logoMediaAssetId: $original->id,
+        );
+        app(BrandManager::class)->create(
+            $this->actor, $this->workspace, 'URL Shared Brand Two', logoMediaAssetId: $original->id,
+        );
+        $transport = $this->fakeTransport([]);
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $original->getRouteKey()])
+            ->mountAction(TestAction::make('stage_asset_replacement_url')->schemaComponent('asset_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/shared-new.png')
+            ->callMountedAction()
+            ->mountAction(TestAction::make('save_media_with_confirmation')->schemaComponent('form-actions', 'content'))
+            ->assertActionMounted(TestAction::make('save_media_with_confirmation')->schemaComponent('form-actions', 'content'))
+            ->assertMountedActionModalSee(['Змінити спільне зображення?', 'брендів: 2']);
+        $this->assertSame([], $transport->requests, 'Neither staging nor opening confirmation may fetch URL bytes.');
+        $component->unmountAction();
+
+        $this->assertSame($hash, (string) $original->fresh()->content_sha256);
+        $this->assertDatabaseCount('media_assets', 1);
+    }
+
+    #[Test]
+    public function invalid_asset_replacement_url_is_reported_inline_without_mutating_asset_or_note(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $original = app(OriginalImageIngestService::class)->ingestStandalone(
+            $this->actor,
+            $this->workspace,
+            UploadedFile::fake()->image('unchanged.png', 400, 300),
+        );
+        $hash = (string) $original->content_sha256;
+        $path = (string) $original->storage_path;
+        $transport = $this->fakeTransport([
+            new ConnectorHttpResult(403, ['content-type' => ['text/plain']], 'not allowed'),
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $original->getRouteKey()])
+            ->mountAction(TestAction::make('stage_asset_replacement_url')->schemaComponent('asset_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/denied.png')
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
+            ->fillForm(['internal_note' => 'Must roll back'])
+            ->call('save')
+            ->assertHasErrors(['data.replacement_url' => 'Сервер зображення не повернув файл. Перевірте URL.']);
+
+        $fresh = $original->fresh();
+        $this->assertSame($hash, (string) $fresh->content_sha256);
+        $this->assertSame($path, (string) $fresh->storage_path);
+        $this->assertNull($fresh->internal_note);
+        $this->assertDatabaseCount('media_assets', 1);
+        $this->assertCount(1, $transport->requests);
+    }
+
+    #[Test]
+    public function asset_url_replacement_rejects_duplicate_original_content_without_rebinding_identity(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $target = app(OriginalImageIngestService::class)->ingestStandalone(
+            $this->actor, $this->workspace, UploadedFile::fake()->image('target.png', 400, 300),
+        );
+        $other = app(OriginalImageIngestService::class)->ingestStandalone(
+            $this->actor, $this->workspace, UploadedFile::fake()->image('other.png', 800, 600),
+        );
+        $oldHash = (string) $target->content_sha256;
+        $bytes = Storage::disk('public')->get((string) $other->storage_path);
+        $this->fakeTransport([new ConnectorHttpResult(200, ['content-type' => ['image/png']], $bytes)]);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditMediaAsset::class, ['record' => $target->getRouteKey()])
+            ->mountAction(TestAction::make('stage_asset_replacement_url')->schemaComponent('asset_media_url_actions'))
+            ->set('mountedActions.0.data.url', 'https://cdn.example.net/other.png')
+            ->callMountedAction()
+            ->call('save')
+            ->assertSet('replacementBusinessWarning', 'Це зображення вже є в медіатеці. Оберіть інший файл.');
+
+        $this->assertSame($oldHash, (string) $target->fresh()->content_sha256);
+        $this->assertSame((string) $other->id, (string) $other->fresh()->id);
+        $this->assertDatabaseCount('media_assets', 2);
     }
 
     #[Test]

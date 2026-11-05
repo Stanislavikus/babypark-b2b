@@ -56,10 +56,58 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     assert.ok(assetArea && assetArea.width >= 700,
       'Asset editor source area must span its desktop Filament form, not one half-width column.');
     assert.equal(await assetSource.getByRole('button', { name: 'Завантажити' }).count(), 1,
-      'Original replacement has one real, native upload action, not a fake library rebind.');
+      'Original replacement must retain the native FilePond action.');
+    assert.equal(await assetSource.getByRole('button', { name: 'Додати за URL' }).count(), 1,
+      'Asset replacement must share the real native URL source button with Brand and Product.');
+    assert.equal(await assetSource.getByRole('button', { name: 'Обрати з медіатеки' }).count(), 0,
+      'Replacing canonical Asset bytes must never masquerade as rebinding another Asset.');
+
+    // The URL button stages a URL only; an explicit Save is the sole mutation.
+    await assetSource.getByRole('button', { name: 'Додати за URL' }).click();
+    const urlDialog = page.locator('.fi-modal.fi-modal-open').filter({
+      has: page.getByRole('heading', { name: 'Обрати URL нового зображення', exact: true }),
+    });
+    await urlDialog.getByLabel('Посилання на зображення').fill('https://cdn.example.net/replacement.png');
+    await urlDialog.getByRole('button', { name: 'Обрати URL', exact: true }).click();
+    const stagedUrl = assetSource.getByLabel('URL нового зображення (після «Зберегти»)');
+    await stagedUrl.waitFor({ state: 'visible', timeout: 20_000 });
+    assert.equal(await stagedUrl.inputValue(), 'https://cdn.example.net/replacement.png');
+    await stagedUrl.fill('');
+    await stagedUrl.waitFor({ state: 'hidden', timeout: 20_000 });
+    // Compare the two real source buttons, not just presence of a common CSS class.
+    const desktopActions = await assetSource.evaluate(element => {
+      const rect = selector => {
+        const node = element.querySelector(selector);
+        if (!node) return null;
+        const { left, right, top, bottom, height } = node.getBoundingClientRect();
+        return { left, right, top, bottom, height };
+      };
+      return {
+        upload: rect('.bp-brand-media-browse-button'),
+        url: rect('.bp-brand-media-url-action button'),
+      };
+    });
+    assert.ok(desktopActions.upload && desktopActions.url
+      && desktopActions.upload.right <= desktopActions.url.left + 4
+      && Math.abs(desktopActions.upload.top - desktopActions.url.top) <= 5
+      && Math.abs(desktopActions.upload.height - desktopActions.url.height) <= 3,
+    'Asset desktop Upload/URL must share the approved Brand source-action row: '
+      + JSON.stringify(desktopActions));
     await mkdir(root, { recursive: true });
     await assetSource.screenshot({ path: `${root}/asset-replacement-desktop.png` });
     await page.setViewportSize({ width: 390, height: 844 });
+    const mobileActions = await assetSource.evaluate(element => {
+      const bounds = selector => {
+        const { left, right, top, bottom } = element.querySelector(selector).getBoundingClientRect();
+        return { left, right, top, bottom };
+      };
+      return {
+        upload: bounds('.bp-brand-media-browse-button'),
+        url: bounds('.bp-brand-media-url-action button'),
+      };
+    });
+    assert.ok(mobileActions.upload.bottom + 2 <= mobileActions.url.top,
+      'Asset mobile Upload/URL must stack without overlapping: ' + JSON.stringify(mobileActions));
     await assetSource.screenshot({ path: `${root}/asset-replacement-mobile.png` });
     await page.setViewportSize({ width: 1440, height: 960 });
 
