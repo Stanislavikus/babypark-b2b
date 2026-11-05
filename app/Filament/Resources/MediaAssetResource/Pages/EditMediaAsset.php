@@ -7,6 +7,7 @@ use App\Models\MediaAsset;
 use App\Models\User;
 use App\Services\Media\MediaAssetLibraryReadService;
 use App\Services\Media\MediaAssetLifecycleService;
+use App\Services\Media\OriginalImageUrlIngestService;
 use App\Support\Media\Exceptions\MediaAssetLifecycleException;
 use App\Support\Media\Exceptions\MediaIngestException;
 use App\Support\Media\MediaSaveNotice;
@@ -80,16 +81,22 @@ class EditMediaAsset extends EditRecord
 
         $upload = $this->replacementUpload(data_get($this->data, 'replacement_upload'));
 
-        if (! $upload instanceof UploadedFile) {
+        $url = trim((string) data_get($this->data, 'replacement_url', ''));
+
+        if (! $upload instanceof UploadedFile && $url === '') {
             return false;
         }
 
-        $currentHash = $this->record->content_sha256;
-        $path = $upload->getRealPath();
+        // URL bytes are not fetched until Save. In that case conservatively
+        // require the same shared-usage confirmation as a changed local file.
+        if ($upload instanceof UploadedFile) {
+            $currentHash = $this->record->content_sha256;
+            $path = $upload->getRealPath();
 
-        if (is_string($currentHash) && is_string($path) && $path !== ''
-            && hash_equals($currentHash, (string) hash_file('sha256', $path))) {
-            return false;
+            if (is_string($currentHash) && is_string($path) && $path !== ''
+                && hash_equals($currentHash, (string) hash_file('sha256', $path))) {
+                return false;
+            }
         }
 
         $usage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($this->record);
@@ -129,6 +136,17 @@ class EditMediaAsset extends EditRecord
         }
 
         $file = $this->replacementUpload($data['replacement_upload'] ?? null);
+        $url = trim((string) ($data['replacement_url'] ?? ''));
+        unset($data['replacement_url']);
+
+        // The two native source choices are mutually exclusive. Never silently
+        // choose a source if a crafted form submits both.
+        if ($file instanceof UploadedFile && $url !== '') {
+            throw ValidationException::withMessages([
+                'data.replacement_url' => 'Оберіть лише одне джерело зображення.',
+            ]);
+        }
+
         $previousNote = filled($record->internal_note) ? trim((string) $record->internal_note) : null;
         $updatedRecord = $record;
         $imageUnchanged = false;
@@ -136,33 +154,44 @@ class EditMediaAsset extends EditRecord
         $this->replacementBusinessWarning = null;
         $this->replacementPostSaveNotice = null;
 
-        if ($file instanceof UploadedFile) {
+        if ($file instanceof UploadedFile || $url !== '') {
             $actor = auth()->user();
 
             if (! $actor instanceof User) {
                 throw new AuthorizationException('This action is unauthorized.');
             }
 
+            $workspace = app(WorkspaceContext::class)->current();
+            $replace = fn (UploadedFile $candidate) => app(MediaAssetLifecycleService::class)
+                ->replaceOriginal($actor, $workspace, $record, $candidate);
+
             try {
-                $result = app(MediaAssetLifecycleService::class)->replaceOriginal(
-                    $actor,
-                    app(WorkspaceContext::class)->current(),
-                    $record,
-                    $file,
-                );
+                // URL supplies only a bounded temporary image, then the SAME
+                // authorized Replace writer owns the canonical Asset mutation.
+                $result = $file instanceof UploadedFile
+                    ? $replace($file)
+                    : app(OriginalImageUrlIngestService::class)->withDownloadedFile(
+                        $actor, $workspace, $url, $replace,
+                    );
             } catch (MediaAssetLifecycleException $exception) {
                 $this->replacementBusinessWarning = $exception->getMessage();
 
                 throw (new Halt)->rollBackDatabaseTransaction();
             } catch (MediaIngestException $exception) {
                 throw ValidationException::withMessages([
-                    'data.replacement_upload' => $exception->getMessage(),
+                    $url !== '' ? 'data.replacement_url' : 'data.replacement_upload' => $exception->getMessage(),
+                ]);
+            } catch (ValidationException $exception) {
+                throw ValidationException::withMessages([
+                    'data.replacement_url' => collect($exception->errors())->flatten()->first()
+                        ?? 'Не вдалося безпечно завантажити зображення.',
                 ]);
             }
 
             $postSaveUsage = app(MediaAssetLibraryReadService::class)->freshUsageCounts($result->asset);
             $imageUnchanged = ! $result->replaced;
             data_set($this->data, 'replacement_upload', null);
+            data_set($this->data, 'replacement_url', null);
             $record->setRawAttributes($result->asset->getAttributes(), true);
             $record->unsetRelations();
             $updatedRecord = $record;
@@ -174,7 +203,7 @@ class EditMediaAsset extends EditRecord
                 : null,
         ])->save();
 
-        if ($file instanceof UploadedFile) {
+        if ($file instanceof UploadedFile || $url !== '') {
             $nextNote = filled($updatedRecord->internal_note) ? trim((string) $updatedRecord->internal_note) : null;
 
             $this->replacementPostSaveNotice = match (true) {
@@ -277,7 +306,7 @@ class EditMediaAsset extends EditRecord
 
     private function hasUnsavedAssetChanges(): bool
     {
-        if ($this->replacementUpload() instanceof UploadedFile) {
+        if ($this->replacementUpload() instanceof UploadedFile || filled(data_get($this->data, 'replacement_url'))) {
             return true;
         }
 

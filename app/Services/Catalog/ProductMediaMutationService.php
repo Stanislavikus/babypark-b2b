@@ -2,7 +2,9 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\MediaAssetType;
 use App\Enums\MediaRole;
+use App\Models\MediaAsset;
 use App\Models\Product;
 use App\Models\ProductMedia;
 use App\Models\User;
@@ -90,6 +92,69 @@ final class ProductMediaMutationService
 
             throw $e;
         }
+    }
+
+    /**
+     * Reuse canonical same-workspace Originals in the Product gallery without
+     * copying their bytes or changing shared Asset identity.
+     *
+     * @param  list<string>  $assetIds
+     * @return Collection<int, ProductMedia>
+     */
+    public function addExistingImages(
+        User $actor,
+        Workspace $workspace,
+        Product $product,
+        array $assetIds,
+    ): Collection {
+        return DB::transaction(function () use ($actor, $workspace, $product, $assetIds): Collection {
+            [$lockedWorkspace, $lockedProduct] = $this->lockContext($actor, $workspace, $product);
+            $existing = $this->lockedProductMedia($lockedProduct);
+
+            if ($existing->isEmpty() && $this->hasLegacyMediaPayload($lockedProduct)) {
+                throw ProductMediaException::legacyMediaNeedsRepair();
+            }
+
+            $nextOrder = $existing->isEmpty() ? 0 : ((int) $existing->max('sort_order')) + 1;
+            $alreadyLinked = $existing->pluck('media_asset_id')->map(fn ($id): string => (string) $id)->all();
+
+            foreach (array_unique($assetIds) as $assetId) {
+                if (! is_string($assetId) || $assetId === '') {
+                    throw ProductMediaException::mediaNotFound();
+                }
+
+                $asset = MediaAsset::withoutWorkspaceScope()
+                    ->where('workspace_id', $lockedWorkspace->id)
+                    ->whereNull('parent_media_asset_id')
+                    ->where('asset_type', MediaAssetType::Image->value)
+                    ->whereKey($assetId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $asset instanceof MediaAsset) {
+                    throw ProductMediaException::mediaNotFound();
+                }
+
+                if (in_array((string) $asset->id, $alreadyLinked, true)) {
+                    continue;
+                }
+
+                ProductMedia::withoutWorkspaceScope()->create([
+                    'workspace_id' => $lockedWorkspace->id,
+                    'product_id' => $lockedProduct->id,
+                    'media_asset_id' => $asset->id,
+                    'role' => $nextOrder === 0 ? MediaRole::Primary : MediaRole::Gallery,
+                    'sort_order' => $nextOrder,
+                    'locale' => null,
+                ]);
+                $alreadyLinked[] = (string) $asset->id;
+                $nextOrder++;
+            }
+
+            $this->syncLegacyProjection($lockedProduct);
+
+            return $this->readService->productMedia($lockedProduct);
+        });
     }
 
     /**

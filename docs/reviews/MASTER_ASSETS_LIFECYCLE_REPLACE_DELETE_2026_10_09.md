@@ -115,6 +115,15 @@ new file is prepared/diagnosed/hashed before the mutation lock is acquired.
 If an External Original is replaced by an uploaded file, that same MediaAsset identity
 becomes a Managed Original: managed storage becomes authoritative and `source_url`
 is cleared.
+**Source extension [Resolved — 2026-11-05 — Product Owner].** A safely fetched
+public image URL is also accepted as new Original *bytes*, not as a new
+external MediaAsset identity. The bounded URL transport supplies only a
+temporary file to the existing replaceOriginal writer on the normal
+EditRecord Save path. All same-ID, rollback, collision, derivative,
+authorization, and used-by reference protections below apply unchanged.
+Selecting a different existing library Asset is not a replacement source
+under this lifecycle; doing so would require a separate rebind contract.
+
 ### 2. Dedupe and derivative behavior
 
 Lifecycle v1 mutates **Originals only** (`parent_media_asset_id IS NULL`). Derivative

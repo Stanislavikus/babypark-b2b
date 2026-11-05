@@ -293,3 +293,54 @@ visible buttons at intermediate widths, selected-image previews, picker/URL
 and persistence, plus final MySQL/style gates and owner visual sign-off.
 The existing separate local-to-local replacement GAP (X before new selection)
 remains OPEN and must not be represented as fixed.
+
+## [Resolved — 2026-10-25 — owner-approved Media UI reuse across authoring contexts]
+
+After real production verification of the October Brand Media UI, the owner
+confirmed Brand upload/library/URL appeared functional and approved reuse of
+the same approved centered dashed source layout across MediaAsset and the
+Master Product editor. This reuses native Filament/FilePond and the existing
+MediaAsset / ProductMedia / VariantMedia persistence; no new upload library,
+table, storage owner, copy-on-select or custom image transport.
+
+**Context-sensitive semantics (must not be faked):**
+- **Brand:** exactly one logo Original; three working sources, Brand Save
+  remains authoritative.
+- **Master Product:** multi-image gallery with same-workspace Original reuse,
+  local upload and safely ingested URL, under existing ProductMedia locking;
+  explicit gallery order / primary / VariantMedia are unchanged. Media
+  attachment is an immediate gallery operation, like the existing Add Media
+  action; it is not a hidden Product-form field mutation.
+- **Existing MediaAsset editor:** `Нове зображення` is replacement of *this
+  same canonical Original identity*, potentially used by several Products
+  or Brands. Reuse the native dashed source presentation and real file
+  replacement; DO NOT disguise "select existing Asset from this same library"
+  as replacing the existing Original, and DO NOT ingest an independent new URL
+  Original as if it had replaced this identity. Such cross-identity
+  replacement needs a separate explicit asset-lifecycle contract. The index
+  continues to support standalone local/URL creation.
+
+**Acceptance:** 1440px + narrow Chromium screenshots, native drag, selected
+preview/X, authorized Save/reopen, library reuse and URL failure state;
+tenant/derivative rejection and multi-image order/primary regression; frozen
+HEAD final PHP/MySQL/Pint/build/Chromium and owner review. PR is not
+accepted merely because the same CSS class is present. FilePond native
+same-source replacement GAP remains open and is not silently "fixed" here.
+
+## [Resolved — 2026-11-05 — Product Owner approval: Asset Replace URL source]
+
+The existing MediaAsset edit card now uses the *same* approved Brand
+MediaSourceArea presentation, with two legitimate choices:
+«Завантажити» and «Додати за URL». The URL is chosen in the native
+Filament modal, staged visibly in the form and downloaded only on Save;
+the Save reuses the existing authorized replaceOriginal lifecycle
+and shared-usage confirmation. This replaces the old "upload only"
+source restriction, **not** the same-Original identity rule in
+[Resolved — 2026-10-09] or the ban on silently reassigning one
+existing library Asset to another. Master Product and Brand retain all
+three sources with their respective association writers.
+
+Accept with real Chromium on 1440px and narrow viewports (one dashed
+area, native FilePond, visible URL control/modal, no accidental library
+rebind), focused URL/identity/collision tests, and final frozen-HEAD
+CI. The native local-to-local FilePond replacement GAP remains open.
