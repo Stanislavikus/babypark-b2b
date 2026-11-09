@@ -629,6 +629,7 @@ class MediaAssetLifecycleTest extends TestCase
             ->assertSee('Запустіть Preview ще раз');
 
         $fresh = $asset->fresh();
+        $this->assertSame((string) $asset->id, (string) $fresh->id);
         $this->assertSame('ui-new.png', $fresh->original_filename);
         $this->assertSame((string) $asset->id, (string) $productMedia->fresh()->media_asset_id);
         $this->assertNull(data_get($component->get('data'), 'replacement_upload'));

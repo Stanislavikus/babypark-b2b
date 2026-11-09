@@ -12,6 +12,7 @@ use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\ConnectorTransportLimits;
 use App\Support\Connectors\Transport\TransportFailureReason;
 use App\Support\Workspace\WorkspacePermissions;
+use Closure;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
@@ -37,6 +38,30 @@ final class OriginalImageUrlIngestService
 
     public function ingest(User $actor, Workspace $workspace, string $url): MediaAsset
     {
+        return $this->withDownloadedFile(
+            $actor,
+            $workspace,
+            $url,
+            fn (UploadedFile $file): MediaAsset => $this->ingest->ingestStandalone($actor, $workspace, $file),
+        );
+    }
+
+    /**
+     * Download and validate the URL without claiming persistence ownership.
+     * The consumer runs while the bounded temporary image still exists and
+     * owns its own atomic media mutation (for example ProductMedia upload).
+     *
+     * @template T
+     *
+     * @param  Closure(UploadedFile): T  $consume
+     * @return T
+     */
+    public function withDownloadedFile(
+        User $actor,
+        Workspace $workspace,
+        string $url,
+        Closure $consume,
+    ): mixed {
         // Permission precedes every outbound request; there is no unauthenticated URL oracle.
         if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::MANAGE_PRODUCTS)) {
             throw new AuthorizationException('This action is unauthorized.');
@@ -128,7 +153,7 @@ final class OriginalImageUrlIngestService
                 $name = $name !== '' && $name !== '/' ? $name : 'remote-image';
                 $file = new UploadedFile($path, $name, null, UPLOAD_ERR_OK, true);
 
-                return $this->ingest->ingestStandalone($actor, $workspace, $file);
+                return $consume($file);
             } finally {
                 @unlink($path);
             }
