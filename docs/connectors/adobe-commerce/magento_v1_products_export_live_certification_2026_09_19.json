@@ -1,0 +1,257 @@
+{
+  "campaign": "Magento V1 Products / Export / Live production-readiness truth flip",
+  "date": "2026-09-19",
+  "authoritative_base": "75465daf210cc019377282f4015fae2153b21e07",
+  "result": "PASS",
+  "support_truth": {
+    "products_export_preview": true,
+    "products_export_live": true,
+    "products_import_live": false,
+    "product_create": false,
+    "standard_path": "moduleless_stock_rest"
+  },
+  "runtime_readiness": {
+    "configured_store": "default",
+    "fresh_probe_ready": true,
+    "probe_contract": "bounded Product baseline READ + exact configured Store Config base-currency READ; no Safe Sync module and no consequential preflight WRITE",
+    "admission_timing": "outside Live admission DB transaction",
+    "worker_timing": "after prepareRun and immediately before first Product execution, followed by DB-fresh SyncRunConsequentialWriteGate recheck"
+  },
+  "bounded_smoke": {
+    "target": {
+      "sku": "Універсальна коляска Joolz Day5",
+      "entity_id": 3,
+      "type_id": "simple",
+      "configured_store": "default",
+      "baseline": {
+        "classification": "found",
+        "entity_id": 3,
+        "sku": "Універсальна коляска Joolz Day5",
+        "name": "Універсальна коляска Joolz Day5",
+        "attribute_set_id": 10,
+        "type_id": "simple",
+        "status": 1,
+        "visibility": 4,
+        "price": 1299,
+        "description": null,
+        "category_ids": [
+          "6"
+        ],
+        "url_key": "universal-na-koljaska-joolz-day5"
+      }
+    },
+    "preview_baseline": {
+      "run_id": "a2c85a32-0121-4939-a330-7ff14dfc0665",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "ready",
+          "findings": []
+        }
+      ]
+    },
+    "currency_mismatch_fail_closed": {
+      "run_id": "a2c85bf4-cdd4-4341-ab8e-60ffcda58d61",
+      "source_preview_run_id": "a2c85a32-0121-4939-a330-7ff14dfc0665",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "not_applied",
+          "findings": [
+            {
+              "code": "command_evidence",
+              "context": {
+                "reason_code": "currency_mismatch",
+                "ownership_trust_satisfied": false,
+                "reconciliation_get_attempts": 0,
+                "consequential_write_attempts": 0,
+                "external_record_link_persisted": false
+              },
+              "subject": null
+            }
+          ]
+        }
+      ]
+    },
+    "noop_live": {
+      "run_id": "a2c85c84-61c5-415f-96f1-8bd2ccbd7b92",
+      "source_preview_run_id": "a2c85a32-0121-4939-a330-7ff14dfc0665",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "synchronized",
+          "findings": [
+            {
+              "code": "command_evidence",
+              "context": {
+                "reason_code": "stock_state_already_matches",
+                "subject_sku": "Універсальна коляска Joolz Day5",
+                "ownership_trust_satisfied": true,
+                "remote_get_classification": "found",
+                "reconciliation_get_attempts": 0,
+                "consequential_write_attempts": 0,
+                "external_record_link_persisted": false
+              },
+              "subject": "Універсальна коляска Joolz Day5"
+            }
+          ]
+        }
+      ]
+    },
+    "preview_change": {
+      "run_id": "a2c85ca2-ed7b-41db-94f4-7bbd8037b928",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "ready",
+          "findings": []
+        }
+      ]
+    },
+    "live_change": {
+      "run_id": "a2c85cb3-8cb1-4d38-a006-7cda93437cd8",
+      "source_preview_run_id": "a2c85ca2-ed7b-41db-94f4-7bbd8037b928",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "synchronized",
+          "findings": [
+            {
+              "code": "command_evidence",
+              "context": {
+                "reason_code": "stock_write_verified",
+                "subject_sku": "Універсальна коляска Joolz Day5",
+                "ownership_trust_satisfied": true,
+                "remote_get_classification": "found",
+                "reconciliation_get_attempts": 1,
+                "consequential_write_attempts": 1,
+                "external_record_link_persisted": false
+              },
+              "subject": "Універсальна коляска Joolz Day5"
+            }
+          ]
+        }
+      ]
+    },
+    "remote_after_change": {
+      "classification": "found",
+      "entity_id": 3,
+      "sku": "Універсальна коляска Joolz Day5",
+      "name": "Універсальна коляска Joolz Day5 [Live Cert]",
+      "attribute_set_id": 10,
+      "type_id": "simple",
+      "status": 1,
+      "visibility": 4,
+      "price": 1299,
+      "description": null,
+      "category_ids": [
+        "6"
+      ],
+      "url_key": "universal-na-koljaska-joolz-day5"
+    },
+    "preview_restore": {
+      "run_id": "a2c85cda-b65f-4617-bdc7-15fc5178790c",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "ready",
+          "findings": []
+        }
+      ]
+    },
+    "live_restore": {
+      "run_id": "a2c85cdf-de95-42f5-b31d-8235d8df14b9",
+      "source_preview_run_id": "a2c85cda-b65f-4617-bdc7-15fc5178790c",
+      "configuration_revision": "ad3ffca78df30676e6999386c68ecb38f214b17de647d95574d0afe60d9a20f4",
+      "status": "completed",
+      "items": [
+        {
+          "product_id": 3,
+          "outcome": "synchronized",
+          "findings": [
+            {
+              "code": "command_evidence",
+              "context": {
+                "reason_code": "stock_write_verified",
+                "subject_sku": "Універсальна коляска Joolz Day5",
+                "ownership_trust_satisfied": true,
+                "remote_get_classification": "found",
+                "reconciliation_get_attempts": 1,
+                "consequential_write_attempts": 1,
+                "external_record_link_persisted": false
+              },
+              "subject": "Універсальна коляска Joolz Day5"
+            }
+          ]
+        }
+      ]
+    },
+    "remote_final": {
+      "classification": "found",
+      "entity_id": 3,
+      "sku": "Універсальна коляска Joolz Day5",
+      "name": "Універсальна коляска Joolz Day5",
+      "attribute_set_id": 10,
+      "type_id": "simple",
+      "status": 1,
+      "visibility": 4,
+      "price": 1299,
+      "description": null,
+      "category_ids": [
+        "6"
+      ],
+      "url_key": "universal-na-koljaska-joolz-day5"
+    }
+  },
+  "postconditions": {
+    "change_name": "Універсальна коляска Joolz Day5 [Live Cert]",
+    "change_verified": true,
+    "restore_verified": true,
+    "identity_preserved": true,
+    "price_preserved": true,
+    "category_preserved": true,
+    "url_key_preserved": true
+  },
+  "local_cleanup": {
+    "result": "CLEANUP_OK",
+    "configuration_revision": "26cc92b95161535dc29ea9410a46c72eb087686e8a266a84ca31fabc0aa11fc9",
+    "expected_revision": "26cc92b95161535dc29ea9410a46c72eb087686e8a266a84ca31fabc0aa11fc9",
+    "selection_count": 54,
+    "product": {
+      "id": 3,
+      "name": "Товар BabyPark #3",
+      "description": "Тестовий опис товару #3 для B2B кабінету.",
+      "is_active": true,
+      "images": "[\"https:\\/\\/picsum.photos\\/400\\/400?random=3\"]",
+      "category_id": 1
+    },
+    "variant": {
+      "id": 3,
+      "sku": "BP-00003-V1",
+      "is_active": true,
+      "base_price_cache": null
+    },
+    "temporary_erl_remaining": 0,
+    "temporary_category_mapping_remaining": 0,
+    "price_currency": "UAH"
+  },
+  "remaining_non_blocking_boundaries": {
+    "P-04": "real permission-denial response remains deferred because safe proof requires temporarily restricting Magento Integration permissions; normal WRITE permission is proven by this Live smoke and the runtime remains fail-closed for structured denial",
+    "P-05": "message-only trusted-missing 404 remains conservative untrusted_or_failed with zero PUT",
+    "P-06": "swatch_image remains read/preserve-only; direct role mutation is not advertised",
+    "P-07": "Receive/Import breadth is separate; public Products/Import/Live remains false",
+    "P-09": "non-default Store View media-label clear remains outside advertised V1; configured default-store path is certified"
+  }
+}

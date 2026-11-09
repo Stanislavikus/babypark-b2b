@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteMappedAttributeInterface"
+                type="B2BPlatform\MagentoSafeSync\Model\Data\ProductWriteMappedAttribute"/>
+    <preference for="B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteRequestInterface"
+                type="B2BPlatform\MagentoSafeSync\Model\Data\ProductWriteRequest"/>
+    <preference for="B2BPlatform\MagentoSafeSync\Api\HandshakeManagementInterface"
+                type="B2BPlatform\MagentoSafeSync\Model\HandshakeManagement"/>
+    <preference for="B2BPlatform\MagentoSafeSync\Api\ProductReadManagementInterface"
+                type="B2BPlatform\MagentoSafeSync\Model\ProductReadManagement"/>
+    <preference for="B2BPlatform\MagentoSafeSync\Api\ProductWriteManagementInterface"
+                type="B2BPlatform\MagentoSafeSync\Model\ProductWriteManagement"/>
+    <type name="Magento\Catalog\Model\Product\Gallery\UpdateHandler">
+        <plugin name="b2bplatform_magento_safe_sync_non_media_gallery_bypass"
+                type="B2BPlatform\MagentoSafeSync\Plugin\Gallery\UpdateHandlerNonMediaBypassPlugin"
+                sortOrder="10"/>
+    </type>
+</config>

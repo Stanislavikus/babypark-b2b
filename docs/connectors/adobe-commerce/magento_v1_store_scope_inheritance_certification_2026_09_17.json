@@ -1,0 +1,123 @@
+{
+  "schema_version": "1.0.0",
+  "certification_date": "2026-09-17",
+  "connector": "adobe-commerce",
+  "campaign": "magento-v1-real-certification",
+  "pending_item": "P-10",
+  "status": "resolved_pass",
+  "target_scope": {
+    "sku": "1234567890",
+    "logical_entity_id": 1,
+    "product_type": "simple",
+    "configured_store_code": "default",
+    "configured_store_view_id": 1
+  },
+  "method": {
+    "mutation_path": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor -> stock PUT /V1/products/{sku}",
+    "mutation_cycle": "production GET -> one PUT -> production reconciliation GET",
+    "observer": "temporary read-only target-side Magento bootstrap/ResourceConnection raw-EAV query over SSH",
+    "observer_mutated_magento": false,
+    "local_certification_identity_persisted": false,
+    "local_fixture_strategy": "temporary MerchantConfirmed ExternalRecordLink inside a local DB transaction rolled back after each executor invocation"
+  },
+  "baseline": {
+    "selection_basis": "exhaustive current-product scan of non-global non-static EAV attributes with an Admin row and no store_id=1 row across varchar/text/int/decimal/datetime backends",
+    "raw_eav_snapshot_sha256": "a900f7ce31d24565bfb497809bc5da92e186169a39dc4ed6bb8bcda2802e4c22",
+    "inherited_canary_count": 6,
+    "store_1_override_count": 0
+  },
+  "canaries": [
+    {
+      "attribute_code": "image",
+      "attribute_id": 87,
+      "backend_type": "varchar",
+      "is_global": 0,
+      "admin_value_present": true,
+      "store_1_row_present_before": false
+    },
+    {
+      "attribute_code": "small_image",
+      "attribute_id": 88,
+      "backend_type": "varchar",
+      "is_global": 0,
+      "admin_value_present": true,
+      "store_1_row_present_before": false
+    },
+    {
+      "attribute_code": "swatch_image",
+      "attribute_id": 135,
+      "backend_type": "varchar",
+      "is_global": 0,
+      "admin_value_present": true,
+      "store_1_row_present_before": false
+    },
+    {
+      "attribute_code": "thumbnail",
+      "attribute_id": 89,
+      "backend_type": "varchar",
+      "is_global": 0,
+      "admin_value_present": true,
+      "store_1_row_present_before": false
+    },
+    {
+      "attribute_code": "url_key",
+      "attribute_id": 121,
+      "backend_type": "varchar",
+      "is_global": 0,
+      "admin_value_present": true,
+      "store_1_row_present_before": false
+    },
+    {
+      "attribute_code": "cost",
+      "attribute_id": 81,
+      "backend_type": "decimal",
+      "is_global": 2,
+      "admin_value_present": true,
+      "store_1_row_present_before": false
+    }
+  ],
+  "controlled_write": {
+    "field": "price",
+    "original_value": 150,
+    "probe_value": 151,
+    "result": "known_applied",
+    "reason_code": "stock_write_verified",
+    "consequential_write_attempts": 1,
+    "reconciliation_get_attempts": 1,
+    "ownership_trust_satisfied": true,
+    "raw_eav_snapshot_sha256_after_write": "a900f7ce31d24565bfb497809bc5da92e186169a39dc4ed6bb8bcda2802e4c22",
+    "new_store_1_override_count": 0,
+    "new_store_1_overrides": []
+  },
+  "restore": {
+    "field": "price",
+    "probe_value": 151,
+    "restored_value": 150,
+    "result": "known_applied",
+    "reason_code": "stock_write_verified",
+    "consequential_write_attempts": 1,
+    "reconciliation_get_attempts": 1,
+    "raw_eav_snapshot_sha256_final": "a900f7ce31d24565bfb497809bc5da92e186169a39dc4ed6bb8bcda2802e4c22",
+    "raw_eav_matches_baseline": true
+  },
+  "final_read": {
+    "logical_entity_id": 1,
+    "sku": "1234567890",
+    "type_id": "simple",
+    "price": 150,
+    "name": "Test Product"
+  },
+  "conclusion": {
+    "p10_cleared": true,
+    "hidden_store_view_override_side_effect_observed": false,
+    "stock_default_store_put_preserved_inheritance_for_all_current_canaries": true,
+    "public_live_support_flipped": false,
+    "reason_public_live_not_flipped": "P-10 closure is one certification gate; public support truth remains governed by the full current Magento V1 capability/certification contract."
+  },
+  "operational_hygiene": {
+    "ssh_used_only_for_read_only_observation": true,
+    "mysql_exposed_externally": false,
+    "target_side_persistent_probe_installed": false,
+    "temporary_ssh_key_should_be_removed_after_evidence_is committed": true
+  }
+}

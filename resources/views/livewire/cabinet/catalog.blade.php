@@ -89,10 +89,10 @@
                                 <button type="button" wire:click="removeCategoryFilter('{{ $catId }}')" class="hover:text-primary-900">&times;</button>
                             </span>
                         @endforeach
-                        @foreach($selectedBrands as $brandName)
+                        @foreach($selectedBrands as $brandId)
                             <span class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-700">
-                                {{ $brandName }}
-                                <button type="button" wire:click="removeBrandFilter(@js($brandName))" class="hover:text-primary-900">&times;</button>
+                                {{ $brands[$brandId] ?? $brandId }}
+                                <button type="button" wire:click="removeBrandFilter(@js($brandId))" class="hover:text-primary-900">&times;</button>
                             </span>
                         @endforeach
                     </div>
@@ -121,15 +121,15 @@
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1.5">Бренди</label>
                         <div class="max-h-40 overflow-y-auto rounded-md border border-gray-200 p-2 space-y-1">
-                            @forelse($brands as $b)
+                            @forelse($brands as $brandId => $brandName)
                                 <label class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-gray-700 hover:bg-primary-50">
                                     <input
                                         type="checkbox"
                                         wire:model.live="selectedBrands"
-                                        value="{{ $b }}"
+                                        value="{{ $brandId }}"
                                         class="rounded border-gray-300 text-primary-600 focus:ring-primary-600"
                                     >
-                                    {{ $b }}
+                                    {{ $brandName }}
                                 </label>
                             @empty
                                 <p class="px-1.5 py-1 text-xs text-gray-400">Всі</p>
@@ -340,7 +340,7 @@
                                     title="Перемкнути формат маржі"
                                 >
                                     Маржа
-                                    <span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600">
+                                    <span class="text-[10px] font-bold px-1 py-0.5 rounded bp-muted-badge">
                                         {{ $marginFormat === 'percent' ? '%' : '₴' }}
                                     </span>
                                 </button>
@@ -433,7 +433,7 @@
                             {{-- Бренд (optional) --}}
                             @if(! in_array('brand', $hiddenColumns))
                                 <td class="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">
-                                    {{ $product->brand ?? '—' }}
+                                    {{ $product->brand?->name ?? '—' }}
                                 </td>
                             @endif
 
@@ -446,7 +446,11 @@
 
                             {{-- Ваша ціна --}}
                             <td class="px-3 py-2 text-right whitespace-nowrap">
-                                @if($myPrice > 0)
+                                @if(! empty($data['priceLabel']))
+                                    <span class="font-semibold {{ $myPrice > 0 ? 'text-primary-700' : 'text-gray-500 text-xs' }}">
+                                        {{ $data['priceLabel'] }}
+                                    </span>
+                                @elseif($myPrice > 0)
                                     <span class="font-semibold text-primary-700">
                                         {{ number_format($myPrice, 2, ',', ' ') }} ₴
                                     </span>
@@ -595,7 +599,7 @@
                             <p class="text-xs text-gray-400 font-mono">{{ $product->sku }}</p>
                             <p class="text-sm font-medium text-gray-900 line-clamp-2 flex-1">{{ $product->name }}</p>
                             @if($product->brand)
-                                <p class="text-xs text-gray-500 mt-0.5">{{ $product->brand }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">{{ $product->brand->name }}</p>
                             @endif
 
                             {{-- Prices --}}
@@ -603,7 +607,9 @@
                                 @if($rrp > 0)
                                     <span class="text-xs text-gray-400 line-through">{{ number_format($rrp, 2, ',', ' ') }} ₴</span>
                                 @endif
-                                @if($myPrice > 0)
+                                @if(! empty($data['priceLabel']))
+                                    <span class="text-base font-bold {{ $myPrice > 0 ? 'text-green-700' : 'text-gray-500 text-sm' }}">{{ $data['priceLabel'] }}</span>
+                                @elseif($myPrice > 0)
                                     <span class="text-base font-bold text-green-700">{{ number_format($myPrice, 2, ',', ' ') }} ₴</span>
                                 @endif
                             </div>
