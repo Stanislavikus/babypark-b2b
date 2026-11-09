@@ -180,8 +180,43 @@ Owner: D1–D3, visual sign-off, business decisions, final `OK` for merge / depl
 | TBD | Q1 rest: commits between the two HEADs; clean/anomalous status of #799–#817, #820, #823, #824 | log headers, `git log` | | |
 | TBD | Q2 rest: failed tests in the child summaries of #819, #821, #822, #825 | raw logs | | |
 | TBD | Q3: total / full-suite durations of clean runs #789–#798 | `gh run view` | | |
-| TBD | Gate after the fixture fix: total, executed/skipped IDs, single summary | CI run | | |
+| 2026-11-04 | Post-fix #829 @ `8821faf` (Pint style error after green suite) | MySQL run `41875510644`, job `126734216969`, raw excerpts below | Full suite **3400.00s (56:40)**; workflow 70:23; **3895 passed, 15 skipped**, one final full-suite summary, 379 distinct classes / 0 repeated; overall workflow **FAIL** only at Pint | **verified** |
+| 2026-11-04 | Post-fix #830 @ `0bf110c` (final #305 HEAD) | MySQL run `41890193101`, job `126785236600`, raw excerpts below | Full suite **3262.83s (54:23)**; workflow **67:08**; **3895 passed, 15 skipped**, one final full-suite summary, 379 distinct classes / 0 repeated; MySQL + Pint **SUCCESS** | **verified** |
+| 2026-11-04 | Post-fix #831 @ `c16e8ea` (final #306 HEAD) | MySQL run `41913896231`, job `126868342305`, raw excerpts below | Full suite **1988.41s (33:08)**; workflow **41:11**; **3895 passed, 15 skipped**, one final full-suite summary, 379 distinct classes / 0 repeated; MySQL + Pint **SUCCESS** | **verified** |
 | TBD | Top-30 slowest classes + category (after the fix) | | | |
+
+
+### Post-fix Measurement Evidence — raw GitHub Actions job excerpts (UTC, 2026-11-04)
+
+These **verified** entries are from the linked raw job logs, not from a model estimate. Full-suite elapsed time is PHPUnit's `Duration`; workflow elapsed time is GitHub run start-to-completion, including installation, targeted checks, build and Pint. Distinct-class and repeat counts are counted **only inside the last/full `Run php artisan test` step**, not across intentionally repeated targeted preflight steps. Executed/skipped **test IDs** were not exported; the complete per-ID inventory remains unverified. The baseline #825 ran on a different PR #304 HEAD and is not a valid like-for-like test-ID comparison.
+
+[MySQL #829](https://github.com/Stanislavikus/babypark-b2b/actions/runs/41875510644) — exact HEAD `8821faf46e7bbb44eddca8baa8a8a39ae158ce4d`, run 17:13:45–18:24:08 UTC:
+```text
+2026-11-04T17:26:56.5032255Z    PASS  Tests\Unit\Connectors\Transport\LocalHttpServerProcessSafetyTest
+2026-11-04T18:22:44.4701119Z   Tests:    15 skipped, 3895 passed (85910 assertions)
+2026-11-04T18:22:44.4702077Z   Duration: 3400.00s
+2026-11-04T18:24:04.1912329Z     FAIL   ......................................... 1658 files, 1 style issue
+2026-11-04T18:24:04.1918911Z   ⨯ tests/Unit/Connectors/Transport/Support/ForkFixtureSafetyProbe.php fully_…
+```
+The lone Pint issue was fixed **without changing behavior** by PR #305 commit `0bf110c`; the full-suite result itself was green.
+
+[MySQL #830](https://github.com/Stanislavikus/babypark-b2b/actions/runs/41890193101) — exact HEAD `0bf110cc53f0e2df1a6187235666a4577efe101b`, run 18:45:02–19:52:10 UTC:
+```text
+2026-11-04T18:56:58.9890572Z    PASS  Tests\Unit\Connectors\Transport\ConnectorTlsVerificationTest
+2026-11-04T18:57:05.6398847Z    PASS  Tests\Unit\Connectors\Transport\LocalHttpServerProcessSafetyTest
+2026-11-04T19:50:39.2734369Z   Tests:    15 skipped, 3895 passed (85927 assertions)
+2026-11-04T19:50:39.2735071Z   Duration: 3262.83s
+2026-11-04T19:51:59.9748963Z     PASS   ........................................................ 1658 files
+```
+
+[MySQL #831](https://github.com/Stanislavikus/babypark-b2b/actions/runs/41913896231) — exact HEAD `c16e8ea7723fea9955129eba79bfdd7fb7a745de`, run 21:12:27–21:53:38 UTC:
+```text
+2026-11-04T21:52:51.1654492Z   Tests:    15 skipped, 3895 passed (85922 assertions)
+2026-11-04T21:52:51.1655504Z   Duration: 1988.41s
+2026-11-04T21:53:33.1968248Z     PASS   ........................................................ 1658 files
+```
+
+Each run has exactly one final **full-suite** summary and no duplicate classes within the full-suite step; no `Broken pipe` error. Differences in assertion counts reflect different real executions; no assertion count parity is claimed. **One 33-minute suite is not proof of a stable ≤30-minute gate**, and these run durations do not themselves authorize new workflow modes or skipping tests.
 
 ## 8. Decisions of the Product Owner (answered 2026-11-04)
 
