@@ -60,6 +60,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -129,6 +130,39 @@ class ProductResource extends Resource
                                 ->columnSpanFull(),
                             RichEditor::make('description')
                                 ->label('Опис')
+                                ->toolbarButtons([
+                                    [
+                                        'bold',
+                                        'italic',
+                                        'underline',
+                                        'strike',
+                                        ToolbarButtonGroup::make(__('rich_editor.product_description_toolbar.headings'), ['h2', 'h3'])
+                                            ->textualButtons(),
+                                        ToolbarButtonGroup::make(__('rich_editor.product_description_toolbar.alignment'), [
+                                            'alignStart',
+                                            'alignCenter',
+                                            'alignEnd',
+                                        ]),
+                                    ],
+                                    [
+                                        ToolbarButtonGroup::make(__('rich_editor.product_description_toolbar.lists'), [
+                                            'bulletList',
+                                            'orderedList',
+                                        ]),
+                                        ToolbarButtonGroup::make(__('rich_editor.product_description_toolbar.more'), [
+                                            'subscript',
+                                            'superscript',
+                                            'link',
+                                            'blockquote',
+                                            'codeBlock',
+                                            'table',
+                                            'attachFiles',
+                                        ])->textualButtons(),
+                                        'undo',
+                                        'redo',
+                                    ],
+                                ])
+                                ->extraAttributes(['class' => 'bp-product-description-editor'])
                                 ->columnSpanFull(),
                             TextInput::make('sku')
                                 ->label('Артикул / SKU')
@@ -2158,9 +2192,7 @@ class ProductResource extends Resource
     {
         if ($record === null) {
             return new HtmlString(
-                '<div style="padding:20px;border:1px dashed #d1d5db;border-radius:10px;color:#6b7280;">'.
-                'Медіа можна додати після створення товару.'.
-                '</div>'
+                '<div class="bp-product-media-gallery__pending">Медіа можна додати після створення товару.</div>'
             );
         }
 
@@ -2168,7 +2200,7 @@ class ProductResource extends Resource
 
         if ($urls === []) {
             return new HtmlString(
-                '<div style="padding:0.5rem 0;color:#6b7280;">Медіа ще не додано. Додайте перше зображення нижче.</div>'
+                '<div class="bp-product-media-gallery__empty">Медіа ще не додано. Додайте перше зображення нижче.</div>'
             );
         }
 
@@ -2178,24 +2210,25 @@ class ProductResource extends Resource
             ->map(function (string $url) use ($alt): string {
                 $safe = e($url);
 
-                return '<img src="'.$safe.'" alt="'.$alt.'" '.
-                    'style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;">';
+                return '<img src="'.$safe.'" alt="'.$alt.'" class="bp-product-media-gallery__thumbnail">';
             })
             ->implode('');
 
         $remaining = count($urls) - 6;
         $more = $remaining > 0
-            ? '<div style="width:72px;height:72px;border-radius:8px;border:1px dashed #d1d5db;display:flex;align-items:center;justify-content:center;color:#6b7280;">+'.
-                $remaining.'</div>'
+            ? '<div class="bp-product-media-gallery__more">+'.$remaining.'</div>'
             : '';
 
         return new HtmlString(
-            '<div style="display:flex;gap:12px;align-items:flex-start;">'.
-                '<img src="'.$main.'" alt="'.$alt.'" '.
-                    'style="width:220px;height:220px;object-fit:contain;border-radius:10px;border:1px solid #e5e7eb;background:#f9fafb;">'.
-                '<div style="display:flex;gap:8px;flex-wrap:wrap;align-content:flex-start;">'.$thumbs.$more.'</div>'.
-            '</div>'.
-            '<div style="margin-top:10px;font-size:12px;color:#6b7280;">'.count($urls).' медіа · поточний Master-набір</div>'
+            '<div class="bp-product-media-gallery">'.
+                '<div class="bp-product-media-gallery__layout">'.
+                    '<div class="bp-media-preview-frame bp-media-preview-frame--brand-form bp-media-preview-frame__surface bp-product-media-gallery__primary">'.
+                        '<img src="'.$main.'" alt="'.$alt.'" class="bp-media-preview-frame__image">'.
+                    '</div>'.
+                    '<div class="bp-product-media-gallery__thumbnails">'.$thumbs.$more.'</div>'.
+                '</div>'.
+                '<div class="bp-product-media-gallery__count">'.count($urls).' медіа · поточний Master-набір</div>'.
+            '</div>'
         );
     }
 

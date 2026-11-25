@@ -80,14 +80,16 @@ class MediaAssetResource extends Resource
                 Text::make('Поточне зображення')
                     ->weight(FontWeight::SemiBold),
                 Group::make([
-                    MediaPreviewFrame::entry(
-                        ImageEntry::make('current_preview')
-                            ->label('Поточне зображення')
-                            ->hiddenLabel()
-                            ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
-                            ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
-                        MediaPreviewFrame::DETAIL,
-                    ),
+                    Group::make([
+                        MediaPreviewFrame::entry(
+                            ImageEntry::make('current_preview')
+                                ->label('Поточне зображення')
+                                ->hiddenLabel()
+                                ->state(fn (MediaAsset $record): ?string => app(MediaAssetSourceResolver::class)->sourceReference($record))
+                                ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(180))),
+                            MediaPreviewFrame::BRAND_FORM,
+                        ),
+                    ])->columns(1)->extraAttributes(['class' => 'bp-brand-media-current-image bp-asset-media-current-image']),
                     Group::make([
                         TextEntry::make('current_file')
                             ->label('Файл')
@@ -105,11 +107,11 @@ class MediaAssetResource extends Resource
                         TextEntry::make('current_mime_type')
                             ->label('Формат')
                             ->state(fn (MediaAsset $record): string => filled($record->mime_type) ? (string) $record->mime_type : '—'),
-                    ])->columns(2),
+                    ])->columns(2)->extraAttributes(['class' => 'bp-brand-media-current-metadata']),
                 ])->columns([
                     'default' => 1,
                     'md' => 2,
-                ])->columnSpanFull(),
+                ])->extraAttributes(['class' => 'bp-brand-media-current-layout bp-asset-media-current-layout'])->columnSpanFull(),
                 MediaSourceArea::make([
                     Group::make([
                         Group::make([

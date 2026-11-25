@@ -109,6 +109,57 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     assert.ok(mobileActions.upload.bottom + 2 <= mobileActions.url.top,
       'Asset mobile Upload/URL must stack without overlapping: ' + JSON.stringify(mobileActions));
     await assetSource.screenshot({ path: `${root}/asset-replacement-mobile.png` });
+
+    const currentLayout = page.locator('.bp-asset-media-current-layout');
+    await currentLayout.waitFor({ state: 'visible', timeout: 20_000 });
+    for (const width of [360, 390, 430, 1440]) {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 960 });
+      const currentGeometry = await currentLayout.evaluate(element => {
+        const bounds = node => {
+          const rect = node.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, width: rect.width, height: rect.height };
+        };
+        const imageWrap = element.querySelector('.bp-asset-media-current-image');
+        const imageFrame = imageWrap?.querySelector('.bp-media-preview-frame');
+        const metadata = element.querySelector('.bp-brand-media-current-metadata');
+        const rows = [...(metadata?.querySelectorAll('.fi-in-entry') ?? [])].map(row => ({
+          display: getComputedStyle(row).display,
+          alignment: getComputedStyle(row.querySelector('.fi-in-entry-content')).textAlign,
+          label: bounds(row.querySelector('.fi-in-entry-label-col')),
+          value: bounds(row.querySelector('.fi-in-entry-content-col')),
+        }));
+        const parent = element.parentElement;
+        const parentRect = parent.getBoundingClientRect();
+        const layoutRect = element.getBoundingClientRect();
+        const imageRect = imageWrap.getBoundingClientRect();
+        const frameRect = imageFrame.getBoundingClientRect();
+
+        return {
+          width: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          parentCenterDelta: Math.abs((layoutRect.left + layoutRect.width / 2) - (parentRect.left + parentRect.width / 2)),
+          imageCenterDelta: Math.abs((imageRect.left + imageRect.width / 2) - (frameRect.left + frameRect.width / 2)),
+          metadata: bounds(metadata),
+          metadataRowGap: getComputedStyle(metadata.querySelector('.fi-grid')).rowGap,
+          rows,
+        };
+      });
+
+      assert.ok(currentGeometry.scrollWidth <= currentGeometry.width + 1,
+        `Media Asset current-image block must not overflow at ${width}px: ${JSON.stringify(currentGeometry)}`);
+      assert.ok(currentGeometry.parentCenterDelta <= 1,
+        `Media Asset current-image container must be centered at ${width}px: ${JSON.stringify(currentGeometry)}`);
+      assert.ok(currentGeometry.imageCenterDelta <= 1,
+        `Media Asset image must be centered in the Brand preview frame at ${width}px.`);
+      if (width <= 430) {
+        assert.equal(currentGeometry.metadataRowGap, '12px');
+        assert.ok(currentGeometry.rows.length >= 4);
+        assert.ok(currentGeometry.rows.every(row => row.display === 'grid' && row.alignment === 'right'
+          && row.label.left < row.value.left && row.value.right <= currentGeometry.metadata.right + 1),
+        `Media Asset metadata must use the compact Brand label/value rows at ${width}px: ${JSON.stringify(currentGeometry.rows)}`);
+      }
+      await currentLayout.screenshot({ path: `${root}/asset-current-${width}.png` });
+    }
     await page.setViewportSize({ width: 1440, height: 960 });
 
     await uploadViaInitializedFilePond(page, 'replacement.png');
@@ -179,6 +230,31 @@ test('shared Asset confirmation/cancellation and Brand dedup use real Chromium',
     // A separate upload after navigation must not inherit FilePond's previously processed item.
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByText('replacement.png', { exact: false }).first().waitFor({ state: 'visible' });
+    const brandCurrent = page.locator('.bp-brand-media-current-layout');
+    await brandCurrent.waitFor({ state: 'visible', timeout: 20_000 });
+    for (const width of [360, 390, 430, 1440]) {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 960 });
+      const brandGeometry = await brandCurrent.evaluate(element => {
+        const metadata = element.querySelector('.bp-brand-media-current-metadata');
+        const rows = [...metadata.querySelectorAll('.fi-in-entry')].map(row => ({
+          display: getComputedStyle(row).display,
+          alignment: getComputedStyle(row.querySelector('.fi-in-entry-content')).textAlign,
+        }));
+        return {
+          width: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          rows,
+        };
+      });
+      assert.ok(brandGeometry.scrollWidth <= brandGeometry.width + 1,
+        `The approved Brand media block must remain overflow-free at ${width}px.`);
+      if (width <= 430) {
+        assert.ok(brandGeometry.rows.every(row => row.display === 'grid' && row.alignment === 'right'),
+          `The approved Brand compact metadata layout must remain intact at ${width}px.`);
+      }
+      await brandCurrent.screenshot({ path: `${root}/brand-current-${width}.png` });
+    }
+    await page.setViewportSize({ width: 1440, height: 960 });
     await uploadViaInitializedFilePond(page, 'replacement.png');
     await page.getByRole('button', { name: 'Зберегти', exact: true }).first().click();
     await page.getByText('Зображення вже актуальне. Інших змін немає.', { exact: true })

@@ -30,7 +30,8 @@
 }
 
 .bp-media-preview-frame.fi-in-image,
-.bp-media-preview-frame.fi-ta-image {
+.bp-media-preview-frame.fi-ta-image,
+.bp-media-preview-frame__surface {
     width: var(--bp-media-preview-width);
     height: auto;
     max-width: 100%;
@@ -70,6 +71,13 @@
 .bp-brand-media-current-image {
     position: relative;
     width: min(100%, 20rem);
+}
+/* Media Assets reuses the approved Brand current-image layout and metadata
+   grammar while centering its standalone preview within the page content. */
+.bp-asset-media-current-layout { margin-inline: auto; }
+.bp-asset-media-current-image {
+    justify-self: center;
+    margin-inline: auto;
 }
 .bp-brand-media-current-dismiss {
     position: absolute;
@@ -118,6 +126,108 @@
 }
 .bp-media-preview-frame--detail {
     --bp-media-preview-width: min(100%, 18rem);
+}
+
+/* Master Product keeps its ordered gallery, using the shared Brand preview
+   frame while allowing its thumbnail row to adapt to the actual container. */
+.bp-product-media-gallery {
+    width: 100%;
+    max-width: 44rem;
+    margin-inline: auto;
+    container: bp-product-media-gallery / inline-size;
+}
+.bp-product-media-gallery__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+}
+.bp-product-media-gallery__primary { justify-self: center; }
+.bp-product-media-gallery__thumbnails {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.bp-product-media-gallery__thumbnail,
+.bp-product-media-gallery__more {
+    box-sizing: border-box;
+    flex: 0 0 4.5rem;
+    width: 4.5rem;
+    height: 4.5rem;
+    border: 1px solid var(--color-gray-200);
+    border-radius: 0.5rem;
+    background: var(--color-gray-50);
+}
+.bp-product-media-gallery__thumbnail { object-fit: cover; }
+.bp-product-media-gallery__more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-style: dashed;
+    color: var(--color-gray-500);
+}
+.dark .bp-product-media-gallery__thumbnail,
+.dark .bp-product-media-gallery__more {
+    border-color: rgb(255 255 255 / 0.12);
+    background: var(--color-gray-800);
+}
+.dark .bp-product-media-gallery__more { color: var(--color-gray-400); }
+.bp-product-media-gallery__count {
+    margin-top: 0.625rem;
+    color: var(--color-gray-500);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.bp-product-media-gallery__empty,
+.bp-product-media-gallery__pending {
+    padding-block: 0.5rem;
+    color: var(--color-gray-500);
+    text-align: center;
+}
+.bp-product-media-gallery__pending {
+    padding: 1.25rem;
+    border: 1px dashed var(--color-gray-300);
+    border-radius: 0.625rem;
+}
+.dark .bp-product-media-gallery__pending { border-color: rgb(255 255 255 / 0.2); }
+.bp-product-description-editor { container: bp-product-description-editor / inline-size; }
+@container bp-product-media-gallery (max-width: 35rem) {
+    .bp-product-media-gallery__layout { grid-template-columns: minmax(0, 1fr); }
+    .bp-product-media-gallery__thumbnails { justify-content: center; }
+    .bp-product-media-gallery__count { text-align: center; }
+}
+@container bp-product-description-editor (max-width: 35rem) {
+    .bp-product-description-editor .fi-fo-rich-editor-toolbar {
+        gap: 0.25rem 0.375rem;
+        padding: 0.5rem;
+    }
+    .bp-product-description-editor .fi-fo-rich-editor-toolbar-group { gap: 0.25rem; }
+    .bp-product-description-editor :is(
+        .fi-fo-rich-editor-tool,
+        .fi-fo-rich-editor-dropdown-tool-trigger
+    ) {
+        box-sizing: border-box;
+        width: 2.5rem;
+        min-width: 2.5rem;
+        height: 2.5rem;
+        min-height: 2.5rem;
+    }
+    .bp-product-description-editor .fi-fo-rich-editor-dropdown-tool-trigger { padding-inline: 0.25rem; }
+    .bp-product-description-editor .fi-fo-rich-editor-dropdown-tool-option {
+        box-sizing: border-box;
+        width: 2.5rem;
+        min-width: 2.5rem;
+        height: 2.5rem;
+        min-height: 2.5rem;
+    }
+    .bp-product-description-editor .fi-fo-rich-editor-dropdown-tool-textual .fi-fo-rich-editor-dropdown-tool-option {
+        width: auto;
+        min-width: 0;
+        min-height: 2.75rem;
+    }
 }
 
 /* Brand footer metadata: same approved compact mobile row grammar as the
