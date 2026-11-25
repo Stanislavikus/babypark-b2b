@@ -143,11 +143,82 @@ test('Master Product Media uses approved native source controls and persists a r
       { media_asset_id: String(fixture.sharedAssetId), role: 'gallery', sort_order: 1 },
     ]);
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    const mobile = page.locator('.bp-product-media-source.bp-brand-media-dropzone');
-    await mobile.getByRole('button', { name: 'Обрати з медіатеки' })
-      .waitFor({ state: 'visible' });
-    await mobile.screenshot({ path: `${root}/product-media-mobile.png` });
+    const gallery = page.locator('.bp-product-media-gallery');
+    await gallery.waitFor({ state: 'visible', timeout: 20_000 });
+    assert.equal(await gallery.locator('img').count(), 2,
+      'The primary preview and the gallery thumbnail must both remain visible after attaching two images.');
+
+    const toolbar = page.locator('.bp-product-description-editor .fi-fo-rich-editor-toolbar');
+    await toolbar.waitFor({ state: 'visible', timeout: 20_000 });
+    assert.equal(await toolbar.locator('.fi-fo-rich-editor-toolbar-group').count(), 2,
+      'The description editor must present a compact two-group toolbar.');
+    const dropdowns = toolbar.locator('.fi-fo-rich-editor-dropdown-tool-trigger');
+    assert.equal(await dropdowns.count(), 4,
+      'Headings, alignment, lists, and additional tools must remain reachable through four native dropdowns.');
+
+    for (const width of [360, 390, 430, 1440]) {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 960 });
+      const responsiveGeometry = await page.evaluate(() => {
+        const bounds = node => {
+          const rect = node.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, width: rect.width, height: rect.height };
+        };
+        const galleryNode = document.querySelector('.bp-product-media-gallery');
+        const primary = galleryNode.querySelector('.bp-product-media-gallery__primary');
+        const thumbnails = galleryNode.querySelector('.bp-product-media-gallery__thumbnails');
+        const toolbarNode = document.querySelector('.bp-product-description-editor .fi-fo-rich-editor-toolbar');
+        const toolbarGroups = [...toolbarNode.querySelectorAll(':scope > .fi-fo-rich-editor-toolbar-group')].map(bounds);
+        const controls = [...toolbarNode.querySelectorAll(
+          ':scope > .fi-fo-rich-editor-toolbar-group > .fi-fo-rich-editor-tool, ' +
+          ':scope > .fi-fo-rich-editor-toolbar-group > .fi-fo-rich-editor-dropdown-tool > .fi-fo-rich-editor-dropdown-tool-trigger',
+        )].filter(node => getComputedStyle(node).display !== 'none').map(bounds);
+        const galleryRect = galleryNode.getBoundingClientRect();
+        const primaryRect = primary.getBoundingClientRect();
+        const thumbnailsRect = thumbnails.getBoundingClientRect();
+        return {
+          gallery: { width: galleryNode.clientWidth, scrollWidth: galleryNode.scrollWidth },
+          primaryCenterDelta: Math.abs((primaryRect.left + primaryRect.width / 2) - (galleryRect.left + galleryRect.width / 2)),
+          thumbnailsCenterDelta: Math.abs((thumbnailsRect.left + thumbnailsRect.width / 2) - (galleryRect.left + galleryRect.width / 2)),
+          thumbnails: { width: thumbnails.clientWidth, scrollWidth: thumbnails.scrollWidth },
+          toolbar: { width: toolbarNode.clientWidth, scrollWidth: toolbarNode.scrollWidth },
+          toolbarRows: new Set(toolbarGroups.map(group => Math.round(group.top))).size,
+          controlTargets: controls.map(control => ({ width: control.width, height: control.height })),
+        };
+      });
+
+      assert.ok(responsiveGeometry.gallery.scrollWidth <= responsiveGeometry.gallery.width + 1,
+        `Master Product gallery must fit at ${width}px: ${JSON.stringify(responsiveGeometry)}`);
+      assert.ok(responsiveGeometry.thumbnails.scrollWidth <= responsiveGeometry.thumbnails.width + 1,
+        `Master Product gallery thumbnails must wrap without horizontal overflow at ${width}px.`);
+      if (width <= 430) {
+        assert.ok(responsiveGeometry.primaryCenterDelta <= 1 && responsiveGeometry.thumbnailsCenterDelta <= 1,
+          `Master Product image and thumbnails must be centered at ${width}px: ${JSON.stringify(responsiveGeometry)}`);
+        assert.ok(responsiveGeometry.controlTargets.every(target => target.width >= 40 && target.height >= 40),
+          `Description editor mobile controls must retain 40px touch targets at ${width}px: ${JSON.stringify(responsiveGeometry.controlTargets)}`);
+      }
+      assert.ok(responsiveGeometry.toolbar.scrollWidth <= responsiveGeometry.toolbar.width + 1,
+        `Description editor toolbar must not overflow at ${width}px.`);
+      assert.ok(responsiveGeometry.toolbarRows <= 2,
+        `Description editor toolbar must use no more than two rows at ${width}px: ${JSON.stringify(responsiveGeometry)}`);
+
+      await gallery.screenshot({ path: `${root}/product-gallery-${width}.png` });
+      await toolbar.screenshot({ path: `${root}/product-description-toolbar-${width}.png` });
+    }
+
+    await page.setViewportSize({ width: 360, height: 844 });
+    const expectedDropdownSizes = [2, 3, 2, 6];
+    for (let index = 0; index < expectedDropdownSizes.length; index += 1) {
+      const trigger = dropdowns.nth(index);
+      const wrapper = trigger.locator('xpath=..');
+      await trigger.click();
+      const menu = wrapper.locator('[role="menu"]');
+      await menu.waitFor({ state: 'visible', timeout: 5_000 });
+      const itemCount = await menu.locator('.fi-fo-rich-editor-dropdown-tool-option').count();
+      assert.ok(itemCount >= expectedDropdownSizes[index],
+        `Description toolbar dropdown ${index + 1} must retain its editing tools.`);
+      await page.keyboard.press('Escape');
+      await menu.waitFor({ state: 'hidden', timeout: 5_000 });
+    }
     succeeded = true;
   } finally {
     if (!succeeded) {
