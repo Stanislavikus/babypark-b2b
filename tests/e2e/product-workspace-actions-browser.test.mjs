@@ -46,8 +46,14 @@ test('Master Product contextual actions and close behavior work on desktop and m
 
     const productRow = list.getByRole('row').filter({ hasText: 'E2E Master Media Product' });
     await productRow.waitFor({ state: 'visible', timeout: 20_000 });
+    await productRow.getByText('E2E Master Media Product', { exact: true }).click();
+
+    const viewDrawer = list.locator('.fi-modal.fi-modal-open').filter({
+      has: list.getByRole('heading', { name: 'E2E Master Media Product', exact: true }),
+    });
+    await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
     const viewPagePromise = context.waitForEvent('page', { timeout: 20_000 });
-    await productRow.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
+    await viewDrawer.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
     const editor = await viewPagePromise;
     await editor.waitForLoadState('domcontentloaded');
     editor.on('dialog', async dialog => {
@@ -192,12 +198,34 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
     await targetRow.waitFor({ state: 'visible', timeout: 20_000 });
     const photoButton = targetRow.locator('button[title="Редагувати власні фото варіанта"]');
     assert.equal(await photoButton.count(), 1, 'The target Variant row must expose its photo action.');
+    const handler = await photoButton.getAttribute('wire:click');
+    assert.ok(handler?.includes('form.product_media_manage_actions'),
+      'The photo click must pass the existing media action schema context.');
+    const clientErrors = [];
+    page.on('pageerror', error => clientErrors.push(error.message));
+    page.on('console', message => {
+      if (message.type() === 'error') clientErrors.push(message.text());
+    });
     await photoButton.click();
 
     const drawer = page.locator('.fi-modal.fi-modal-open').filter({
       has: page.getByRole('heading', { name: 'Медіа варіантів', exact: true }),
     });
-    await drawer.waitFor({ state: 'visible', timeout: 20_000 });
+    try {
+      await drawer.waitFor({ state: 'visible', timeout: 20_000 });
+    } catch (error) {
+      const componentStates = await page.locator('[wire\\:id][wire\\:snapshot]').evaluateAll(elements =>
+        elements.map(element => {
+          const snapshot = JSON.parse(element.getAttribute('wire:snapshot') ?? '{}');
+          return {
+            id: element.getAttribute('wire:id'),
+            mountedActions: snapshot.data?.mountedActions ?? null,
+          };
+        }),
+      );
+      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({ handler, clientErrors, componentStates }));
+      throw error;
+    }
     const selectedVariant = drawer.locator(
       '.fi-select-input-btn .fi-badge[data-value="' + fixture.variantMediaTargetId + '"]',
     );
