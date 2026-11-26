@@ -164,10 +164,8 @@ class ProductResource extends Resource
      * @param  list<string>  $names
      * @return list<Action>
      */
-    private static function productPageActions(array $names): array
+    private static function productPageActions(mixed $page, array $names): array
     {
-        $page = Livewire::current();
-
         if (! $page instanceof EditProduct) {
             return [];
         }
@@ -368,7 +366,7 @@ class ProductResource extends Resource
                                         ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                                 ])->extraAttributes(['class' => 'bp-brand-media-actions']),
                             ], 'bp-product-media-source')->visible(fn (?Product $record): bool => $record !== null),
-                            SchemaActions::make(fn (): array => self::productPageActions([
+                            SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
                                 'assign_variant_media',
                                 'reorder_media',
                                 'remove_media',
@@ -516,7 +514,7 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_variants')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
-                            SchemaActions::make(fn (): array => self::productPageActions([
+                            SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
                                 'promote_variants',
                                 'add_variant_axis',
                                 'add_variant',
@@ -529,7 +527,7 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_attributes')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildAttributeGroupsHtml($record)),
-                            SchemaActions::make(fn (): array => self::productPageActions([
+                            SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
                                 'edit_product_fields',
                                 'optional_groups',
                             ]))->key('product_characteristics_actions')->columnSpanFull(),
@@ -660,7 +658,7 @@ class ProductResource extends Resource
                                 ->content(fn (?Product $record): string => $record
                                     ? app(ProductWorkspaceSummaryService::class)->productTypeLabel($record)
                                     : 'Базовий товар буде призначено автоматично')
-                                ->suffixAction(fn (): ?Action => self::productPageActions(['change_product_type'])[0] ?? null),
+                                ->suffixAction(fn ($livewire): ?Action => self::productPageActions($livewire, ['change_product_type'])[0] ?? null),
                             TextInput::make('merchant_type')
                                 ->label('Внутрішня класифікація')
                                 ->helperText('Вільна внутрішня мітка. Не визначає характеристики, варіанти або сімейство товару.')
