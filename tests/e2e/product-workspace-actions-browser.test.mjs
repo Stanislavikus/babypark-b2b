@@ -48,22 +48,39 @@ test('Master Product contextual actions and close behavior work on desktop and m
     await productRow.waitFor({ state: 'visible', timeout: 20_000 });
     await productRow.getByText('E2E Master Media Product', { exact: true }).click();
 
-    const viewDrawer = list.locator('.fi-modal.fi-modal-open').filter({
-      hasText: 'Відкрити повну картку',
-    });
+    const fullCardLink = list.getByRole('link', { name: 'Відкрити повну картку', exact: true });
     try {
-      await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
+      await fullCardLink.waitFor({ state: 'visible', timeout: 20_000 });
     } catch (error) {
-      const dialogs = await list.locator('[role="dialog"]').evaluateAll(elements => elements.map(dialog => ({
-        visible: Boolean(dialog.getClientRects().length),
-        text: dialog.innerText.slice(0, 500),
-        classes: dialog.className,
-      })));
-      console.log('PRODUCT_ROW_VIEW_DEBUG', JSON.stringify({ url: list.url(), dialogs }));
+      const linkState = await fullCardLink.evaluateAll(links => links.map(link => {
+        const dialog = link.closest('[role="dialog"]');
+        const rect = link.getBoundingClientRect();
+        const dialogRect = dialog?.getBoundingClientRect();
+        const style = window.getComputedStyle(link);
+
+        return {
+          text: link.innerText,
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          visibility: style.visibility,
+          display: style.display,
+          dialogRect: dialogRect && {
+            x: dialogRect.x,
+            y: dialogRect.y,
+            width: dialogRect.width,
+            height: dialogRect.height,
+          },
+          dialogClasses: dialog?.className ?? null,
+        };
+      }));
+      console.log('PRODUCT_ROW_VIEW_DEBUG', JSON.stringify({ url: list.url(), linkState }));
       throw error;
     }
+    assert.equal(await fullCardLink.count(), 1, 'View drawer must expose one full-card link.');
+    const viewDialog = fullCardLink.locator('xpath=ancestor::*[@role="dialog"][1]');
+    assert.ok((await viewDialog.getAttribute('class'))?.includes('fi-modal-open'),
+      'The full-card link must belong to the open View drawer.');
     const viewPagePromise = context.waitForEvent('page', { timeout: 20_000 });
-    await viewDrawer.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
+    await fullCardLink.click();
     const editor = await viewPagePromise;
     await editor.waitForLoadState('domcontentloaded');
     editor.on('dialog', async dialog => {
@@ -204,6 +221,14 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
     const response = await page.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(response?.status(), 200);
 
+    const existingActionButton = page.getByRole('button', { name: 'Призначити варіантам', exact: true });
+    assert.equal(await existingActionButton.count(), 1,
+      'The existing media assignment Action must be visible in its schema component.');
+    await existingActionButton.waitFor({ state: 'visible', timeout: 10_000 });
+    const existingActionHandler = await existingActionButton.getAttribute('wire:click');
+    assert.ok(existingActionHandler?.includes('form.product_media_manage_actions'),
+      'The native Action trigger must use its registered schema context.');
+
     const targetRow = page.locator('tr').filter({ hasText: 'Сірий' });
     await targetRow.waitFor({ state: 'visible', timeout: 20_000 });
     const photoButton = targetRow.locator('button[title="Редагувати власні фото варіанта"]');
@@ -251,11 +276,9 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
       && call.params?.[0] === 'assign_variant_media'
       && call.params?.[2]?.schemaComponent === 'form.product_media_manage_actions'
     ), 'The Livewire request must send the existing Action schema context.');
-    const drawer = page.locator('.fi-modal.fi-modal-open').filter({
-      has: page.getByRole('heading', { name: 'Медіа варіантів', exact: true }),
-    });
+    const drawerHeading = page.getByRole('heading', { name: 'Медіа варіантів', exact: true });
     try {
-      await drawer.waitFor({ state: 'visible', timeout: 20_000 });
+      await drawerHeading.waitFor({ state: 'visible', timeout: 20_000 });
     } catch (error) {
       const componentStates = await page.locator('[wire\\:id][wire\\:snapshot]').evaluateAll(elements =>
         elements.map(element => {
@@ -266,9 +289,20 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
           };
         }),
       );
-      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({ handler, livewireCalls, livewireStatus: livewireResponse.status(), livewireResponseBody: livewireResponseBody.slice(0, 6_000), clientErrors, componentStates }));
+      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({
+        handler,
+        existingActionHandler,
+        livewireCalls,
+        livewireStatus: livewireResponse.status(),
+        livewireResponseBody: livewireResponseBody.slice(0, 6_000),
+        clientErrors,
+        componentStates,
+      }));
       throw error;
     }
+    const drawer = drawerHeading.locator('xpath=ancestor::*[@role="dialog"][1]');
+    assert.ok((await drawer.getAttribute('class'))?.includes('fi-modal-open'),
+      'The media heading must belong to the open variant media drawer.');
     const selectedVariant = drawer.locator(
       '.fi-select-input-btn .fi-badge[data-value="' + fixture.variantMediaTargetId + '"]',
     );
