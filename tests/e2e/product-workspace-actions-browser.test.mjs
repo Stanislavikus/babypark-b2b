@@ -125,7 +125,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
     await exitEditor.waitForFunction(() => {
       const component = window.Livewire?.first?.();
 
-      return component?.$get?.('data.name') === 'E2E browser exit draft';
+      return component?.$get?.('form.name') === 'E2E browser exit draft';
     }, null, { timeout: 10_000 });
     let exitDialogType = null;
     exitEditor.once('dialog', async dialog => {
