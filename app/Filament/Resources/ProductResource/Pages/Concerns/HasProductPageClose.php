@@ -56,7 +56,7 @@ trait HasProductPageClose
 
         $this->rememberData();
         $this->unmountAction();
-        $this->js("(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();");
+        $this->js("(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} if (window.opener && ! window.opener.closed) { window.close(); } if (! window.closed) { window.location.href = {$fallback}; } })();");
 
         return null;
     }
