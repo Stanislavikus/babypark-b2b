@@ -51,7 +51,20 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const viewDrawer = list.locator('.fi-modal.fi-modal-open').filter({
       has: list.getByRole('heading', { name: 'E2E Master Media Product', exact: true }),
     });
-    await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
+    try {
+      await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
+    } catch (error) {
+      const rowState = await productRow.evaluate(row => ({
+        html: row.outerHTML.slice(0, 5000),
+        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(dialog => ({
+          visible: Boolean(dialog.getClientRects().length),
+          text: dialog.innerText.slice(0, 500),
+          classes: dialog.className,
+        })),
+      }));
+      console.log('PRODUCT_ROW_VIEW_DEBUG', JSON.stringify({ url: list.url(), rowState }));
+      throw error;
+    }
     const viewPagePromise = context.waitForEvent('page', { timeout: 20_000 });
     await viewDrawer.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
     const editor = await viewPagePromise;
@@ -202,12 +215,37 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
     assert.ok(handler?.includes('form.product_media_manage_actions'),
       'The photo click must pass the existing media action schema context.');
     const clientErrors = [];
+    const livewireCalls = [];
     page.on('pageerror', error => clientErrors.push(error.message));
     page.on('console', message => {
       if (message.type() === 'error') clientErrors.push(message.text());
     });
-    await photoButton.click();
+    page.on('request', request => {
+      if (request.method() !== 'POST' || !request.url().includes('/livewire-') || !request.url().endsWith('/update')) {
+        return;
+      }
 
+      try {
+        const payload = JSON.parse(request.postData() ?? '{}');
+        for (const component of payload.components ?? []) {
+          livewireCalls.push(...(component.calls ?? []));
+        }
+      } catch (error) {
+        livewireCalls.push({ parseError: error.message });
+      }
+    });
+    await photoButton.click();
+    await page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && response.url().includes('/livewire-')
+      && response.url().endsWith('/update'),
+    { timeout: 10_000 });
+
+    assert.ok(livewireCalls.some(call =>
+      call.method === 'mountAction'
+      && call.params?.[0] === 'assign_variant_media'
+      && call.params?.[2]?.schemaComponent === 'form.product_media_manage_actions'
+    ), 'The Livewire request must send the existing Action schema context.');
     const drawer = page.locator('.fi-modal.fi-modal-open').filter({
       has: page.getByRole('heading', { name: 'Медіа варіантів', exact: true }),
     });
@@ -223,7 +261,7 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
           };
         }),
       );
-      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({ handler, clientErrors, componentStates }));
+      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({ handler, livewireCalls, clientErrors, componentStates }));
       throw error;
     }
     const selectedVariant = drawer.locator(
