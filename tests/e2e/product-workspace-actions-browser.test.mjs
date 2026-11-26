@@ -122,42 +122,11 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const exitResponse = await exitEditor.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(exitResponse?.status(), 200);
     await exitEditor.locator('input[id="form.name"]').fill('E2E browser exit draft');
-    const exitStateProbe = await exitEditor.evaluate(() => {
-      const input = document.getElementById('form.name');
-      const components = window.Livewire?.all?.() ?? [];
-
-      return {
-        input: input ? {
-          value: input.value,
-          attributes: Object.fromEntries([...input.attributes].map(attribute => [attribute.name, attribute.value])),
-        } : null,
-        components: components.map(component => {
-          const read = path => {
-            try {
-              return component.$get?.(path);
-            } catch {
-              return undefined;
-            }
-          };
-
-          return {
-            id: component.id,
-            name: component.name,
-            wireId: component.el?.getAttribute('wire:id'),
-            hasGet: typeof component.$get === 'function',
-            formName: read('form.name'),
-            dataName: read('data.name'),
-          };
-        }),
-      };
-    });
-    console.log('PRODUCT_EXIT_STATE_PROBE', JSON.stringify(exitStateProbe));
-
     const navigation = exitEditor.goto(new URL('/admin/products', baseUrl).href, {
       waitUntil: 'domcontentloaded',
     }).catch(() => null);
     const exitDialog = await exitEditor.waitForEvent('dialog', { timeout: 10_000 });
-    const exitDialogType = exitDialog.type;
+    const exitDialogType = exitDialog.type();
     await exitDialog.dismiss();
     await navigation;
     assert.equal(exitDialogType, 'beforeunload',
