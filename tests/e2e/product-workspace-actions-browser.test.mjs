@@ -102,16 +102,18 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const header = editor.locator('.fi-header-actions-ctn');
     await header.waitFor({ state: 'visible', timeout: 20_000 });
     const viewLink = header.getByRole('link', { name: 'Перегляд', exact: true });
-    const closeButton = header.getByRole('button', { name: 'Закрити', exact: true });
+    const closeLink = header.getByRole('link', { name: 'Закрити', exact: true });
     assert.equal(await viewLink.count(), 1, 'Edit header must expose the View action as one link.');
-    assert.equal(await closeButton.count(), 1, 'Edit header must expose one Close button.');
+    assert.equal(await closeLink.count(), 1, 'A clean Edit header must expose one Close fallback link.');
+    assert.ok((await closeLink.getAttribute('class'))?.includes('fi-ac-btn-action'),
+      'Close fallback must retain the existing Filament button presentation.');
     assert.equal(
       (await header.getByRole('link').count()) + (await header.getByRole('button').count()),
       2,
       'Edit header must contain only View and Close.',
     );
     await viewLink.waitFor({ state: 'visible' });
-    await closeButton.waitFor({ state: 'visible' });
+    await closeLink.waitFor({ state: 'visible' });
     await viewLink.click();
     await editor.waitForURL(url => !url.pathname.endsWith('/edit'), { timeout: 20_000 });
     assertListContext(editor.url());
@@ -129,7 +131,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
 
     for (const width of [1440, 390]) {
       await editor.setViewportSize({ width, height: width < 768 ? 844 : 960 });
-      await closeButton.waitFor({ state: 'visible' });
+      await closeLink.waitFor({ state: 'visible' });
       await reorder.waitFor({ state: 'visible' });
       await remove.waitFor({ state: 'visible' });
     }
@@ -142,6 +144,8 @@ test('Master Product contextual actions and close behavior work on desktop and m
     assert.equal(await editor.getByText('Товар збережено', { exact: true }).count(), 0);
 
     await name.fill('E2E unsaved product name');
+    const closeButton = header.getByRole('button', { name: 'Закрити', exact: true });
+    await closeButton.waitFor({ state: 'visible', timeout: 10_000 });
     await closeButton.click();
     const closeDialog = editor.locator('.fi-modal.fi-modal-open').filter({
       hasText: 'Закрити без збереження?',

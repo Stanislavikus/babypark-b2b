@@ -30,6 +30,7 @@ trait HasProductPageClose
             ->label('Закрити')
             ->icon('heroicon-o-x-mark')
             ->color('gray')
+            ->button()
             ->url(fn (): ?string => $this->hasUnsavedProductChanges()
                 ? null
                 : ProductResource::getUrl('index', $this->productListContext))
