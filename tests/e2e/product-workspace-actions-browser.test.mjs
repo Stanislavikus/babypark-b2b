@@ -199,9 +199,39 @@ test('Master Product contextual actions and close behavior work on desktop and m
     fallbackUrl.searchParams.set('returnUrl', 'https://untrusted.example.test/never');
     const fallbackResponse = await fallbackEditor.goto(fallbackUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(fallbackResponse?.status(), 200);
-    await fallbackEditor.locator('.fi-header-actions-ctn')
-      .getByRole('button', { name: 'Закрити', exact: true }).click();
-    await fallbackEditor.waitForURL(url => url.pathname === '/admin/products', { timeout: 20_000 });
+    const fallbackCloseButton = fallbackEditor.locator('.fi-header-actions-ctn')
+      .getByRole('button', { name: 'Закрити', exact: true });
+    const fallbackConsoleErrors = [];
+    fallbackEditor.on('pageerror', error => fallbackConsoleErrors.push(error.message));
+    fallbackEditor.on('console', message => {
+      if (message.type() === 'error') fallbackConsoleErrors.push(message.text());
+    });
+    const fallbackBefore = await fallbackEditor.evaluate(() => ({
+      url: window.location.href,
+      closed: window.closed,
+      hasOpener: Boolean(window.opener),
+      openerClosed: window.opener ? window.opener.closed : null,
+    }));
+    await fallbackCloseButton.click();
+    try {
+      await fallbackEditor.waitForURL(url => url.pathname === '/admin/products', { timeout: 5_000 });
+    } catch (error) {
+      const fallbackAfter = fallbackEditor.isClosed()
+        ? { pageClosed: true }
+        : await fallbackEditor.evaluate(() => ({
+          url: window.location.href,
+          closed: window.closed,
+          hasOpener: Boolean(window.opener),
+          openerClosed: window.opener ? window.opener.closed : null,
+        }));
+      console.log('PRODUCT_CLOSE_FALLBACK_DEBUG', JSON.stringify({
+        fallbackBefore,
+        fallbackAfter,
+        fallbackConsoleErrors,
+        pageIsClosed: fallbackEditor.isClosed(),
+      }));
+      throw error;
+    }
     assertListContext(fallbackEditor.url());
 
   } finally {
