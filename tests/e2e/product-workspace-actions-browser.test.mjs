@@ -31,7 +31,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
 
     const listUrl = new URL('/admin/products', baseUrl);
     listUrl.searchParams.set('channel', 'campaign-b-context');
-    listUrl.searchParams.set('tableSearch', 'E2E');
+    listUrl.searchParams.set('search', 'E2E');
     listUrl.searchParams.set('returnUrl', 'https://untrusted.example.test/never');
     await list.goto(listUrl.href, { waitUntil: 'domcontentloaded' });
     await list.waitForFunction(() => typeof window.__babyparkProductsRefreshHandler === 'function');
@@ -39,7 +39,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const assertListContext = currentUrl => {
       const url = new URL(currentUrl);
       assert.equal(url.searchParams.get('channel'), 'campaign-b-context');
-      assert.equal(url.searchParams.get('tableSearch'), 'E2E');
+      assert.equal(url.searchParams.get('search'), 'E2E');
       assert.equal(url.searchParams.has('returnUrl'), false,
         'Only allowlisted list state may cross product page transitions.');
     };
@@ -172,7 +172,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const returnedListUrl = new URL(list.url());
     assert.equal(returnedListUrl.pathname, '/admin/products');
     assert.equal(returnedListUrl.searchParams.get('channel'), 'campaign-b-context');
-    assert.equal(returnedListUrl.searchParams.get('tableSearch'), 'E2E');
+    assert.equal(returnedListUrl.searchParams.get('search'), 'E2E');
     assert.equal(nativeDialogs.length, 0,
       'Confirmed Close must reset the browser-exit guard before closing or falling back.');
 
@@ -195,7 +195,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const fallbackEditor = await context.newPage();
     const fallbackUrl = new URL('/admin/products/' + fixture.mediaProductId + '/edit', baseUrl);
     fallbackUrl.searchParams.set('channel', 'campaign-b-context');
-    fallbackUrl.searchParams.set('tableSearch', 'E2E');
+    fallbackUrl.searchParams.set('search', 'E2E');
     fallbackUrl.searchParams.set('returnUrl', 'https://untrusted.example.test/never');
     const fallbackResponse = await fallbackEditor.goto(fallbackUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(fallbackResponse?.status(), 200);

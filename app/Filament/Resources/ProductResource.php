@@ -121,12 +121,12 @@ class ProductResource extends Resource
             if ($page instanceof ListProducts) {
                 $query = array_replace($query, [
                     'channel' => $page->channelContext,
-                    'tableFilters' => $page->tableFilters,
-                    'tableSearch' => $page->tableSearch,
+                    'filters' => $page->tableFilters,
+                    'search' => $page->tableSearch,
                     'tableColumnSearches' => $page->tableColumnSearches,
-                    'tableSort' => $page->tableSort,
+                    'sort' => $page->tableSort,
                     'tableRecordsPerPage' => $page->tableRecordsPerPage,
-                    'tableGrouping' => $page->tableGrouping,
+                    'grouping' => $page->tableGrouping,
                     'page' => $page->paginators['page'] ?? null,
                 ]);
             }
@@ -134,13 +134,13 @@ class ProductResource extends Resource
 
         $context = [];
 
-        foreach (['channel', 'tableSearch', 'tableSort', 'tableGrouping'] as $key) {
+        foreach (['channel', 'search', 'sort', 'grouping'] as $key) {
             if (isset($query[$key]) && is_string($query[$key]) && strlen($query[$key]) <= 255) {
                 $context[$key] = $query[$key];
             }
         }
 
-        foreach (['tableFilters', 'tableColumnSearches'] as $key) {
+        foreach (['filters', 'tableColumnSearches'] as $key) {
             if (isset($query[$key]) && is_array($query[$key]) && count($query[$key]) <= 100) {
                 $context[$key] = $query[$key];
             }
