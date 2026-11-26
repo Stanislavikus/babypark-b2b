@@ -9,6 +9,7 @@ use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Enums\UserRole;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
+use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\AttributeGroup;
 use App\Models\FieldBinding;
@@ -32,6 +33,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -95,6 +97,89 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertSee('Зберегти й додати ще товар')
             ->assertDontSee('Імпортувати Excel / CSV')
             ->assertDontSee('URL товару на сайті');
+    }
+
+    #[Test]
+    public function create_and_edit_keep_quiet_save_and_semantic_close_with_allowlisted_list_context(): void
+    {
+        $query = [
+            'channel' => 'campaign-b-context',
+            'tableSearch' => 'stroller',
+            'tableFilters' => ['status' => ['value' => 'working']],
+            'tableSort' => 'sku:asc',
+            'tableRecordsPerPage' => '50',
+            'page' => '2',
+            'returnUrl' => 'https://untrusted.example.test',
+        ];
+        $listContext = ProductResource::listContextParameters($query);
+
+        $this->assertSame([
+            'channel' => 'campaign-b-context',
+            'tableSearch' => 'stroller',
+            'tableSort' => 'sku:asc',
+            'tableFilters' => ['status' => ['value' => 'working']],
+            'tableRecordsPerPage' => '50',
+            'page' => 2,
+        ], $listContext);
+
+        $fallback = Js::from(ProductResource::getUrl('index', $listContext));
+        $refreshKey = Js::from(ProductResource::LIST_REFRESH_STORAGE_KEY);
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+
+        $create = Livewire::withQueryParams($query)
+            ->actingAs($this->admin)
+            ->test(CreateProduct::class)
+            ->assertActionVisible('close_page')
+            ->assertSeeHtml('setUpUnsavedDataChangesAlert')
+            ->mountAction('close_page')
+            ->assertActionNotMounted()
+            ->assertJs($closeJs)
+            ->fillForm(['name' => 'Unsaved draft'])
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?')
+            ->assertMountedActionModalSee('Незбережені зміни товару буде втрачено.')
+            ->unmountAction()
+            ->assertSet('data.name', 'Unsaved draft')
+            ->fillForm(['name' => 'Quiet create product'])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertNotNotified();
+
+        $product = $create->instance()->getRecord();
+        $this->assertInstanceOf(Product::class, $product);
+        $this->assertSame('Quiet create product', $product->fresh()->name);
+        $create->assertRedirect(ProductResource::getUrl('edit', [
+            'record' => $product,
+            ...$listContext,
+        ]));
+
+        $edit = Livewire::withQueryParams($query)
+            ->actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertActionVisible('close_page')
+            ->assertSee('Перегляд')
+            ->assertSeeHtml('setUpUnsavedDataChangesAlert')
+            ->fillForm(['name' => 'Quiet edit product'])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotNotified()
+            ->assertNoRedirect()
+            ->assertSet('data.name', 'Quiet edit product')
+            ->mountAction('close_page')
+            ->assertActionNotMounted()
+            ->assertJs($closeJs)
+            ->fillForm(['name' => 'Unsaved edit product'])
+            ->mountAction('close_page')
+            ->assertMountedActionModalSee('Закрити без збереження?')
+            ->assertSet('data.name', 'Unsaved edit product')
+            ->unmountAction()
+            ->assertSet('data.name', 'Unsaved edit product')
+            ->mountAction('close_page')
+            ->callMountedAction()
+            ->assertActionNotMounted()
+            ->assertJs($closeJs);
+
+        $this->assertSame('Quiet edit product', $product->fresh()->name);
     }
 
     #[Test]
@@ -442,10 +527,25 @@ class MasterProductWorkspaceShellTest extends TestCase
         $this->assertSame(1, $complete[0]['filled']);
         $this->assertSame(100, $complete[0]['percentage']);
         $this->assertSame([], $complete[0]['missing']);
+
+        $groupPlacement->update(['is_optional' => true]);
+        $this->grantWorkspacePermission(WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
+
+        $characteristicActions = Livewire::actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertActionVisible(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
+            ->assertActionVisible(TestAction::make('optional_groups')->schemaComponent('product_characteristics_actions'))
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
+            ->assertActionMounted(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
+            ->unmountAction()
+            ->mountAction(TestAction::make('optional_groups')->schemaComponent('product_characteristics_actions'))
+            ->assertActionMounted(TestAction::make('optional_groups')->schemaComponent('product_characteristics_actions'));
+
+        $characteristicActions->unmountAction();
     }
 
     #[Test]
-    public function product_type_header_action_uses_governed_mutation_service(): void
+    public function contextual_product_type_action_uses_governed_mutation_service(): void
     {
         $this->grantWorkspacePermission(WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
 
@@ -475,7 +575,10 @@ class MasterProductWorkspaceShellTest extends TestCase
 
         Livewire::actingAs($this->admin)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->callAction('change_product_type', ['product_type_id' => $target->id])
+            ->callAction(
+                TestAction::make('change_product_type')->schemaComponent('workspace_product_type'),
+                ['product_type_id' => $target->id],
+            )
             ->assertNotified();
 
         $this->assertSame((string) $target->id, (string) $product->fresh()->product_type_id);
@@ -512,7 +615,7 @@ class MasterProductWorkspaceShellTest extends TestCase
 
         $component = Livewire::actingAs($this->admin)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('change_product_type')
+            ->mountAction(TestAction::make('change_product_type')->schemaComponent('workspace_product_type'))
             ->setActionData(['product_type_id' => $target->id])
             ->assertActionDataSet(fn (array $data): bool => filled($data['reviewed_impact_token'] ?? null));
 

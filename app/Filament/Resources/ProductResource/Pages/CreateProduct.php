@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Enums\ProductLifecycleStatus;
 use App\Filament\Resources\ProductResource;
+use App\Filament\Resources\ProductResource\Pages\Concerns\HasProductPageClose;
 use App\Services\Catalog\MasterProductDraftCreator;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
@@ -12,7 +13,25 @@ use Illuminate\Database\Eloquent\Model;
 
 class CreateProduct extends CreateRecord
 {
+    use HasProductPageClose;
+
     protected static string $resource = ProductResource::class;
+
+    protected ?bool $hasUnsavedDataChangesAlert = true;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->captureProductListContext();
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            $this->closeProductPageAction(),
+        ];
+    }
 
     public function getTitle(): string
     {
@@ -38,7 +57,7 @@ class CreateProduct extends CreateRecord
 
     protected function getCreatedNotificationTitle(): ?string
     {
-        return 'Товар збережено';
+        return null;
     }
 
     protected function getCreateFormAction(): Action
@@ -55,6 +74,9 @@ class CreateProduct extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return ProductResource::getUrl('edit', ['record' => $this->record]);
+        return ProductResource::getUrl('edit', [
+            'record' => $this->record,
+            ...$this->productListContext,
+        ]);
     }
 }

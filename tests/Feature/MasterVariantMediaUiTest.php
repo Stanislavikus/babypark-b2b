@@ -25,6 +25,7 @@ use App\Services\Catalog\ProductVariantStructureService;
 use App\Services\Catalog\VariantMediaMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -65,7 +66,7 @@ final class MasterVariantMediaUiTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden('assign_variant_media')
+            ->assertActionHidden(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'))
             ->assertDontSee('Медіа варіантів');
     }
 
@@ -89,11 +90,11 @@ final class MasterVariantMediaUiTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('assign_variant_media')
+            ->assertActionVisible(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'))
             ->assertSee('Фото')
             ->assertSee('Лише загальні')
             ->assertSeeHtml('assign_variant_media')
-            ->mountAction('assign_variant_media', ['variant_id' => $variants[1]->id])
+            ->mountAction(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'), ['variant_id' => $variants[1]->id])
             ->assertActionDataSet(fn (array $data): bool => $data['variant_ids'] === [$variants[1]->id])
             ->assertMountedActionModalSee('Медіа варіантів')
             ->assertMountedActionModalSee('Додати до власних фото')
@@ -141,7 +142,7 @@ final class MasterVariantMediaUiTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('assign_variant_media')
+            ->mountAction(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'))
             ->assertMountedActionModalSee('Колір')
             ->assertMountedActionModalSee('Сірий · 2 вар.')
             ->assertMountedActionModalSee('Розмір')
@@ -235,7 +236,7 @@ final class MasterVariantMediaUiTest extends TestCase
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('assign_variant_media')
+            ->mountAction(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'))
             ->setActionData([
                 'media_asset_ids' => [$new->id],
                 'variant_ids' => [],
@@ -306,7 +307,7 @@ final class MasterVariantMediaUiTest extends TestCase
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('assign_variant_media')
+            ->mountAction(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'))
             ->setActionData([
                 'media_asset_ids' => [$new->id],
                 'variant_ids' => $variants->pluck('id')->all(),

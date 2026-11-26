@@ -24,6 +24,7 @@ use App\Services\Fields\GovernedDynamicFieldValueWriter;
 use App\Services\ProductStructure\ProductCompletenessService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -72,8 +73,8 @@ class MasterProductWorkspaceFieldEditingTest extends TestCase
 
         Livewire::actingAs($this->editor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('edit_product_fields')
-            ->mountAction('edit_product_fields')
+            ->assertActionVisible(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
             ->assertMountedActionModalSee('Матеріал')
             ->assertMountedActionModalSee('Колір')
             ->setActionData([
@@ -126,7 +127,7 @@ class MasterProductWorkspaceFieldEditingTest extends TestCase
 
         Livewire::actingAs($this->editor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('edit_product_fields')
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
             ->assertMountedActionModalSee('SKU '.$firstVariant->sku)
             ->assertMountedActionModalSee('SKU '.$secondVariant->sku)
             ->setActionData([
@@ -196,7 +197,7 @@ class MasterProductWorkspaceFieldEditingTest extends TestCase
 
         Livewire::actingAs($this->editor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('edit_product_fields')
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
             ->assertMountedActionModalSee('Детальний текст')
             ->assertMountedActionModalSee('Функції')
             ->assertMountedActionModalSee('Локалізований текст')
@@ -281,7 +282,7 @@ class MasterProductWorkspaceFieldEditingTest extends TestCase
 
         $component = Livewire::actingAs($this->editor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('edit_product_fields');
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'));
 
         app(GovernedDynamicFieldValueWriter::class)->set(
             workspaceId: $this->workspace->id,
@@ -329,7 +330,7 @@ class MasterProductWorkspaceFieldEditingTest extends TestCase
 
         Livewire::actingAs($this->editor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->mountAction('edit_product_fields')
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
             ->setActionData([
                 'values' => [
                     'product' => [

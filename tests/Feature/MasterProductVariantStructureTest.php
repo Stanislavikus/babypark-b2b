@@ -27,6 +27,7 @@ use App\Services\ProductStructure\ProductTypeMutationService;
 use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -166,8 +167,8 @@ class MasterProductVariantStructureTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('promote_variants')
-            ->callAction('promote_variants', [
+            ->assertActionVisible(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'))
+            ->callAction(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'), [
                 'axis_binding_id' => $color->id,
                 'existing_value' => 'black',
                 'additional_values' => ['white'],
@@ -176,7 +177,9 @@ class MasterProductVariantStructureTest extends TestCase
             ->assertSee('Чорний')
             ->assertSee('Білий')
             ->assertSee('BASE-SKU')
-            ->assertSee('Залишок');
+            ->assertSee('Залишок')
+            ->mountAction('close_page')
+            ->assertActionNotMounted();
 
         $this->assertSame($existing->id, ProductVariant::withoutWorkspaceScope()
             ->where('product_id', $product->id)
@@ -196,8 +199,8 @@ class MasterProductVariantStructureTest extends TestCase
 
         $component = Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('add_variant_axis')
-            ->callAction('add_variant_axis', [
+            ->assertActionVisible(TestAction::make('add_variant_axis')->schemaComponent('product_variant_actions'))
+            ->callAction(TestAction::make('add_variant_axis')->schemaComponent('product_variant_actions'), [
                 'axis_binding_id' => $size->id,
                 'assignments' => [
                     (string) $variants[0]->id => 's',
@@ -205,12 +208,12 @@ class MasterProductVariantStructureTest extends TestCase
                 ],
             ])
             ->assertNotified()
-            ->assertActionVisible('add_variant');
+            ->assertActionVisible(TestAction::make('add_variant')->schemaComponent('product_variant_actions'));
 
         $this->assertSame(2, ProductVariant::withoutWorkspaceScope()->where('product_id', $product->id)->count());
 
         $component
-            ->callAction('add_variant', [
+            ->callAction(TestAction::make('add_variant')->schemaComponent('product_variant_actions'), [
                 'axis_values' => [
                     $color->id => 'black',
                     $size->id => 'm',
@@ -245,9 +248,9 @@ class MasterProductVariantStructureTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden('promote_variants')
-            ->assertActionHidden('add_variant_axis')
-            ->assertActionHidden('add_variant');
+            ->assertActionHidden(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'))
+            ->assertActionHidden(TestAction::make('add_variant_axis')->schemaComponent('product_variant_actions'))
+            ->assertActionHidden(TestAction::make('add_variant')->schemaComponent('product_variant_actions'));
     }
 
     #[Test]
@@ -293,8 +296,8 @@ class MasterProductVariantStructureTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('edit_product_fields')
-            ->mountAction('edit_product_fields')
+            ->assertActionVisible(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
+            ->mountAction(TestAction::make('edit_product_fields')->schemaComponent('product_characteristics_actions'))
             ->assertMountedActionModalDontSee('Колір варіанта')
             ->assertMountedActionModalSee('Примітка варіанта');
     }
@@ -308,9 +311,9 @@ class MasterProductVariantStructureTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden('promote_variants')
-            ->assertActionHidden('add_variant_axis')
-            ->assertActionHidden('add_variant');
+            ->assertActionHidden(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'))
+            ->assertActionHidden(TestAction::make('add_variant_axis')->schemaComponent('product_variant_actions'))
+            ->assertActionHidden(TestAction::make('add_variant')->schemaComponent('product_variant_actions'));
 
         $this->expectException(ProductVariantStructureException::class);
         app(ProductVariantStructureService::class)->promoteSimple(
