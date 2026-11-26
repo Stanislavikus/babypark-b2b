@@ -46,25 +46,8 @@ test('Master Product contextual actions and close behavior work on desktop and m
     editUrl.searchParams.set('tableSearch', 'E2E');
     const response = await editor.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(response?.status(), 200);
-    const name = editor.getByLabel('Назва', { exact: true }).first();
-    try {
-      await name.waitFor({ state: 'visible', timeout: 20_000 });
-    } catch (error) {
-      console.log('PRODUCT EDIT DEBUG URL', editor.url());
-      console.log('PRODUCT EDIT DEBUG BODY', await editor.locator('body').innerText().catch(() => 'unavailable'));
-      console.log('PRODUCT EDIT DEBUG INPUTS', JSON.stringify(await editor.locator('input').evaluateAll(inputs =>
-        inputs.map(input => ({
-          id: input.id,
-          name: input.name,
-          ariaLabel: input.getAttribute('aria-label'),
-          value: input.value,
-          visible: Boolean(input.offsetWidth || input.offsetHeight || input.getClientRects().length),
-          outerHTML: input.outerHTML,
-        })),
-      ).catch(() => [])));
-      await editor.screenshot({ path: root + '/product-workspace-edit-failure.png', fullPage: true }).catch(() => {});
-      throw error;
-    }
+    const name = editor.locator('input[id="form.name"]');
+    await name.waitFor({ state: 'visible', timeout: 20_000 });
     const header = editor.locator('.fi-header-actions-ctn');
     await header.waitFor({ state: 'visible', timeout: 20_000 });
     const headerButtons = header.getByRole('button');

@@ -97,6 +97,26 @@ class EditProduct extends EditRecord
         return 'Master Product · '.$source.$sku;
     }
 
+    /**
+     * Returns an allowlisted workspace action for its contextual schema section.
+     * These actions are intentionally separate from the page header action list.
+     */
+    public function contextualProductAction(string $name): ?Action
+    {
+        return match ($name) {
+            'assign_variant_media' => $this->assignVariantMediaAction(),
+            'reorder_media' => $this->reorderMediaAction(),
+            'remove_media' => $this->removeMediaAction(),
+            'promote_variants' => $this->promoteVariantsAction(),
+            'add_variant_axis' => $this->addVariantAxisAction(),
+            'add_variant' => $this->addVariantAction(),
+            'edit_product_fields' => $this->editProductFieldsAction(),
+            'change_product_type' => $this->changeProductTypeAction(),
+            'optional_groups' => $this->optionalGroupsAction(),
+            default => null,
+        };
+    }
+
     protected function getHeaderActions(): array
     {
         return [

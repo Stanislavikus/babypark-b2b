@@ -174,7 +174,7 @@ class ProductResource extends Resource
 
         return array_values(array_filter(
             array_map(
-                fn (string $name): mixed => $page->getAction($name, isMounting: false),
+                fn (string $name): mixed => $page->contextualProductAction($name),
                 $names,
             ),
             fn (mixed $action): bool => $action instanceof Action,
