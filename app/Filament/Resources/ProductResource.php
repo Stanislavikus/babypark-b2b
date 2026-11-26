@@ -513,7 +513,10 @@ class ProductResource extends Resource
                         ->schema([
                             Placeholder::make('workspace_variants')
                                 ->hiddenLabel()
-                                ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
+                                ->content(fn ($livewire, ?Product $record): HtmlString => self::buildVariantWorkspaceHtml(
+                                    $record,
+                                    $livewire instanceof EditProduct ? $livewire : null,
+                                )),
                             SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
                                 'promote_variants',
                                 'add_variant_axis',
@@ -2322,7 +2325,7 @@ class ProductResource extends Resource
         );
     }
 
-    private static function buildVariantWorkspaceHtml(?Product $record): HtmlString
+    private static function buildVariantWorkspaceHtml(?Product $record, ?EditProduct $page = null): HtmlString
     {
         if ($record === null) {
             return new HtmlString(
@@ -2332,6 +2335,7 @@ class ProductResource extends Resource
 
         $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
         $label = e($summary['label']);
+        $variantMediaAction = $page?->getSchema('form')?->getAction('assign_variant_media', 'product_media_manage_actions');
 
         if ($summary['axes'] === [] && $summary['count'] <= 1) {
             $sku = $summary['skus'][0] ?? null;
@@ -2408,11 +2412,13 @@ class ProductResource extends Resource
                     $photoState = '<span style="color:#9ca3af;white-space:nowrap;">Немає фото</span>';
                 }
 
-                if ($canManageMedia) {
-                    $arguments = json_encode(['variant_id' => (int) $row['id']], JSON_THROW_ON_ERROR);
-                    $handler = e("mountAction('assign_variant_media', {$arguments}, { schemaComponent: 'form.product_media_manage_actions' })");
-                    $photoState = '<button type="button" wire:click="'.$handler.'" title="Редагувати власні фото варіанта" '.
-                        'style="border:0;background:transparent;padding:2px;cursor:pointer;text-align:left;">'.$photoState.'</button>';
+                if ($canManageMedia && $variantMediaAction) {
+                    $handler = $variantMediaAction(['variant_id' => (int) $row['id']])->getLivewireClickHandler();
+
+                    if (filled($handler)) {
+                        $photoState = '<button type="button" wire:click="'.e($handler).'" title="Редагувати власні фото варіанта" '.
+                            'style="border:0;background:transparent;padding:2px;cursor:pointer;text-align:left;">'.$photoState.'</button>';
+                    }
                 }
 
                 return '<tr>'.

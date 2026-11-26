@@ -49,22 +49,9 @@ test('Master Product contextual actions and close behavior work on desktop and m
     await productRow.getByText('E2E Master Media Product', { exact: true }).click();
 
     const viewDrawer = list.locator('.fi-modal.fi-modal-open').filter({
-      has: list.getByRole('heading', { name: 'E2E Master Media Product', exact: true }),
+      has: list.getByRole('heading', { name: 'Перегляд товар', exact: true }),
     });
-    try {
-      await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
-    } catch (error) {
-      const rowState = await productRow.evaluate(row => ({
-        html: row.outerHTML.slice(0, 5000),
-        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(dialog => ({
-          visible: Boolean(dialog.getClientRects().length),
-          text: dialog.innerText.slice(0, 500),
-          classes: dialog.className,
-        })),
-      }));
-      console.log('PRODUCT_ROW_VIEW_DEBUG', JSON.stringify({ url: list.url(), rowState }));
-      throw error;
-    }
+    await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
     const viewPagePromise = context.waitForEvent('page', { timeout: 20_000 });
     await viewDrawer.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
     const editor = await viewPagePromise;
@@ -235,11 +222,13 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
       }
     });
     await photoButton.click();
-    await page.waitForResponse(response =>
+    const livewireResponse = await page.waitForResponse(response =>
       response.request().method() === 'POST'
       && response.url().includes('/livewire-')
       && response.url().endsWith('/update'),
     { timeout: 10_000 });
+    const livewireResponseBody = await livewireResponse.text();
+    assert.equal(livewireResponse.status(), 200, livewireResponseBody.slice(0, 2_000));
 
     assert.ok(livewireCalls.some(call =>
       call.method === 'mountAction'
@@ -261,7 +250,7 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
           };
         }),
       );
-      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({ handler, livewireCalls, clientErrors, componentStates }));
+      console.log('VARIANT_MEDIA_MOUNT_DEBUG', JSON.stringify({ handler, livewireCalls, livewireStatus: livewireResponse.status(), livewireResponseBody: livewireResponseBody.slice(0, 6_000), clientErrors, componentStates }));
       throw error;
     }
     const selectedVariant = drawer.locator(
