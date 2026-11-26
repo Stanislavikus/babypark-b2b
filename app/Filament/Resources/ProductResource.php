@@ -2384,7 +2384,7 @@ class ProductResource extends Resource
             ->map(fn (array $axis): string => '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;font-weight:600;">'.e($axis['label']).'</th>')
             ->implode('');
         $rows = collect($summary['rows'])
-            ->map(function (array $row) use ($specificByVariant, $commonMediaCount, $canManageMedia, $mediaReadService): string {
+            ->map(function (array $row) use ($specificByVariant, $commonMediaCount, $canManageMedia, $mediaReadService, $variantMediaAction): string {
                 $optionCells = collect($row['options'])
                     ->map(fn (string $value): string => '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($value).'</td>')
                     ->implode('');

@@ -49,9 +49,19 @@ test('Master Product contextual actions and close behavior work on desktop and m
     await productRow.getByText('E2E Master Media Product', { exact: true }).click();
 
     const viewDrawer = list.locator('.fi-modal.fi-modal-open').filter({
-      has: list.getByRole('heading', { name: 'Перегляд товар', exact: true }),
+      hasText: 'Відкрити повну картку',
     });
-    await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
+    try {
+      await viewDrawer.waitFor({ state: 'visible', timeout: 20_000 });
+    } catch (error) {
+      const dialogs = await list.locator('[role="dialog"]').evaluateAll(elements => elements.map(dialog => ({
+        visible: Boolean(dialog.getClientRects().length),
+        text: dialog.innerText.slice(0, 500),
+        classes: dialog.className,
+      })));
+      console.log('PRODUCT_ROW_VIEW_DEBUG', JSON.stringify({ url: list.url(), dialogs }));
+      throw error;
+    }
     const viewPagePromise = context.waitForEvent('page', { timeout: 20_000 });
     await viewDrawer.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
     const editor = await viewPagePromise;
@@ -228,6 +238,12 @@ test('Clicking a variant row photo opens its existing media drawer with the clic
       && response.url().endsWith('/update'),
     { timeout: 10_000 });
     const livewireResponseBody = await livewireResponse.text();
+    if (livewireResponse.status() !== 200) {
+      console.log('VARIANT_ACTION_HTTP_DEBUG', JSON.stringify({
+        status: livewireResponse.status(),
+        body: livewireResponseBody.slice(0, 6_000),
+      }));
+    }
     assert.equal(livewireResponse.status(), 200, livewireResponseBody.slice(0, 2_000));
 
     assert.ok(livewireCalls.some(call =>
