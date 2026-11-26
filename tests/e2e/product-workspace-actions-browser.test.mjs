@@ -122,26 +122,48 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const exitResponse = await exitEditor.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(exitResponse?.status(), 200);
     await exitEditor.locator('input[id="form.name"]').fill('E2E browser exit draft');
-    await exitEditor.waitForFunction(() => {
-      const component = window.Livewire?.first?.();
+    const exitStateProbe = await exitEditor.evaluate(() => {
+      const input = document.getElementById('form.name');
+      const components = window.Livewire?.all?.() ?? [];
 
-      return component?.$get?.('form.name') === 'E2E browser exit draft';
-    }, null, { timeout: 10_000 });
-    let exitDialogType = null;
-    exitEditor.once('dialog', async dialog => {
-      exitDialogType = dialog.type;
+      return {
+        input: input ? {
+          value: input.value,
+          attributes: Object.fromEntries([...input.attributes].map(attribute => [attribute.name, attribute.value])),
+        } : null,
+        components: components.map(component => {
+          const read = path => {
+            try {
+              return component.$get?.(path);
+            } catch {
+              return undefined;
+            }
+          };
 
-      try {
-        await dialog.dismiss();
-      } catch (error) {
-        if (!String(error?.message ?? error).includes('already handled')) {
-          throw error;
-        }
-      }
+          return {
+            id: component.id,
+            name: component.name,
+            wireId: component.el?.getAttribute('wire:id'),
+            hasGet: typeof component.$get === 'function',
+            formName: read('form.name'),
+            dataName: read('data.name'),
+          };
+        }),
+      };
     });
-    await exitEditor.close({ runBeforeUnload: true });
+    console.log('PRODUCT_EXIT_STATE_PROBE', JSON.stringify(exitStateProbe));
+
+    const navigation = exitEditor.goto(new URL('/admin/products', baseUrl).href, {
+      waitUntil: 'domcontentloaded',
+    }).catch(() => null);
+    const exitDialog = await exitEditor.waitForEvent('dialog', { timeout: 10_000 });
+    const exitDialogType = exitDialog.type;
+    await exitDialog.dismiss();
+    await navigation;
     assert.equal(exitDialogType, 'beforeunload',
-      'Ordinary browser exit must retain Filament’s unsaved-changes guard.');
+      'Ordinary browser navigation must retain Filament’s unsaved-changes guard.');
+    assert.equal(new URL(exitEditor.url()).pathname, editUrl.pathname,
+      'Dismissing the browser-exit warning must leave the user on the edited product.');
 
   } finally {
     await context.close().catch(() => {});
