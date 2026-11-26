@@ -50,10 +50,16 @@ test('Master Product contextual actions and close behavior work on desktop and m
     await name.waitFor({ state: 'visible', timeout: 20_000 });
     const header = editor.locator('.fi-header-actions-ctn');
     await header.waitFor({ state: 'visible', timeout: 20_000 });
-    const headerButtons = header.getByRole('button');
-    assert.equal(await headerButtons.count(), 2, 'Edit header must contain only View and Close.');
-    await header.getByRole('button', { name: 'Перегляд', exact: true }).waitFor({ state: 'visible' });
+    const viewLink = header.getByRole('link', { name: 'Перегляд', exact: true });
     const closeButton = header.getByRole('button', { name: 'Закрити', exact: true });
+    assert.equal(await viewLink.count(), 1, 'Edit header must expose the View action as one link.');
+    assert.equal(await closeButton.count(), 1, 'Edit header must expose one Close button.');
+    assert.equal(
+      (await header.getByRole('link').count()) + (await header.getByRole('button').count()),
+      2,
+      'Edit header must contain only View and Close.',
+    );
+    await viewLink.waitFor({ state: 'visible' });
     await closeButton.waitFor({ state: 'visible' });
     assert.equal(await editor.getByRole('button', { name: 'Медіа', exact: true }).count(), 0,
       'The duplicate top-level Media menu must be removed.');
