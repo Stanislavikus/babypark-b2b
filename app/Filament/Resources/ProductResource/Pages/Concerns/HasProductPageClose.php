@@ -52,7 +52,7 @@ trait HasProductPageClose
 
         $currentHash = md5((string) str(
             json_encode($this->data, JSON_UNESCAPED_UNICODE),
-        )->replace('\\\\', ''));
+        )->replace('\\', ''));
 
         return $this->savedDataHash !== $currentHash;
     }
