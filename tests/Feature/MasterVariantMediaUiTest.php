@@ -66,7 +66,7 @@ final class MasterVariantMediaUiTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'))
+            ->assertDontSee('Призначити варіантам')
             ->assertDontSee('Медіа варіантів');
     }
 

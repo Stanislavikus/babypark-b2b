@@ -248,9 +248,9 @@ class MasterProductVariantStructureTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'))
-            ->assertActionHidden(TestAction::make('add_variant_axis')->schemaComponent('product_variant_actions'))
-            ->assertActionHidden(TestAction::make('add_variant')->schemaComponent('product_variant_actions'));
+            ->assertDontSee('Додати варіанти')
+            ->assertDontSee('Додати опцію')
+            ->assertDontSee('Додати варіант');
     }
 
     #[Test]
@@ -311,9 +311,9 @@ class MasterProductVariantStructureTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionHidden(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'))
-            ->assertActionHidden(TestAction::make('add_variant_axis')->schemaComponent('product_variant_actions'))
-            ->assertActionHidden(TestAction::make('add_variant')->schemaComponent('product_variant_actions'));
+            ->assertDontSee('Додати варіанти')
+            ->assertDontSee('Додати опцію')
+            ->assertDontSee('Додати варіант');
 
         $this->expectException(ProductVariantStructureException::class);
         app(ProductVariantStructureService::class)->promoteSimple(
