@@ -24,19 +24,10 @@ trait HasProductPageClose
 
     protected function closeProductPageAction(): Action
     {
-        $refreshKey = Js::from(ProductResource::LIST_REFRESH_STORAGE_KEY);
-
         return Action::make('close_page')
             ->label('Закрити')
             ->icon('heroicon-o-x-mark')
             ->color('gray')
-            ->button()
-            ->url(fn (): ?string => $this->hasUnsavedProductChanges()
-                ? null
-                : ProductResource::getUrl('index', $this->productListContext))
-            ->extraAttributes([
-                'x-on:click' => "if (\$event.currentTarget.tagName === 'A') { try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} if (window.opener && ! window.opener.closed) { \$event.preventDefault(); const fallback = \$event.currentTarget.href; window.close(); if (! window.closed) { window.location.href = fallback; } } }",
-            ])
             ->requiresConfirmation(fn (): bool => $this->hasUnsavedProductChanges())
             ->modalHidden(fn (): bool => ! $this->hasUnsavedProductChanges())
             ->modalHeading('Закрити без збереження?')
