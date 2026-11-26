@@ -46,8 +46,9 @@ test('Master Product contextual actions and close behavior work on desktop and m
     editUrl.searchParams.set('tableSearch', 'E2E');
     const response = await editor.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(response?.status(), 200);
-
-    const header = editor.locator('.fi-header-actions');
+    const name = editor.getByLabel('Назва', { exact: true }).first();
+    await name.waitFor({ state: 'visible', timeout: 20_000 });
+    const header = editor.locator('.fi-header-actions-ctn');
     await header.waitFor({ state: 'visible', timeout: 20_000 });
     const headerButtons = header.getByRole('button');
     assert.equal(await headerButtons.count(), 2, 'Edit header must contain only View and Close.');
@@ -69,7 +70,6 @@ test('Master Product contextual actions and close behavior work on desktop and m
       await remove.waitFor({ state: 'visible' });
     }
 
-    const name = editor.getByLabel('Назва', { exact: true }).first();
     await name.fill('E2E quiet save product');
     await editor.getByRole('button', { name: 'Зберегти', exact: true }).last().click();
     await editor.getByRole('heading', { name: 'E2E quiet save product', exact: true })
