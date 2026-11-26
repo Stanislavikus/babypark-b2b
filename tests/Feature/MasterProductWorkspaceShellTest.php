@@ -104,9 +104,9 @@ class MasterProductWorkspaceShellTest extends TestCase
     {
         $query = [
             'channel' => 'campaign-b-context',
-            'tableSearch' => 'stroller',
-            'tableFilters' => ['status' => ['value' => 'working']],
-            'tableSort' => 'sku:asc',
+            'search' => 'stroller',
+            'filters' => ['status' => ['value' => 'working']],
+            'sort' => 'sku:asc',
             'tableRecordsPerPage' => '50',
             'page' => '2',
             'returnUrl' => 'https://untrusted.example.test',
@@ -115,16 +115,16 @@ class MasterProductWorkspaceShellTest extends TestCase
 
         $this->assertSame([
             'channel' => 'campaign-b-context',
-            'tableSearch' => 'stroller',
-            'tableSort' => 'sku:asc',
-            'tableFilters' => ['status' => ['value' => 'working']],
+            'search' => 'stroller',
+            'sort' => 'sku:asc',
+            'filters' => ['status' => ['value' => 'working']],
             'tableRecordsPerPage' => '50',
             'page' => 2,
         ], $listContext);
 
         $fallback = Js::from(ProductResource::getUrl('index', $listContext));
         $refreshKey = Js::from(ProductResource::LIST_REFRESH_STORAGE_KEY);
-        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} window.close(); setTimeout(() => { if (! window.closed) { window.location.href = {$fallback}; } }, 100); })();";
+        $closeJs = "(() => { try { \$wire.savedDataHash = window.jsMd5(JSON.stringify(\$wire.data).split(String.fromCharCode(92)).join('')); } catch (e) {} try { localStorage.setItem({$refreshKey}, String(Date.now()) + ':' + String(Math.random())); } catch (e) {} if (window.opener && ! window.opener.closed) { window.close(); } if (! window.closed) { window.location.href = {$fallback}; } })();";
 
         $create = Livewire::withQueryParams($query)
             ->actingAs($this->admin)
