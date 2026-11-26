@@ -94,13 +94,22 @@ test('Master Product contextual actions and close behavior work on desktop and m
     await closeDialog.waitFor({ state: 'hidden', timeout: 10_000 });
     assert.equal(await name.inputValue(), 'E2E unsaved product name');
 
-    const listReload = list.waitForEvent('load', { timeout: 20_000 });
+    const listReload = list.waitForEvent('load', { timeout: 20_000 }).then(() => true).catch(error => {
+      console.log('PRODUCT LIST RELOAD DEBUG', JSON.stringify({
+        message: error.message,
+        editorClosed: editor.isClosed(),
+        editorUrl: editor.url(),
+        listUrl: list.url(),
+      }));
+      return false;
+    });
     await closeButton.click();
     const confirmation = editor.locator('.fi-modal.fi-modal-open').filter({
       hasText: 'Закрити без збереження?',
     });
     await confirmation.getByRole('button', { name: 'Закрити', exact: true }).click();
-    await listReload;
+    const listReloaded = await listReload;
+    assert.equal(listReloaded, true, 'The open Products list must reload after confirmed Close.');
 
     const returnedListUrl = new URL(list.url());
     assert.equal(returnedListUrl.pathname, '/admin/products');
@@ -112,7 +121,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const exitEditor = await context.newPage();
     const exitResponse = await exitEditor.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
     assert.equal(exitResponse?.status(), 200);
-    await exitEditor.getByLabel('Назва', { exact: true }).first().fill('E2E browser exit draft');
+    await exitEditor.locator('input[id="form.name"]').fill('E2E browser exit draft');
     let exitDialogType = null;
     exitEditor.once('dialog', async dialog => {
       exitDialogType = dialog.type;
