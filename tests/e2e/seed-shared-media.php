@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
@@ -10,6 +17,7 @@ use App\Models\WorkspacePermission;
 use App\Models\WorkspaceRole;
 use App\Models\WorkspaceUser;
 use App\Services\Catalog\BrandManager;
+use App\Services\Catalog\ProductVariantStructureService;
 use App\Services\Media\OriginalImageIngestService;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Contracts\Console\Kernel;
@@ -46,6 +54,12 @@ DB::table('workspace_role_permissions')->insert([
     'workspace_id' => $workspace->id,
     'workspace_role_id' => $role->id,
     'workspace_permission_id' => $permission->id,
+]);
+$structurePermission = WorkspacePermission::query()->where('code', WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE)->sole();
+DB::table('workspace_role_permissions')->insert([
+    'workspace_id' => $workspace->id,
+    'workspace_role_id' => $role->id,
+    'workspace_permission_id' => $structurePermission->id,
 ]);
 DB::table('workspace_user_roles')->insert([
     'workspace_id' => $workspace->id,
@@ -107,6 +121,60 @@ ProductVariant::withoutWorkspaceScope()->create([
     'is_active' => true,
 ]);
 
+$variantMediaProduct = Product::withoutWorkspaceScope()->create([
+    'workspace_id' => $workspace->id,
+    'onec_guid' => null,
+    'name' => 'E2E Variant Media Product',
+    'images' => [],
+    'is_active' => true,
+]);
+ProductVariant::withoutWorkspaceScope()->create([
+    'workspace_id' => $workspace->id,
+    'product_id' => $variantMediaProduct->id,
+    'onec_guid' => null,
+    'sku' => 'E2E-COLOR-BLACK',
+    'attributes' => [],
+    'is_active' => true,
+]);
+$colorDefinition = FieldDefinition::withoutWorkspaceScope()->create([
+    'workspace_id' => $workspace->id,
+    'code' => 'e2e_variant_color',
+    'data_type' => AttributeDataType::Select,
+    'scope' => AttributeScope::WorkspaceCustom,
+    'localized_labels' => ['uk' => 'Колір'],
+    'validation_rules' => [
+        'options' => [
+            ['code' => 'black', 'labels' => ['uk' => 'Чорний']],
+            ['code' => 'grey', 'labels' => ['uk' => 'Сірий']],
+        ],
+    ],
+    'is_localizable' => false,
+    'is_multi_value' => false,
+    'status' => AttributeStatus::Active,
+]);
+$colorBinding = FieldBinding::withoutWorkspaceScope()->create([
+    'workspace_id' => $workspace->id,
+    'field_definition_id' => $colorDefinition->id,
+    'object_type' => FieldObjectType::ProductVariant,
+    'storage_type' => AttributeStorageType::Dynamic,
+    'storage_path' => null,
+    'field_group' => 'characteristics',
+    'is_required' => false,
+    'is_filterable' => true,
+    'is_sortable' => false,
+    'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+    'sort_order' => 100,
+    'status' => AttributeStatus::Active,
+]);
+$variantRows = app(ProductVariantStructureService::class)->promoteSimple(
+    $actor,
+    $workspace,
+    $variantMediaProduct,
+    $colorBinding->id,
+    'black',
+    ['grey'],
+);
+
 file_put_contents($dir.'/fixture.json', json_encode([
     'sharedAssetId' => $shared->id,
     'otherAssetId' => $other->id,
@@ -116,6 +184,8 @@ file_put_contents($dir.'/fixture.json', json_encode([
     'differentBrandId' => $third->id,
     'pickerBrandId' => $pickerBrand->id,
     'mediaProductId' => $product->id,
+    'variantMediaProductId' => $variantMediaProduct->id,
+    'variantMediaTargetId' => $variantRows[1]->id,
 ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
 
 echo "Isolated shared-media fixture created.\n";

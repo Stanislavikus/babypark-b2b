@@ -94,6 +94,7 @@ final class MasterVariantMediaUiTest extends TestCase
             ->assertSee('Фото')
             ->assertSee('Лише загальні')
             ->assertSeeHtml('assign_variant_media')
+            ->assertSeeHtml('form.product_media_manage_actions')
             ->mountAction(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'), ['variant_id' => $variants[1]->id])
             ->assertActionDataSet(fn (array $data): bool => $data['variant_ids'] === [$variants[1]->id])
             ->assertMountedActionModalSee('Медіа варіантів')

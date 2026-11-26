@@ -32,20 +32,38 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const listUrl = new URL('/admin/products', baseUrl);
     listUrl.searchParams.set('channel', 'campaign-b-context');
     listUrl.searchParams.set('tableSearch', 'E2E');
+    listUrl.searchParams.set('returnUrl', 'https://untrusted.example.test/never');
     await list.goto(listUrl.href, { waitUntil: 'domcontentloaded' });
     await list.waitForFunction(() => typeof window.__babyparkProductsRefreshHandler === 'function');
 
-    const editor = await context.newPage();
+    const assertListContext = currentUrl => {
+      const url = new URL(currentUrl);
+      assert.equal(url.searchParams.get('channel'), 'campaign-b-context');
+      assert.equal(url.searchParams.get('tableSearch'), 'E2E');
+      assert.equal(url.searchParams.has('returnUrl'), false,
+        'Only allowlisted list state may cross product page transitions.');
+    };
+
+    const productRow = list.getByRole('row').filter({ hasText: 'E2E Master Media Product' });
+    await productRow.waitFor({ state: 'visible', timeout: 20_000 });
+    const viewPagePromise = context.waitForEvent('page', { timeout: 20_000 });
+    await productRow.getByRole('link', { name: 'Відкрити повну картку', exact: true }).click();
+    const editor = await viewPagePromise;
+    await editor.waitForLoadState('domcontentloaded');
     editor.on('dialog', async dialog => {
       nativeDialogs.push(dialog.type);
       await dialog.accept();
     });
+    assertListContext(editor.url());
 
-    const editUrl = new URL('/admin/products/' + fixture.mediaProductId + '/edit', baseUrl);
-    editUrl.searchParams.set('channel', 'campaign-b-context');
-    editUrl.searchParams.set('tableSearch', 'E2E');
-    const response = await editor.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
-    assert.equal(response?.status(), 200);
+    const viewHeader = editor.locator('.fi-header-actions-ctn');
+    const viewEditLink = viewHeader.getByRole('link').first();
+    assert.equal(await viewHeader.getByRole('link').count(), 1,
+      'View header must expose the standard Edit action.');
+    await viewEditLink.click();
+    await editor.waitForURL(url => url.pathname.endsWith('/edit'), { timeout: 20_000 });
+    assertListContext(editor.url());
+    const editUrl = new URL(editor.url());
     const name = editor.locator('input[id="form.name"]');
     await name.waitFor({ state: 'visible', timeout: 20_000 });
     const header = editor.locator('.fi-header-actions-ctn');
@@ -61,6 +79,13 @@ test('Master Product contextual actions and close behavior work on desktop and m
     );
     await viewLink.waitFor({ state: 'visible' });
     await closeButton.waitFor({ state: 'visible' });
+    await viewLink.click();
+    await editor.waitForURL(url => !url.pathname.endsWith('/edit'), { timeout: 20_000 });
+    assertListContext(editor.url());
+    const editLinkFromView = editor.locator('.fi-header-actions-ctn').getByRole('link').first();
+    await editLinkFromView.click();
+    await editor.waitForURL(url => url.pathname.endsWith('/edit'), { timeout: 20_000 });
+    assertListContext(editor.url());
     assert.equal(await editor.getByRole('button', { name: 'Медіа', exact: true }).count(), 0,
       'The duplicate top-level Media menu must be removed.');
 
@@ -134,6 +159,54 @@ test('Master Product contextual actions and close behavior work on desktop and m
     assert.equal(new URL(exitEditor.url()).pathname, editUrl.pathname,
       'Dismissing the browser-exit warning must leave the user on the edited product.');
 
+    const fallbackEditor = await context.newPage();
+    const fallbackUrl = new URL('/admin/products/' + fixture.mediaProductId + '/edit', baseUrl);
+    fallbackUrl.searchParams.set('channel', 'campaign-b-context');
+    fallbackUrl.searchParams.set('tableSearch', 'E2E');
+    fallbackUrl.searchParams.set('returnUrl', 'https://untrusted.example.test/never');
+    const fallbackResponse = await fallbackEditor.goto(fallbackUrl.href, { waitUntil: 'domcontentloaded' });
+    assert.equal(fallbackResponse?.status(), 200);
+    await fallbackEditor.locator('.fi-header-actions-ctn')
+      .getByRole('button', { name: 'Закрити', exact: true }).click();
+    await fallbackEditor.waitForURL(url => url.pathname === '/admin/products', { timeout: 20_000 });
+    assertListContext(fallbackEditor.url());
+
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close();
+  }
+});
+
+test('Clicking a variant row photo opens its existing media drawer with the clicked VariantID selected', { timeout: 60_000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const page = await context.newPage();
+  try {
+    await signIn(page);
+
+    const editUrl = new URL('/admin/products/' + fixture.variantMediaProductId + '/edit', baseUrl);
+    const response = await page.goto(editUrl.href, { waitUntil: 'domcontentloaded' });
+    assert.equal(response?.status(), 200);
+
+    const targetRow = page.locator('tr').filter({ hasText: 'Сірий' });
+    await targetRow.waitFor({ state: 'visible', timeout: 20_000 });
+    const photoButton = targetRow.locator('button[title="Редагувати власні фото варіанта"]');
+    assert.equal(await photoButton.count(), 1, 'The target Variant row must expose its photo action.');
+    await photoButton.click();
+
+    const drawer = page.locator('.fi-modal.fi-modal-open').filter({
+      has: page.getByRole('heading', { name: 'Медіа варіантів', exact: true }),
+    });
+    await drawer.waitFor({ state: 'visible', timeout: 20_000 });
+    const selectedVariant = drawer.locator(
+      '.fi-select-input-btn .fi-badge[data-value="' + fixture.variantMediaTargetId + '"]',
+    );
+    await selectedVariant.waitFor({ state: 'visible', timeout: 10_000 });
+    assert.equal(await selectedVariant.count(), 1,
+      'The existing media drawer must preselect the exact clicked VariantID.');
+    const selectedVariantIds = await drawer.locator('.fi-select-input-btn .fi-badge[data-value]')
+      .evaluateAll(badges => badges.map(badge => badge.getAttribute('data-value')));
+    assert.deepEqual(selectedVariantIds, [String(fixture.variantMediaTargetId)]);
   } finally {
     await context.close().catch(() => {});
     await browser.close();

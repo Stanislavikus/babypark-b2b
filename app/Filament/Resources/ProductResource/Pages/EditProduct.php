@@ -120,7 +120,12 @@ class EditProduct extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            ViewAction::make()->label('Перегляд'),
+            ViewAction::make()
+                ->label('Перегляд')
+                ->url(fn (): string => ProductResource::getUrl('view', [
+                    'record' => $this->getRecord(),
+                    ...ProductResource::listContextParameters($this->productListContext),
+                ])),
             $this->closeProductPageAction(),
         ];
     }

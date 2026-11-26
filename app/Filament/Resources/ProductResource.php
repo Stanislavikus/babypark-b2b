@@ -2410,7 +2410,7 @@ class ProductResource extends Resource
 
                 if ($canManageMedia) {
                     $arguments = json_encode(['variant_id' => (int) $row['id']], JSON_THROW_ON_ERROR);
-                    $handler = e("mountAction('assign_variant_media', {$arguments})");
+                    $handler = e("mountAction('assign_variant_media', {$arguments}, { schemaComponent: 'form.product_media_manage_actions' })");
                     $photoState = '<button type="button" wire:click="'.$handler.'" title="Редагувати власні фото варіанта" '.
                         'style="border:0;background:transparent;padding:2px;cursor:pointer;text-align:left;">'.$photoState.'</button>';
                 }
