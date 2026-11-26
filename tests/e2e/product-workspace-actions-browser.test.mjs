@@ -125,7 +125,14 @@ test('Master Product contextual actions and close behavior work on desktop and m
     let exitDialogType = null;
     exitEditor.once('dialog', async dialog => {
       exitDialogType = dialog.type;
-      await dialog.dismiss();
+
+      try {
+        await dialog.dismiss();
+      } catch (error) {
+        if (!String(error?.message ?? error).includes('already handled')) {
+          throw error;
+        }
+      }
     });
     await exitEditor.close({ runBeforeUnload: true });
     assert.equal(exitDialogType, 'beforeunload',
