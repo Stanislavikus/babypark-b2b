@@ -107,7 +107,7 @@ test('Master Product contextual actions and close behavior work on desktop and m
     const confirmation = editor.locator('.fi-modal.fi-modal-open').filter({
       hasText: 'Закрити без збереження?',
     });
-    await confirmation.getByRole('button', { name: 'Закрити', exact: true }).click();
+    await confirmation.locator('button[type="submit"]').click();
     const listReloaded = await listReload;
     assert.equal(listReloaded, true, 'The open Products list must reload after confirmed Close.');
 
