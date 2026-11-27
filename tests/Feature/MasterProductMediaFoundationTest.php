@@ -18,6 +18,7 @@ use App\Services\Catalog\ProductMediaReadService;
 use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -75,12 +76,13 @@ class MasterProductMediaFoundationTest extends TestCase
             ->assertSee(__('media_ui.drop_heading'))
             ->assertSee(__('media_ui.select_existing'))
             ->assertSee(__('media_ui.add_from_url'))
-            ->assertActionVisible('add_media')
-            ->callAction('add_media', [
-                'files' => [UploadedFile::fake()->image('ui-original.jpg', 1000, 750)],
+            ->call('addUploadedMediaFromForm', [
+                UploadedFile::fake()->image('ui-original.jpg', 1000, 750),
             ])
             ->assertNotified()
-            ->assertSee('1 медіа');
+            ->assertSee('1 медіа')
+            ->mountAction('close_page')
+            ->assertActionNotMounted();
 
         $link = ProductMedia::withoutWorkspaceScope()->where('product_id', $product->id)->sole();
         $this->assertSame(MediaRole::Primary, $link->role);
@@ -123,16 +125,16 @@ class MasterProductMediaFoundationTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('reorder_media')
-            ->callAction('reorder_media', [
+            ->assertActionVisible(TestAction::make('reorder_media')->schemaComponent('product_media_manage_actions'))
+            ->callAction(TestAction::make('reorder_media')->schemaComponent('product_media_manage_actions'), [
                 'items' => [
                     ['id' => (string) $secondLink->id],
                     ['id' => (string) $firstLink->id],
                 ],
             ])
             ->assertNotified()
-            ->assertActionVisible('remove_media')
-            ->callAction('remove_media', ['media_id' => (string) $secondLink->id])
+            ->assertActionVisible(TestAction::make('remove_media')->schemaComponent('product_media_manage_actions'))
+            ->callAction(TestAction::make('remove_media')->schemaComponent('product_media_manage_actions'), ['media_id' => (string) $secondLink->id])
             ->assertNotified();
 
         $remaining = ProductMedia::withoutWorkspaceScope()

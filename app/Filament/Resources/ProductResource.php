@@ -95,6 +95,8 @@ class ProductResource extends Resource
 {
     use HasProductLightbox;
 
+    public const LIST_REFRESH_STORAGE_KEY = 'babypark:admin:products:refresh';
+
     protected static ?string $model = Product::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
@@ -106,6 +108,76 @@ class ProductResource extends Resource
     protected static ?string $pluralModelLabel = 'Товари';
 
     protected static ?int $navigationSort = 3;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function listContextParameters(?array $query = null): array
+    {
+        if ($query === null) {
+            $query = request()->query();
+            $page = Livewire::current();
+
+            if ($page instanceof ListProducts) {
+                $query = array_replace($query, [
+                    'channel' => $page->channelContext,
+                    'filters' => $page->tableFilters,
+                    'search' => $page->tableSearch,
+                    'tableColumnSearches' => $page->tableColumnSearches,
+                    'sort' => $page->tableSort,
+                    'tableRecordsPerPage' => $page->tableRecordsPerPage,
+                    'grouping' => $page->tableGrouping,
+                    'page' => $page->paginators['page'] ?? null,
+                ]);
+            }
+        }
+
+        $context = [];
+
+        foreach (['channel', 'search', 'sort', 'grouping'] as $key) {
+            if (isset($query[$key]) && is_string($query[$key]) && strlen($query[$key]) <= 255) {
+                $context[$key] = $query[$key];
+            }
+        }
+
+        foreach (['filters', 'tableColumnSearches'] as $key) {
+            if (isset($query[$key]) && is_array($query[$key]) && count($query[$key]) <= 100) {
+                $context[$key] = $query[$key];
+            }
+        }
+
+        if (isset($query['tableRecordsPerPage']) && (
+            $query['tableRecordsPerPage'] === 'all'
+            || (is_numeric($query['tableRecordsPerPage']) && (int) $query['tableRecordsPerPage'] > 0)
+        )) {
+            $context['tableRecordsPerPage'] = $query['tableRecordsPerPage'];
+        }
+
+        if (isset($query['page']) && is_numeric($query['page']) && (int) $query['page'] > 0) {
+            $context['page'] = (int) $query['page'];
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param  list<string>  $names
+     * @return list<Action>
+     */
+    private static function productPageActions(mixed $page, array $names): array
+    {
+        if (! $page instanceof EditProduct) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(
+                fn (string $name): mixed => $page->contextualProductAction($name),
+                $names,
+            ),
+            fn (mixed $action): bool => $action instanceof Action,
+        ));
+    }
 
     // -------------------------------------------------------------------------
     // Form (edit)
@@ -294,6 +366,11 @@ class ProductResource extends Resource
                                         ->extraAttributes(['class' => 'bp-brand-media-url-action']),
                                 ])->extraAttributes(['class' => 'bp-brand-media-actions']),
                             ], 'bp-product-media-source')->visible(fn (?Product $record): bool => $record !== null),
+                            SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
+                                'assign_variant_media',
+                                'reorder_media',
+                                'remove_media',
+                            ]))->key('product_media_manage_actions')->columnSpanFull(),
                             SchemaActions::make([
                                 self::pendingCapabilityAction(
                                     'media_enhance',
@@ -436,7 +513,15 @@ class ProductResource extends Resource
                         ->schema([
                             Placeholder::make('workspace_variants')
                                 ->hiddenLabel()
-                                ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
+                                ->content(fn ($livewire, ?Product $record): HtmlString => self::buildVariantWorkspaceHtml(
+                                    $record,
+                                    $livewire instanceof EditProduct ? $livewire : null,
+                                )),
+                            SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
+                                'promote_variants',
+                                'add_variant_axis',
+                                'add_variant',
+                            ]))->key('product_variant_actions')->columnSpanFull(),
                         ]),
 
                     Section::make('Характеристики')
@@ -445,6 +530,10 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_attributes')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildAttributeGroupsHtml($record)),
+                            SchemaActions::make(fn ($livewire): array => self::productPageActions($livewire, [
+                                'edit_product_fields',
+                                'optional_groups',
+                            ]))->key('product_characteristics_actions')->columnSpanFull(),
                             SchemaActions::make([
                                 self::pendingCapabilityAction(
                                     'enrich_characteristics_from_file',
@@ -571,7 +660,8 @@ class ProductResource extends Resource
                                 ->label('Сімейство товару')
                                 ->content(fn (?Product $record): string => $record
                                     ? app(ProductWorkspaceSummaryService::class)->productTypeLabel($record)
-                                    : 'Базовий товар буде призначено автоматично'),
+                                    : 'Базовий товар буде призначено автоматично')
+                                ->suffixAction(fn ($livewire): ?Action => self::productPageActions($livewire, ['change_product_type'])[0] ?? null),
                             TextInput::make('merchant_type')
                                 ->label('Внутрішня класифікація')
                                 ->helperText('Вільна внутрішня мітка. Не визначає характеристики, варіанти або сімейство товару.')
@@ -1031,7 +1121,10 @@ class ProductResource extends Resource
                             ->label('Відкрити повну картку')
                             ->icon('heroicon-m-arrow-top-right-on-square')
                             ->color('gray')
-                            ->url(static::getUrl('view', ['record' => $record]))
+                            ->url(static::getUrl('view', [
+                                'record' => $record,
+                                ...static::listContextParameters(),
+                            ]))
                             ->openUrlInNewTab(),
                     ]),
             ])
@@ -2232,7 +2325,7 @@ class ProductResource extends Resource
         );
     }
 
-    private static function buildVariantWorkspaceHtml(?Product $record): HtmlString
+    private static function buildVariantWorkspaceHtml(?Product $record, ?EditProduct $page = null): HtmlString
     {
         if ($record === null) {
             return new HtmlString(
@@ -2242,6 +2335,7 @@ class ProductResource extends Resource
 
         $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
         $label = e($summary['label']);
+        $variantMediaAction = $page?->getSchema('form')?->getAction('assign_variant_media', 'product_media_manage_actions');
 
         if ($summary['axes'] === [] && $summary['count'] <= 1) {
             $sku = $summary['skus'][0] ?? null;
@@ -2290,7 +2384,7 @@ class ProductResource extends Resource
             ->map(fn (array $axis): string => '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;font-weight:600;">'.e($axis['label']).'</th>')
             ->implode('');
         $rows = collect($summary['rows'])
-            ->map(function (array $row) use ($specificByVariant, $commonMediaCount, $canManageMedia, $mediaReadService): string {
+            ->map(function (array $row) use ($specificByVariant, $commonMediaCount, $canManageMedia, $mediaReadService, $variantMediaAction): string {
                 $optionCells = collect($row['options'])
                     ->map(fn (string $value): string => '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($value).'</td>')
                     ->implode('');
@@ -2318,11 +2412,13 @@ class ProductResource extends Resource
                     $photoState = '<span style="color:#9ca3af;white-space:nowrap;">Немає фото</span>';
                 }
 
-                if ($canManageMedia) {
-                    $arguments = json_encode(['variant_id' => (int) $row['id']], JSON_THROW_ON_ERROR);
-                    $handler = e("mountAction('assign_variant_media', {$arguments})");
-                    $photoState = '<button type="button" wire:click="'.$handler.'" title="Редагувати власні фото варіанта" '.
-                        'style="border:0;background:transparent;padding:2px;cursor:pointer;text-align:left;">'.$photoState.'</button>';
+                if ($canManageMedia && $variantMediaAction) {
+                    $handler = $variantMediaAction(['variant_id' => (int) $row['id']])->getLivewireClickHandler();
+
+                    if (filled($handler)) {
+                        $photoState = '<button type="button" wire:click="'.e($handler).'" title="Редагувати власні фото варіанта" '.
+                            'style="border:0;background:transparent;padding:2px;cursor:pointer;text-align:left;">'.$photoState.'</button>';
+                    }
                 }
 
                 return '<tr>'.

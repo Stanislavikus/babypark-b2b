@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Enums\ProductLifecycleStatus;
 use App\Exceptions\Catalog\MasterProductLifecycleMutationException;
 use App\Filament\Resources\ProductResource;
+use App\Filament\Resources\ProductResource\Pages\Concerns\HasProductPageClose;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditor;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditStaleException;
 use App\Models\MediaAsset;
@@ -39,11 +40,9 @@ use App\Support\ProductStructure\ProductTypeChangeImpact;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
@@ -67,7 +66,23 @@ use Illuminate\Validation\ValidationException;
 
 class EditProduct extends EditRecord
 {
+    use HasProductPageClose;
+
     protected static string $resource = ProductResource::class;
+
+    protected ?bool $hasUnsavedDataChangesAlert = true;
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        $this->captureProductListContext();
+    }
+
+    protected function getSavedNotificationTitle(): ?string
+    {
+        return null;
+    }
 
     public function getTitle(): string
     {
@@ -82,17 +97,36 @@ class EditProduct extends EditRecord
         return 'Master Product · '.$source.$sku;
     }
 
+    /**
+     * Returns an allowlisted workspace action for its contextual schema section.
+     * These actions are intentionally separate from the page header action list.
+     */
+    public function contextualProductAction(string $name): ?Action
+    {
+        return match ($name) {
+            'assign_variant_media' => $this->assignVariantMediaAction(),
+            'reorder_media' => $this->reorderMediaAction(),
+            'remove_media' => $this->removeMediaAction(),
+            'promote_variants' => $this->promoteVariantsAction(),
+            'add_variant_axis' => $this->addVariantAxisAction(),
+            'add_variant' => $this->addVariantAction(),
+            'edit_product_fields' => $this->editProductFieldsAction(),
+            'change_product_type' => $this->changeProductTypeAction(),
+            'optional_groups' => $this->optionalGroupsAction(),
+            default => null,
+        };
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            $this->promoteVariantsAction(),
-            $this->addVariantAxisAction(),
-            $this->addVariantAction(),
-            $this->mediaActions(),
-            $this->editProductFieldsAction(),
-            $this->changeProductTypeAction(),
-            $this->optionalGroupsAction(),
-            ViewAction::make()->label('Перегляд'),
+            ViewAction::make()
+                ->label('Перегляд')
+                ->url(fn (): string => ProductResource::getUrl('view', [
+                    'record' => $this->getRecord(),
+                    ...ProductResource::listContextParameters($this->productListContext),
+                ])),
+            $this->closeProductPageAction(),
         ];
     }
 
@@ -131,51 +165,50 @@ class EditProduct extends EditRecord
             (string) data_get($this->data, 'master_lifecycle_status'),
         );
 
-        if (! $requested instanceof ProductLifecycleStatus) {
-            return;
+        if ($requested instanceof ProductLifecycleStatus) {
+            $expected = $this->currentLifecycle();
+
+            if ($expected !== $requested) {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User && $this->canManageProducts(), 403);
+
+                $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
+
+                try {
+                    $this->record = app(MasterProductLifecycleMutationService::class)->transition(
+                        $actor,
+                        $workspace,
+                        $this->record,
+                        $expected,
+                        $requested,
+                    );
+                    data_set($this->data, 'master_lifecycle_status', $requested->value);
+                } catch (MasterProductLifecycleMutationException $exception) {
+                    data_set($this->data, 'master_lifecycle_status', $expected->value);
+
+                    Notification::make()
+                        ->warning()
+                        ->title('Стан товару не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw (new Halt)->rollBackDatabaseTransaction();
+                } catch (AuthorizationException) {
+                    data_set($this->data, 'master_lifecycle_status', $expected->value);
+
+                    Notification::make()
+                        ->warning()
+                        ->title('Стан товару не змінено')
+                        ->body('Ваші права на редагування товару змінилися. Оновіть сторінку.')
+                        ->send();
+
+                    throw (new Halt)->rollBackDatabaseTransaction();
+                }
+            }
         }
 
-        $expected = $this->currentLifecycle();
-
-        if ($expected === $requested) {
-            return;
-        }
-
-        $actor = auth()->user();
-        abort_unless($actor instanceof User && $this->canManageProducts(), 403);
-
-        $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
-
-        try {
-            $this->record = app(MasterProductLifecycleMutationService::class)->transition(
-                $actor,
-                $workspace,
-                $this->record,
-                $expected,
-                $requested,
-            );
-            data_set($this->data, 'master_lifecycle_status', $requested->value);
-        } catch (MasterProductLifecycleMutationException $exception) {
-            data_set($this->data, 'master_lifecycle_status', $expected->value);
-
-            Notification::make()
-                ->warning()
-                ->title('Стан товару не змінено')
-                ->body($exception->getMessage())
-                ->send();
-
-            throw (new Halt)->rollBackDatabaseTransaction();
-        } catch (AuthorizationException) {
-            data_set($this->data, 'master_lifecycle_status', $expected->value);
-
-            Notification::make()
-                ->warning()
-                ->title('Стан товару не змінено')
-                ->body('Ваші права на редагування товару змінилися. Оновіть сторінку.')
-                ->send();
-
-            throw (new Halt)->rollBackDatabaseTransaction();
-        }
+        $this->record->refresh();
+        $this->fillForm();
     }
 
     private function currentLifecycle(): ProductLifecycleStatus
@@ -217,62 +250,6 @@ class EditProduct extends EditRecord
                 ->addExistingImages($actor, $workspace, $this->record, [$assetId]),
             'Медіа додано',
         );
-    }
-
-    private function mediaActions(): ActionGroup
-    {
-        return ActionGroup::make([
-            $this->addMediaAction(),
-            $this->assignVariantMediaAction(),
-            $this->reorderMediaAction(),
-            $this->removeMediaAction(),
-        ])
-            ->label('Медіа')
-            ->icon('heroicon-o-photo')
-            ->button()
-            ->visible(fn (): bool => $this->canManageProducts());
-    }
-
-    private function addMediaAction(): Action
-    {
-        return Action::make('add_media')
-            ->label('Додати медіа')
-            ->icon('heroicon-o-arrow-up-tray')
-            ->modalHeading('Додати зображення')
-            ->modalDescription('Original зберігається без resize або повторного кодування. Перший кадр порожньої галереї стає основним.')
-            ->schema([
-                FileUpload::make('files')
-                    ->label('Зображення')
-                    ->multiple()
-                    ->storeFiles(false)
-                    ->appendFiles()
-                    ->maxSize(20 * 1024)
-                    ->acceptedFileTypes([
-                        'image/jpeg',
-                        'image/png',
-                        'image/gif',
-                        'image/webp',
-                        'image/avif',
-                    ])
-                    ->validationMessages([
-                        'max' => 'Файл завеликий. Максимальний розмір Original — 20 МіБ.',
-                        'mimetypes' => 'Підтримуються JPEG, PNG, WebP, GIF або AVIF. SVG поки не підтримується.',
-                    ])
-                    ->required()
-                    ->helperText('JPEG, PNG, WebP, GIF або AVIF · до 20 МіБ і 25 МП. SVG поки не підтримується.'),
-            ])
-            ->action(function (array $data): void {
-                $files = array_values(array_filter(
-                    $data['files'] ?? [],
-                    fn ($file): bool => $file instanceof UploadedFile,
-                ));
-
-                $this->runMediaMutation(
-                    fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
-                        ->addUploadedImages($actor, $workspace, $this->record, $files),
-                    'Медіа додано',
-                );
-            });
     }
 
     private function assignVariantMediaAction(): Action
@@ -421,7 +398,7 @@ class EditProduct extends EditRecord
         return Action::make('reorder_media')
             ->label('Впорядкувати')
             ->icon('heroicon-o-bars-3')
-            ->visible(fn (): bool => $this->productMedia()->count() > 1)
+            ->visible(fn (): bool => $this->canManageProducts() && $this->productMedia()->count() > 1)
             ->modalHeading('Порядок медіа')
             ->modalDescription('Перший кадр є основним Master-зображенням. Перетягніть рядки у потрібний порядок.')
             ->schema([
@@ -462,7 +439,7 @@ class EditProduct extends EditRecord
             ->label('Видалити з товару')
             ->icon('heroicon-o-trash')
             ->color('danger')
-            ->visible(fn (): bool => $this->productMedia()->isNotEmpty())
+            ->visible(fn (): bool => $this->canManageProducts() && $this->productMedia()->isNotEmpty())
             ->modalHeading('Видалити медіа з товару')
             ->modalDescription('Видаляється лише зв’язок із цим товаром. Reusable Original не видаляється автоматично.')
             ->schema([
@@ -1092,8 +1069,10 @@ class EditProduct extends EditRecord
     private function changeProductTypeAction(): Action
     {
         return Action::make('change_product_type')
-            ->label('Тип товару')
-            ->icon('heroicon-o-squares-2x2')
+            ->label('Змінити')
+            ->icon('heroicon-o-pencil-square')
+            ->tooltip('Змінити сімейство товару')
+            ->color('gray')
             ->visible(fn (): bool => $this->canManageProductStructure())
             ->schema([
                 Select::make('product_type_id')

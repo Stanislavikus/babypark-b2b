@@ -148,13 +148,13 @@ final class MasterProductCardJourneyTest extends TestCase
             ])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertActionVisible('add_media')
+            ->assertSee('Медіа')
             ->assertSee('Простий товар');
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->callAction('add_media', [
-                'files' => [UploadedFile::fake()->image('simple-journey.jpg', 1200, 900)],
+            ->call('addUploadedMediaFromForm', [
+                UploadedFile::fake()->image('simple-journey.jpg', 1200, 900),
             ])
             ->assertNotified();
 
@@ -260,8 +260,8 @@ final class MasterProductCardJourneyTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->assertActionVisible('promote_variants')
-            ->callAction('promote_variants', [
+            ->assertActionVisible(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'))
+            ->callAction(TestAction::make('promote_variants')->schemaComponent('product_variant_actions'), [
                 'axis_binding_id' => $color->id,
                 'existing_value' => 'black',
                 'additional_values' => ['white'],
@@ -283,11 +283,11 @@ final class MasterProductCardJourneyTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->callAction('add_media', [
-                'files' => [UploadedFile::fake()->image('configurable-journey.jpg', 1200, 900)],
+            ->call('addUploadedMediaFromForm', [
+                UploadedFile::fake()->image('configurable-journey.jpg', 1200, 900),
             ])
             ->assertNotified()
-            ->assertActionVisible('assign_variant_media');
+            ->assertActionVisible(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'));
 
         $media = ProductMedia::withoutWorkspaceScope()
             ->where('product_id', $product->id)
@@ -296,7 +296,7 @@ final class MasterProductCardJourneyTest extends TestCase
 
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
-            ->callAction('assign_variant_media', [
+            ->callAction(TestAction::make('assign_variant_media')->schemaComponent('product_media_manage_actions'), [
                 'media_asset_ids' => [$media->media_asset_id],
                 'variant_ids' => [$target->id],
                 'only_without_specific' => false,

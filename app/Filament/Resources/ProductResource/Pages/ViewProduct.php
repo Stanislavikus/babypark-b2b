@@ -16,7 +16,11 @@ class ViewProduct extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
+            EditAction::make()
+                ->url(fn (): string => ProductResource::getUrl('edit', [
+                    'record' => $this->getRecord(),
+                    ...ProductResource::listContextParameters(),
+                ])),
         ];
     }
 }
