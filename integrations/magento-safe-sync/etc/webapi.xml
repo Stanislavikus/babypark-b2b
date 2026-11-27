@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <route url="/V1/safe-sync/handshake" method="GET">
+        <service class="B2BPlatform\MagentoSafeSync\Api\HandshakeManagementInterface" method="handshake"/>
+        <resources>
+            <resource ref="Magento_Catalog::products"/>
+        </resources>
+    </route>
+    <route url="/V1/safe-sync/products/:logicalEntityId" method="GET">
+        <service class="B2BPlatform\MagentoSafeSync\Api\ProductReadManagementInterface" method="readProduct"/>
+        <resources>
+            <resource ref="Magento_Catalog::products"/>
+        </resources>
+    </route>
+    <route url="/V1/safe-sync/products/:logicalEntityId" method="PUT">
+        <service class="B2BPlatform\MagentoSafeSync\Api\ProductWriteManagementInterface" method="writeSimpleProduct"/>
+        <resources>
+            <resource ref="Magento_Catalog::products"/>
+        </resources>
+    </route>
+</routes>

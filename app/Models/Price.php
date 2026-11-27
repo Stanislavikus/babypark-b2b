@@ -5,6 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Legacy per-customer price rows from the pre–PriceList migration era.
+ *
+ * Read-only compatibility model — active runtime pricing, display, cart, and order
+ * paths must use PriceResolver / PriceListItem instead.
+ */
 class Price extends Model
 {
     public const CREATED_AT = null;
@@ -12,7 +18,7 @@ class Price extends Model
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
-        'contractor_id',
+        'customer_id',
         'variant_id',
         'price',
         'price_with_vat',
@@ -34,9 +40,9 @@ class Price extends Model
         ];
     }
 
-    public function contractor(): BelongsTo
+    public function customer(): BelongsTo
     {
-        return $this->belongsTo(Contractor::class);
+        return $this->belongsTo(Customer::class);
     }
 
     public function variant(): BelongsTo

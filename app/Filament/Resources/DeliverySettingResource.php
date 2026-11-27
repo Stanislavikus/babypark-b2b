@@ -2,21 +2,31 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DeliverySettingResource\Pages;
+use App\Filament\Resources\DeliverySettingResource\Pages\CreateDeliverySetting;
+use App\Filament\Resources\DeliverySettingResource\Pages\EditDeliverySetting;
+use App\Filament\Resources\DeliverySettingResource\Pages\ListDeliverySettings;
 use App\Models\DeliverySetting;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class DeliverySettingResource extends Resource
 {
     protected static ?string $model = DeliverySetting::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-truck';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?string $navigationGroup = 'Система';
+    protected static string|\UnitEnum|null $navigationGroup = 'Система';
 
     protected static ?string $modelLabel = 'доставка';
 
@@ -26,17 +36,17 @@ class DeliverySettingResource extends Resource
 
     protected static ?int $navigationSort = 12;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Налаштування доставки')->schema([
-                    Forms\Components\TextInput::make('city')
+        return $schema
+            ->components([
+                Section::make('Налаштування доставки')->schema([
+                    TextInput::make('city')
                         ->label('Місто / Регіон')
                         ->required()
                         ->maxLength(255),
 
-                    Forms\Components\TextInput::make('free_from')
+                    TextInput::make('free_from')
                         ->label('Безкоштовно від (грн)')
                         ->numeric()
                         ->required()
@@ -44,7 +54,7 @@ class DeliverySettingResource extends Resource
                         ->step(100)
                         ->prefix('₴'),
 
-                    Forms\Components\TextInput::make('delivery_price')
+                    TextInput::make('delivery_price')
                         ->label('Вартість доставки (грн)')
                         ->numeric()
                         ->required()
@@ -52,13 +62,13 @@ class DeliverySettingResource extends Resource
                         ->step(10)
                         ->prefix('₴'),
 
-                    Forms\Components\TextInput::make('sort_order')
+                    TextInput::make('sort_order')
                         ->label('Порядок сортування')
                         ->numeric()
                         ->default(0)
                         ->minValue(0),
 
-                    Forms\Components\Toggle::make('is_active')
+                    Toggle::make('is_active')
                         ->label('Активна')
                         ->default(true)
                         ->inline(false),
@@ -70,42 +80,42 @@ class DeliverySettingResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('city')
+                TextColumn::make('city')
                     ->label('Місто / Регіон')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('free_from')
+                TextColumn::make('free_from')
                     ->label('Безкоштовно від')
-                    ->formatStateUsing(fn ($state) => '₴ ' . number_format((float) $state, 0, '.', ' '))
+                    ->formatStateUsing(fn ($state) => '₴ '.number_format((float) $state, 0, '.', ' '))
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('delivery_price')
+                TextColumn::make('delivery_price')
                     ->label('Вартість доставки')
-                    ->formatStateUsing(fn ($state) => '₴ ' . number_format((float) $state, 0, '.', ' '))
+                    ->formatStateUsing(fn ($state) => '₴ '.number_format((float) $state, 0, '.', ' '))
                     ->sortable(),
 
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Активна')
                     ->boolean()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('sort_order')
+                TextColumn::make('sort_order')
                     ->label('Порядок')
                     ->sortable(),
             ])
             ->defaultSort('sort_order')
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Активна'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -113,9 +123,9 @@ class DeliverySettingResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListDeliverySettings::route('/'),
-            'create' => Pages\CreateDeliverySetting::route('/create'),
-            'edit'   => Pages\EditDeliverySetting::route('/{record}/edit'),
+            'index' => ListDeliverySettings::route('/'),
+            'create' => CreateDeliverySetting::route('/create'),
+            'edit' => EditDeliverySetting::route('/{record}/edit'),
         ];
     }
 }

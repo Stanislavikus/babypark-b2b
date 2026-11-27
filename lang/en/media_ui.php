@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'item' => 'Media file',
+    'one_image' => '1 image',
+    'zero_images' => '0 images',
+    'drop_heading' => 'Drag an image here',
+    'drop_subheading' => 'or use one of the ways to add an image',
+    'choose_assets' => 'Choose from media library',
+    'add_from_url' => 'Add from URL',
+    'image_url' => 'Image URL',
+    'drop_short' => 'Drag an image here or upload a file',
+    'section' => 'Media',
+    'library' => 'Media library',
+    'select_existing' => 'Choose from media library',
+    'cancel_pending_image' => 'Cancel image selection',
+    'upload' => 'Upload',
+    'drop_label' => 'Drag an image here or choose a file',
+    'upload_hint' => 'JPEG, PNG, GIF, WebP, AVIF · up to 20 MiB / 25 MP',
+    'library_hint' => 'Choose an existing image from the library. Files can be reused.',
+    'no_logo' => 'No logo',
+    'reused_notice' => 'This image is already in the media library. The existing file was used.',
+    'duplicate_notice' => 'This image already exists in the media library. Choose another file.',
+    'saved_one' => 'Image saved',
+    'unchanged_other_saved' => 'Image is already up to date. Other changes were saved.',
+    'unchanged_no_changes' => 'Image is already up to date. No other changes were made.',
+    'saved_many' => 'Images saved',
+];

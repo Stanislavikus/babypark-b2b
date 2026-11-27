@@ -8,6 +8,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -18,7 +19,7 @@ class User extends Authenticatable implements FilamentUser
     use HasFactory, HasRoles, Notifiable;
 
     protected $fillable = [
-        'contractor_id',
+        'customer_id',
         'name',
         'email',
         'phone',
@@ -49,9 +50,14 @@ class User extends Authenticatable implements FilamentUser
         return $this->vacation_until !== null && $this->vacation_until->isFuture();
     }
 
-    public function contractor(): BelongsTo
+    public function customer(): BelongsTo
     {
-        return $this->belongsTo(Contractor::class);
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function workspaceUsers(): HasMany
+    {
+        return $this->hasMany(WorkspaceUser::class);
     }
 
     public function canAccessPanel(Panel $panel): bool
@@ -59,6 +65,7 @@ class User extends Authenticatable implements FilamentUser
         return $this->is_active && in_array($this->role, [
             UserRole::Admin,
             UserRole::Manager,
+            UserRole::Merchandiser,
             UserRole::Director,
             UserRole::Programmer,
         ], true);

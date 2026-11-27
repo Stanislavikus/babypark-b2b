@@ -1,0 +1,218 @@
+{
+    "campaign": "Magento V1 P-02 url_key / URL rewrite side effects",
+    "date": "2026-09-19",
+    "authoritative_base": "ba2600b5d029d08669d7afa6390dc4ce9a442101",
+    "result": "PASS",
+    "contract": {
+        "url_key_non_empty_change_restore": "certified_via_stock_product_put",
+        "url_key_clear_reset": "unsupported_fail_closed",
+        "url_path_write": "unsupported_read_only_projection",
+        "generic_field_mapping_for_url_key_url_path": "blocked",
+        "configurable_child_product_level_routing_projection": "blocked",
+        "rewrite_graph_owner": "Magento/provider-owned derived state",
+        "rewrite_ownership_ledger": "not_required",
+        "public_adobe_products_export_live_flipped": false
+    },
+    "magento_source_contract": {
+        "single_product_save_rewrite_observer": "Magento_CatalogUrlRewrite Observer/ProductProcessUrlRewriteSavingObserver.php on catalog_product_save_after",
+        "url_key_autogeneration_observer": "Magento_CatalogUrlRewrite Observer/ProductUrlKeyAutogeneratorObserver.php on catalog_product_save_before",
+        "transaction_boundary": "Magento Framework resource-model save transaction contains model afterSave/event dispatch before commit",
+        "mass_visibility_observer": "ProcessUrlRewriteOnChangeProductVisibilityObserver is outside P-02 single Product PUT scope"
+    },
+    "real_target_effective_behavior": {
+        "configured_store_view": "default",
+        "rewrite_scope_observation": "store_view_scoped_for_certified_save_path",
+        "rewrite_scope_evidence": "Joolz url_key changed only in default while babypark_ua, babypark_ru and babypark_en retained baseline url_key/routes during the mutation",
+        "redirect_history_observation": "not_retained_for_certified_save_path",
+        "redirect_history_evidence": "old canonical A route was absent during B and temporary B route was absent after restore on both certified products"
+    },
+    "products": [
+        {
+            "sku": "Універсальна коляска Joolz Day5",
+            "entity_id": 3,
+            "baseline_url_key": "universal-na-koljaska-joolz-day5",
+            "temporary_url_key": "p02-cert-joolz-day5-20260919",
+            "change": {
+                "result": {
+                    "state": "known_applied",
+                    "reason": "stock_write_verified",
+                    "writes": 1,
+                    "gets": 1
+                },
+                "remote_url_key": null,
+                "visible_store_url_keys": {
+                    "default": "p02-cert-joolz-day5-20260919",
+                    "babypark_ua": "universal-na-koljaska-joolz-day5",
+                    "babypark_ru": "universal-na-koljaska-joolz-day5",
+                    "babypark_en": "universal-na-koljaska-joolz-day5"
+                },
+                "visible_store_rewrites": {
+                    "default": [
+                        "p02-cert-joolz-day5-20260919.html"
+                    ],
+                    "babypark_ua": [
+                        "universal-na-koljaska-joolz-day5.html",
+                        "ditjachi-koljaski/universal-na-koljaska-joolz-day5.html"
+                    ],
+                    "babypark_ru": [
+                        "universal-na-koljaska-joolz-day5.html",
+                        "detskie-kolyaski/universal-na-koljaska-joolz-day5.html"
+                    ],
+                    "babypark_en": [
+                        "universal-na-koljaska-joolz-day5.html",
+                        "baby-strollers/universal-na-koljaska-joolz-day5.html"
+                    ]
+                }
+            },
+            "restore": {
+                "result": {
+                    "state": "known_applied",
+                    "reason": "stock_write_verified",
+                    "writes": 1,
+                    "gets": 1
+                },
+                "remote_url_key": "universal-na-koljaska-joolz-day5",
+                "visible_store_url_keys": {
+                    "default": "universal-na-koljaska-joolz-day5",
+                    "babypark_ua": "universal-na-koljaska-joolz-day5",
+                    "babypark_ru": "universal-na-koljaska-joolz-day5",
+                    "babypark_en": "universal-na-koljaska-joolz-day5"
+                },
+                "visible_store_rewrites": {
+                    "default": [
+                        "universal-na-koljaska-joolz-day5.html"
+                    ],
+                    "babypark_ua": [
+                        "universal-na-koljaska-joolz-day5.html",
+                        "ditjachi-koljaski/universal-na-koljaska-joolz-day5.html"
+                    ],
+                    "babypark_ru": [
+                        "universal-na-koljaska-joolz-day5.html",
+                        "detskie-kolyaski/universal-na-koljaska-joolz-day5.html"
+                    ],
+                    "babypark_en": [
+                        "universal-na-koljaska-joolz-day5.html",
+                        "baby-strollers/universal-na-koljaska-joolz-day5.html"
+                    ]
+                }
+            }
+        },
+        {
+            "sku": "LO-LAYLA 3IN1 BLACK ONYX",
+            "entity_id": 5,
+            "baseline_url_key": "universal-na-koljaska-lionelo-3-v-1-layla-3in1",
+            "temporary_url_key": "p02-cert-layla-20260919",
+            "change": {
+                "result": {
+                    "state": "known_applied",
+                    "reason": "stock_write_verified",
+                    "writes": 1,
+                    "gets": 1
+                },
+                "remote_url_key": "p02-cert-layla-20260919",
+                "visible_store_url_keys": {
+                    "default": "p02-cert-layla-20260919"
+                },
+                "visible_store_rewrites": {
+                    "default": [
+                        "p02-cert-layla-20260919.html"
+                    ]
+                }
+            },
+            "restore": {
+                "result": {
+                    "state": "known_applied",
+                    "reason": "stock_write_verified",
+                    "writes": 1,
+                    "gets": 1
+                },
+                "remote_url_key": "universal-na-koljaska-lionelo-3-v-1-layla-3in1",
+                "visible_store_url_keys": {
+                    "default": "universal-na-koljaska-lionelo-3-v-1-layla-3in1"
+                },
+                "visible_store_rewrites": {
+                    "default": [
+                        "universal-na-koljaska-lionelo-3-v-1-layla-3in1.html"
+                    ]
+                }
+            }
+        }
+    ],
+    "collision": {
+        "target": {
+            "store": "default"
+        },
+        "subject": {
+            "sku": "Універсальна коляска Joolz Day5",
+            "entity_id": 3,
+            "url_key": "universal-na-koljaska-joolz-day5"
+        },
+        "existing_owner": {
+            "sku": "LO-LAYLA 3IN1 BLACK ONYX",
+            "entity_id": 5,
+            "url_key": "universal-na-koljaska-lionelo-3-v-1-layla-3in1"
+        },
+        "attempt_result": {
+            "state": "unknown_or_ambiguous",
+            "reason": "stock_write_http_rejected_or_failed",
+            "writes": 1,
+            "gets": 1,
+            "remote_get_classification": "found"
+        },
+        "postcondition": {
+            "subject_url_key_unchanged": true,
+            "owner_url_key_unchanged": true,
+            "subject_route_unchanged": true,
+            "owner_route_unchanged": true
+        }
+    },
+    "final_independent_reads": {
+        "joolz": {
+            "entity_id": 3,
+            "url_key": "universal-na-koljaska-joolz-day5",
+            "visible_store_url_keys": {
+                "default": "universal-na-koljaska-joolz-day5",
+                "babypark_ua": "universal-na-koljaska-joolz-day5",
+                "babypark_ru": "universal-na-koljaska-joolz-day5",
+                "babypark_en": "universal-na-koljaska-joolz-day5"
+            },
+            "visible_store_rewrites": {
+                "default": [
+                    "universal-na-koljaska-joolz-day5.html"
+                ],
+                "babypark_ua": [
+                    "universal-na-koljaska-joolz-day5.html",
+                    "ditjachi-koljaski/universal-na-koljaska-joolz-day5.html"
+                ],
+                "babypark_ru": [
+                    "universal-na-koljaska-joolz-day5.html",
+                    "detskie-kolyaski/universal-na-koljaska-joolz-day5.html"
+                ],
+                "babypark_en": [
+                    "universal-na-koljaska-joolz-day5.html",
+                    "baby-strollers/universal-na-koljaska-joolz-day5.html"
+                ]
+            }
+        },
+        "layla": {
+            "entity_id": 5,
+            "url_key": "universal-na-koljaska-lionelo-3-v-1-layla-3in1",
+            "visible_store_url_keys": {
+                "default": "universal-na-koljaska-lionelo-3-v-1-layla-3in1"
+            },
+            "visible_store_rewrites": {
+                "default": [
+                    "universal-na-koljaska-lionelo-3-v-1-layla-3in1.html"
+                ]
+            }
+        }
+    },
+    "conclusion": {
+        "p02_cleared": true,
+        "merchant_mapping_opened": false,
+        "canonical_slug_materialized": false,
+        "temporary_remote_product_created": false,
+        "temporary_routes_remaining": false,
+        "collision_left_partial_mutation": false
+    }
+}
